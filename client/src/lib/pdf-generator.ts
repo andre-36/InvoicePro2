@@ -1,0 +1,240 @@
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { formatDate, formatCurrency } from "@/lib/utils";
+
+interface InvoiceItem {
+  description: string;
+  quantity: string;
+  price: string;
+  taxRate: string;
+  subtotal: string;
+  tax: string;
+  total: string;
+}
+
+interface Client {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  taxNumber?: string;
+}
+
+interface Invoice {
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  status: string;
+  subtotal: string;
+  tax: string;
+  discount: string;
+  total: string;
+  notes?: string;
+}
+
+interface PDFData {
+  invoice: Invoice;
+  items: InvoiceItem[];
+  client: Client;
+}
+
+export async function generatePDF(data: PDFData) {
+  const { invoice, items, client } = data;
+  
+  // Create a new PDF document
+  const doc = new jsPDF();
+  
+  // Add fonts
+  doc.setFont("helvetica", "normal");
+  
+  // Set company info
+  doc.setFontSize(24);
+  doc.setTextColor(79, 70, 229); // primary color
+  doc.text("InvoiceHub", 20, 20);
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text("123 Main Street", 20, 30);
+  doc.text("Anytown, ST 12345", 20, 35);
+  doc.text("Phone: (123) 456-7890", 20, 40);
+  doc.text("Email: billing@invoicehub.com", 20, 45);
+  
+  // Add invoice title and number
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`INVOICE: ${invoice.invoiceNumber}`, 140, 20);
+  
+  // Add invoice status
+  doc.setFontSize(12);
+  
+  let statusColor;
+  switch (invoice.status) {
+    case "paid":
+      statusColor = [16, 185, 129]; // green
+      break;
+    case "sent":
+      statusColor = [245, 158, 11]; // amber
+      break;
+    case "overdue":
+      statusColor = [220, 38, 38]; // red
+      break;
+    default:
+      statusColor = [100, 100, 100]; // gray
+  }
+  
+  doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+  
+  // Capitalize first letter of status
+  const statusText = invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1);
+  doc.text(`Status: ${statusText}`, 140, 30);
+  
+  // Reset text color to black
+  doc.setTextColor(0, 0, 0);
+  
+  // Add invoice dates
+  doc.setFontSize(10);
+  doc.text(`Issue Date: ${invoice.issueDate}`, 140, 40);
+  doc.text(`Due Date: ${invoice.dueDate}`, 140, 45);
+  
+  // Add a separator line
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(230, 230, 230);
+  doc.line(20, 55, 190, 55);
+  
+  // Add bill to section
+  doc.setFontSize(12);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.text("Bill To:", 20, 65);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(client.name, 20, 75);
+  doc.text(client.email, 20, 80);
+  
+  let yPosition = 85;
+  
+  if (client.phone) {
+    doc.text(client.phone, 20, yPosition);
+    yPosition += 5;
+  }
+  
+  if (client.address) {
+    const addressLines = client.address.split("\n");
+    addressLines.forEach(line => {
+      doc.text(line, 20, yPosition);
+      yPosition += 5;
+    });
+  }
+  
+  if (client.taxNumber) {
+    doc.text(`Tax Number: ${client.taxNumber}`, 20, yPosition);
+  }
+  
+  // Add invoice items table
+  const tableData = items.map(item => [
+    item.description,
+    item.quantity,
+    formatCurrency(item.price),
+    `${item.taxRate}%`,
+    formatCurrency(item.total)
+  ]);
+  
+  autoTable(doc, {
+    startY: 110,
+    head: [["Description", "Quantity", "Unit Price", "Tax Rate", "Total"]],
+    body: tableData,
+    theme: "striped",
+    styles: {
+      fontSize: 10,
+      cellPadding: 5,
+    },
+    headStyles: {
+      fillColor: [79, 70, 229], // primary color
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    footStyles: {
+      fillColor: [240, 240, 240],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold',
+    }
+  });
+  
+  // Add totals
+  let finalY = (doc as any).lastAutoTable.finalY + 10;
+  
+  // Summary box
+  const boxX = 120;
+  const boxWidth = 70;
+  
+  doc.setFillColor(245, 245, 245);
+  doc.setDrawColor(220, 220, 220);
+  doc.roundedRect(boxX, finalY, boxWidth, 40, 2, 2, 'FD');
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  
+  // Subtotal
+  doc.text("Subtotal:", boxX + 5, finalY + 10);
+  doc.setTextColor(0, 0, 0);
+  doc.text(formatCurrency(invoice.subtotal), boxX + boxWidth - 5, finalY + 10, { align: "right" });
+  
+  // Tax
+  doc.setTextColor(100, 100, 100);
+  doc.text("Tax:", boxX + 5, finalY + 20);
+  doc.setTextColor(0, 0, 0);
+  doc.text(formatCurrency(invoice.tax), boxX + boxWidth - 5, finalY + 20, { align: "right" });
+  
+  // Discount (if applicable)
+  if (parseFloat(invoice.discount) > 0) {
+    doc.setTextColor(100, 100, 100);
+    doc.text("Discount:", boxX + 5, finalY + 30);
+    doc.setTextColor(220, 38, 38); // red for discount
+    doc.text(`-${formatCurrency(invoice.discount)}`, boxX + boxWidth - 5, finalY + 30, { align: "right" });
+    
+    // Move finalY for total
+    finalY += 10;
+  }
+  
+  // Line before total
+  doc.setDrawColor(200, 200, 200);
+  doc.line(boxX + 5, finalY + 30, boxX + boxWidth - 5, finalY + 30);
+  
+  // Total
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text("Total:", boxX + 5, finalY + 40);
+  doc.text(formatCurrency(invoice.total), boxX + boxWidth - 5, finalY + 40, { align: "right" });
+  
+  // Add notes
+  if (invoice.notes) {
+    finalY += 50;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Notes:", 20, finalY);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    
+    const notesLines = doc.splitTextToSize(invoice.notes, 170);
+    doc.text(notesLines, 20, finalY + 10);
+  }
+  
+  // Add footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generated on ${new Date().toLocaleDateString()} by InvoiceHub`, 20, 285);
+    doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+  }
+  
+  // Save the PDF
+  const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
+  doc.save(filename);
+  
+  return filename;
+}
