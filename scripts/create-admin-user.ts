@@ -33,8 +33,7 @@ async function createAdminUser() {
       address: "123 Main St",
       phone: "555-1234",
       email: "store@example.com",
-      currency: "USD",
-      userId: adminUser.id,
+      isActive: true
     });
     
     console.log("Default store created successfully:", store);

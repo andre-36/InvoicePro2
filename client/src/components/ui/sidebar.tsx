@@ -36,7 +36,7 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("POST", "/api/logout", {});
+      await apiRequest("POST", "/api/auth/logout", {});
       window.location.reload();
     } catch (error) {
       toast({
@@ -93,161 +93,152 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
           {/* Navigation */}
           <nav className="flex-1 pt-4 pb-4 overflow-y-auto">
             <div className="px-2 space-y-1">
-              <Link href="/dashboard">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/dashboard") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <BarChart2 className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/dashboard") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Dashboard</span>
-                </a>
+              <Link 
+                href="/dashboard"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/dashboard") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <BarChart2 className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/dashboard") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Dashboard</span>
               </Link>
               
-              <Link href="/invoices">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/invoices") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <FileText className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/invoices") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Invoices</span>
-                </a>
+              <Link 
+                href="/invoices"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/invoices") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <FileText className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/invoices") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Invoices</span>
               </Link>
               
-              <Link href="/clients">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/clients") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <Users className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/clients") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Clients</span>
-                </a>
+              <Link 
+                href="/clients"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/clients") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <Users className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/clients") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Clients</span>
               </Link>
               
-              <Link href="/transactions">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/transactions") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <DollarSign className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/transactions") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Transactions</span>
-                </a>
+              <Link 
+                href="/transactions"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/transactions") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <DollarSign className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/transactions") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Transactions</span>
               </Link>
               
-              <Link href="/reports">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/reports") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <PieChart className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/reports") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Reports</span>
-                </a>
+              <Link 
+                href="/reports"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/reports") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <PieChart className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/reports") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Reports</span>
               </Link>
               
-              <Link href="/products">
-                <a 
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/products") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  )}
-                >
-                  <Package2 className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/products") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                  )} />
-                  <span>Products</span>
-                </a>
+              <Link 
+                href="/products"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/products") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <Package2 className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/products") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Products</span>
               </Link>
             </div>
             
             <div className="mt-8">
               <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Settings</h3>
               <div className="mt-2 px-2 space-y-1">
-                <Link href="/settings">
-                  <a 
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/settings") 
-                        ? "text-white bg-primary" 
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                    )}
-                  >
-                    <Settings className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/settings") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                    )} />
-                    <span>General</span>
-                  </a>
+                <Link 
+                  href="/settings"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/settings") 
+                      ? "text-white bg-primary" 
+                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  <Settings className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/settings") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  )} />
+                  <span>General</span>
                 </Link>
                 
-                <Link href="/settings/payment-methods">
-                  <a 
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/settings/payment-methods") 
-                        ? "text-white bg-primary" 
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                    )}
-                  >
-                    <CreditCard className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/settings/payment-methods") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                    )} />
-                    <span>Payment Methods</span>
-                  </a>
+                <Link 
+                  href="/settings/payment-methods"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/settings/payment-methods") 
+                      ? "text-white bg-primary" 
+                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  <CreditCard className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/settings/payment-methods") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  )} />
+                  <span>Payment Methods</span>
                 </Link>
                 
-                <Link href="/settings/account">
-                  <a 
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/settings/account") 
-                        ? "text-white bg-primary" 
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                    )}
-                  >
-                    <UserCog className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/settings/account") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
-                    )} />
-                    <span>Account</span>
-                  </a>
+                <Link 
+                  href="/settings/account"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/settings/account") 
+                      ? "text-white bg-primary" 
+                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  <UserCog className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/settings/account") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  )} />
+                  <span>Account</span>
                 </Link>
               </div>
             </div>
