@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: number;
@@ -79,26 +82,68 @@ export function InvoiceItemRow({
     onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
   };
   
+  const [open, setOpen] = useState(false)
+
   return (
     <tr>
       <td className="px-4 py-3">
         <div className="space-y-2">
-          <Select
-            value={productId}
-            onValueChange={handleProductChange}
-          >
-            <SelectTrigger className="w-full text-sm">
-              <SelectValue placeholder="Select a product or enter details manually" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">Enter manually</SelectItem>
-              {products.map((product) => (
-                <SelectItem key={product.id} value={product.id.toString()}>
-                  {product.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between text-sm"
+              >
+                {productId && productId !== "0" 
+                  ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
+                  : "Select a product or enter manually"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0">
+              <Command>
+                <CommandInput placeholder="Search product..." className="h-9" />
+                <CommandEmpty>No product found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="manual"
+                    onSelect={() => {
+                      handleProductChange("0");
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        productId === "0" ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    Enter manually
+                  </CommandItem>
+                  {products.map((product) => (
+                    <CommandItem
+                      key={product.id}
+                      value={product.name}
+                      onSelect={() => {
+                        handleProductChange(product.id.toString());
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          productId === product.id.toString() ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {product.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
