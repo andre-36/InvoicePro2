@@ -73,8 +73,11 @@ export function TopClientsList() {
       <CardHeader className="px-5 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-gray-900">Top Clients</CardTitle>
-          <Link href="/clients">
-            <a className="text-sm font-medium text-primary hover:text-primary/80">View All</a>
+          <Link 
+            href="/clients" 
+            className="text-sm font-medium text-primary hover:text-primary/80"
+          >
+            View All
           </Link>
         </div>
       </CardHeader>
@@ -87,10 +90,11 @@ export function TopClientsList() {
                   {client.initials}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link href={`/clients/${client.id}`}>
-                    <a className="text-sm font-medium text-gray-900 hover:underline truncate">
-                      {client.name}
-                    </a>
+                  <Link 
+                    href={`/clients/${client.id}`}
+                    className="text-sm font-medium text-gray-900 hover:underline truncate block"
+                  >
+                    {client.name}
                   </Link>
                   <p className="text-xs text-gray-500 truncate">{client.email}</p>
                 </div>

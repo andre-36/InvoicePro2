@@ -96,8 +96,11 @@ export function RecentInvoicesTable() {
       <CardHeader className="px-5 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-gray-900">Recent Invoices</CardTitle>
-          <Link href="/invoices">
-            <a className="text-sm font-medium text-primary hover:text-primary/80">View All</a>
+          <Link 
+            href="/invoices" 
+            className="text-sm font-medium text-primary hover:text-primary/80"
+          >
+            View All
           </Link>
         </div>
       </CardHeader>
@@ -116,8 +119,11 @@ export function RecentInvoicesTable() {
             {data.map((invoice) => (
               <tr key={invoice.id} className="hover:bg-gray-50">
                 <td className="px-5 py-4 whitespace-nowrap text-sm font-medium text-primary">
-                  <Link href={`/invoices/${invoice.id}`}>
-                    <a>{invoice.invoiceNumber}</a>
+                  <Link 
+                    href={`/invoices/${invoice.id}`}
+                    className="hover:underline"
+                  >
+                    {invoice.invoiceNumber}
                   </Link>
                 </td>
                 <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-800">{invoice.clientName}</td>
