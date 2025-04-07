@@ -52,12 +52,13 @@ function validateRequestBody<T extends z.ZodTypeAny>(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session configuration
+  // Session configuration with PostgreSQL store
   app.use(
     session({
       secret: env.SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
+      store: storage.sessionStore,
       cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,

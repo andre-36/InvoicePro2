@@ -14,8 +14,14 @@ import {
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog
 } from "../shared/schema";
 
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+
 // Define the IStorage interface for all database operations
 export interface IStorage {
+  // Session store for Express
+  sessionStore: session.Store;
+  
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -173,6 +179,17 @@ export type BatchProfitabilityData = {
 };
 
 export class DatabaseStorage implements IStorage {
+  // Session store for PostgreSQL
+  sessionStore: session.Store;
+  
+  constructor() {
+    const PostgresStore = connectPg(session);
+    this.sessionStore = new PostgresStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true
+    });
+  }
+  
   // User methods
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
