@@ -1,906 +1,1415 @@
+import { eq, and, desc, gte, lt, sql, isNull, inArray } from "drizzle-orm";
+import { db, withTransaction } from "./db";
 import {
-  clients, Client, InsertClient,
-  invoices, Invoice, InsertInvoice,
-  invoiceItems, InvoiceItem, InsertInvoiceItem,
-  products, Product, InsertProduct,
-  transactions, Transaction, InsertTransaction,
-  users, User, InsertUser,
-  InvoiceWithItems, ClientWithInvoices,
-} from "@shared/schema";
+  users, clients, products, productBatches, invoices, invoiceItems, 
+  invoiceItemBatches, quotations, quotationItems, transactions, stores,
+  settings, categories, importExportLogs,
+  
+  type User, type InsertUser, type Store, type InsertStore,
+  type Client, type InsertClient, type Product, type InsertProduct,
+  type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
+  type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
+  type Transaction, type InsertTransaction, type Category, type InsertCategory,
+  type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog
+} from "../shared/schema";
 
-// modify the interface with any CRUD methods
-// you might need
+// Define the IStorage interface for all database operations
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: number): Promise<void>;
+  
+  // Store methods
+  getStore(id: number): Promise<Store | undefined>;
+  getStores(): Promise<Store[]>;
+  createStore(store: InsertStore): Promise<Store>;
+  updateStore(id: number, store: Partial<InsertStore>): Promise<Store>;
+  deleteStore(id: number): Promise<void>;
   
   // Client methods
   getClient(id: number): Promise<Client | undefined>;
-  getClients(userId: number): Promise<Client[]>;
+  getClients(storeId: number): Promise<Client[]>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   
+  // Category methods
+  getCategory(id: number): Promise<Category | undefined>;
+  getCategories(): Promise<Category[]>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
+  deleteCategory(id: number): Promise<void>;
+  
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
-  getProducts(userId: number): Promise<Product[]>;
+  getProducts(storeId?: number): Promise<Product[]>;
+  getProductsWithLowStock(storeId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   
+  // Product batch methods
+  getProductBatch(id: number): Promise<ProductBatch | undefined>;
+  getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]>;
+  createProductBatch(batch: InsertProductBatch): Promise<ProductBatch>;
+  updateProductBatch(id: number, batch: Partial<InsertProductBatch>): Promise<ProductBatch>;
+  deleteProductBatch(id: number): Promise<void>;
+  
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
-  getInvoiceWithItems(id: number): Promise<InvoiceWithItems | undefined>;
-  getInvoices(userId: number): Promise<Invoice[]>;
-  getRecentInvoices(userId: number, limit: number): Promise<Invoice[]>;
-  getOpenInvoices(userId: number): Promise<Invoice[]>;
-  createInvoice(invoice: InsertInvoice, items: InsertInvoiceItem[]): Promise<Invoice>;
+  getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
+  getInvoices(storeId: number): Promise<Invoice[]>;
+  getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
+  getOpenInvoices(storeId: number): Promise<Invoice[]>;
+  createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
   
-  // Invoice Item methods
-  getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
-  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
-  updateInvoiceItem(id: number, item: Partial<InsertInvoiceItem>): Promise<InvoiceItem>;
-  deleteInvoiceItem(id: number): Promise<void>;
-  deleteInvoiceItems(invoiceId: number): Promise<void>;
+  // Quotation methods
+  getQuotation(id: number): Promise<Quotation | undefined>;
+  getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
+  getQuotations(storeId: number): Promise<Quotation[]>;
+  createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
+  updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation>;
+  convertQuotationToInvoice(id: number): Promise<Invoice>;
+  deleteQuotation(id: number): Promise<void>;
   
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
-  getTransactions(userId: number): Promise<Transaction[]>;
-  getTransactionsByType(userId: number, type: string): Promise<Transaction[]>;
+  getTransactions(storeId: number): Promise<Transaction[]>;
+  getTransactionsByType(storeId: number, type: string): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction>;
   deleteTransaction(id: number): Promise<void>;
   
+  // Settings methods
+  getSetting(storeId: number, key: string): Promise<Setting | undefined>;
+  getSettings(storeId: number): Promise<Setting[]>;
+  setSetting(setting: InsertSetting): Promise<Setting>;
+  deleteSetting(id: number): Promise<void>;
+  
+  // Import/Export methods
+  createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
+  getImportExportLogs(userId: number): Promise<ImportExportLog[]>;
+  
   // Dashboard metrics
-  getDashboardStats(userId: number): Promise<DashboardStats>;
-  getTopClients(userId: number, limit: number): Promise<ClientWithInvoiceSummary[]>;
-  getRevenueOverview(userId: number, months: number): Promise<RevenueData>;
-  getInvoiceStatusSummary(userId: number): Promise<InvoiceStatusSummary>;
+  getDashboardStats(storeId: number): Promise<DashboardStats>;
+  getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]>;
+  getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData>;
+  getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]>;
+  getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
+  getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]>;
 }
 
+// Types for dashboard metrics
 export type DashboardStats = {
-  totalIncome: number;
+  totalRevenue: number;
   totalExpenses: number;
+  totalProfit: number;
   openInvoices: {
     count: number;
     value: number;
   };
   totalClients: number;
+  productsCount: number;
+  lowStockCount: number;
+  salesCount: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+  };
 };
 
-export type ClientWithInvoiceSummary = {
+export type ClientWithSalesStats = {
   id: number;
   name: string;
   email: string;
-  totalValue: number;
   invoiceCount: number;
-  initials: string;
+  totalSpent: number;
+  averageSpend: number;
+  lastPurchaseDate: Date | null;
 };
 
 export type RevenueData = {
-  labels: string[];
-  income: number[];
+  dates: string[];
+  revenue: number[];
   expenses: number[];
+  profit: number[];
 };
 
-export type InvoiceStatusSummary = {
-  paid: number;
-  pending: number;
-  overdue: number;
-  total: number;
+export type ProductPerformanceStats = {
+  id: number;
+  name: string;
+  sku: string;
+  totalSold: number;
+  totalRevenue: number;
+  totalProfit: number;
+  profitMargin: number;
 };
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private clients: Map<number, Client>;
-  private products: Map<number, Product>;
-  private invoices: Map<number, Invoice>;
-  private invoiceItems: Map<number, InvoiceItem>;
-  private transactions: Map<number, Transaction>;
-  private currentUserId: number;
-  private currentClientId: number;
-  private currentProductId: number;
-  private currentInvoiceId: number;
-  private currentInvoiceItemId: number;
-  private currentTransactionId: number;
+export type InventoryValueStats = {
+  totalItems: number;
+  totalValue: number;
+  batchesCount: number;
+  averageCost: number;
+  valueByCategory: Array<{ category: string; value: number }>;
+};
 
-  constructor() {
-    this.users = new Map();
-    this.clients = new Map();
-    this.products = new Map();
-    this.invoices = new Map();
-    this.invoiceItems = new Map();
-    this.transactions = new Map();
-    this.currentUserId = 1;
-    this.currentClientId = 1;
-    this.currentProductId = 1;
-    this.currentInvoiceId = 1;
-    this.currentInvoiceItemId = 1;
-    this.currentTransactionId = 1;
-    
-    // Create default user
-    this.createUser({
-      username: "admin",
-      password: "password",
-      fullName: "Sarah Johnson",
-      email: "sarah@example.com",
-      companyName: "InvoiceHub",
-      address: "123 Main St, City, Country",
-      phone: "123-456-7890",
-      logoUrl: null
-    });
-    
-    // Setup demo data
-    this.setupDemoData();
-  }
+export type BatchProfitabilityData = {
+  productId: number;
+  productName: string;
+  batchNumber: string;
+  capitalCost: number;
+  avgSellingPrice: number;
+  profitMargin: number;
+  soldQuantity: number;
+  totalProfit: number;
+  purchaseDate: Date;
+};
 
+export class DatabaseStorage implements IStorage {
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+  
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+  
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+  
+  // Store methods
+  async getStore(id: number): Promise<Store | undefined> {
+    const [store] = await db.select().from(stores).where(eq(stores.id, id));
+    return store;
+  }
+  
+  async getStores(): Promise<Store[]> {
+    return db.select().from(stores).orderBy(stores.name);
+  }
+  
+  async createStore(store: InsertStore): Promise<Store> {
+    const [newStore] = await db.insert(stores).values(store).returning();
+    return newStore;
+  }
+  
+  async updateStore(id: number, storeData: Partial<InsertStore>): Promise<Store> {
+    const [updatedStore] = await db
+      .update(stores)
+      .set({ ...storeData, updatedAt: new Date() })
+      .where(eq(stores.id, id))
+      .returning();
+    return updatedStore;
+  }
+  
+  async deleteStore(id: number): Promise<void> {
+    await db.delete(stores).where(eq(stores.id, id));
   }
   
   // Client methods
   async getClient(id: number): Promise<Client | undefined> {
-    return this.clients.get(id);
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
   }
   
-  async getClients(userId: number): Promise<Client[]> {
-    return Array.from(this.clients.values()).filter(
-      (client) => client.userId === userId
-    );
+  async getClients(storeId: number): Promise<Client[]> {
+    return db.select().from(clients).where(eq(clients.storeId, storeId)).orderBy(clients.name);
   }
   
   async createClient(client: InsertClient): Promise<Client> {
-    const id = this.currentClientId++;
-    const newClient: Client = { ...client, id };
-    this.clients.set(id, newClient);
+    const [newClient] = await db.insert(clients).values(client).returning();
     return newClient;
   }
   
-  async updateClient(id: number, updates: Partial<InsertClient>): Promise<Client> {
-    const client = this.clients.get(id);
-    if (!client) {
-      throw new Error(`Client with id ${id} not found`);
-    }
-    
-    const updatedClient = { ...client, ...updates };
-    this.clients.set(id, updatedClient);
+  async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
+    const [updatedClient] = await db
+      .update(clients)
+      .set({ ...clientData, updatedAt: new Date() })
+      .where(eq(clients.id, id))
+      .returning();
     return updatedClient;
   }
   
   async deleteClient(id: number): Promise<void> {
-    this.clients.delete(id);
+    await db.delete(clients).where(eq(clients.id, id));
+  }
+  
+  // Category methods
+  async getCategory(id: number): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category;
+  }
+  
+  async getCategories(): Promise<Category[]> {
+    return db.select().from(categories).orderBy(categories.name);
+  }
+  
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [newCategory] = await db.insert(categories).values(category).returning();
+    return newCategory;
+  }
+  
+  async updateCategory(id: number, categoryData: Partial<InsertCategory>): Promise<Category> {
+    const [updatedCategory] = await db
+      .update(categories)
+      .set({ ...categoryData, updatedAt: new Date() })
+      .where(eq(categories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+  
+  async deleteCategory(id: number): Promise<void> {
+    await db.delete(categories).where(eq(categories.id, id));
   }
   
   // Product methods
   async getProduct(id: number): Promise<Product | undefined> {
-    return this.products.get(id);
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
   }
   
-  async getProducts(userId: number): Promise<Product[]> {
-    return Array.from(this.products.values()).filter(
-      (product) => product.userId === userId
-    );
+  async getProducts(storeId?: number): Promise<Product[]> {
+    const query = db.select().from(products).where(eq(products.isActive, true));
+    
+    // If storeId is provided, we filter only products that have batches in the specified store
+    if (storeId) {
+      const productsInStore = await db.execute(sql`
+        SELECT DISTINCT p.*
+        FROM ${products} p
+        JOIN ${productBatches} pb ON p.id = pb.product_id
+        WHERE pb.store_id = ${storeId} AND p.is_active = true
+        ORDER BY p.name
+      `);
+      return productsInStore;
+    }
+    
+    return query.orderBy(products.name);
   }
   
-  async createProduct(product: InsertProduct): Promise<Product> {
-    const id = this.currentProductId++;
-    const newProduct: Product = { ...product, id };
-    this.products.set(id, newProduct);
+  async getProductsWithLowStock(storeId: number): Promise<Product[]> {
+    const lowStockProducts = await db.execute(sql`
+      SELECT p.*, 
+             SUM(pb.remaining_quantity) as total_quantity
+      FROM ${products} p
+      JOIN ${productBatches} pb ON p.id = pb.product_id
+      WHERE pb.store_id = ${storeId} AND p.is_active = true
+      GROUP BY p.id
+      HAVING SUM(pb.remaining_quantity) <= p.min_stock
+      ORDER BY p.name
+    `);
+    return lowStockProducts;
+  }
+  
+  async createProduct(productData: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(productData).returning();
     return newProduct;
   }
   
-  async updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product> {
-    const product = this.products.get(id);
-    if (!product) {
-      throw new Error(`Product with id ${id} not found`);
-    }
-    
-    const updatedProduct = { ...product, ...updates };
-    this.products.set(id, updatedProduct);
+  async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
+    const [updatedProduct] = await db
+      .update(products)
+      .set({ ...productData, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
     return updatedProduct;
   }
   
   async deleteProduct(id: number): Promise<void> {
-    this.products.delete(id);
+    await db.delete(products).where(eq(products.id, id));
+  }
+  
+  // Product batch methods
+  async getProductBatch(id: number): Promise<ProductBatch | undefined> {
+    const [batch] = await db.select().from(productBatches).where(eq(productBatches.id, id));
+    return batch;
+  }
+  
+  async getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]> {
+    return db
+      .select()
+      .from(productBatches)
+      .where(
+        and(
+          eq(productBatches.productId, productId),
+          eq(productBatches.storeId, storeId)
+        )
+      )
+      .orderBy(productBatches.purchaseDate);
+  }
+  
+  async createProductBatch(batchData: InsertProductBatch): Promise<ProductBatch> {
+    const [newBatch] = await db.insert(productBatches).values(batchData).returning();
+    return newBatch;
+  }
+  
+  async updateProductBatch(id: number, batchData: Partial<InsertProductBatch>): Promise<ProductBatch> {
+    const [updatedBatch] = await db
+      .update(productBatches)
+      .set({ ...batchData, updatedAt: new Date() })
+      .where(eq(productBatches.id, id))
+      .returning();
+    return updatedBatch;
+  }
+  
+  async deleteProductBatch(id: number): Promise<void> {
+    await db.delete(productBatches).where(eq(productBatches.id, id));
   }
   
   // Invoice methods
   async getInvoice(id: number): Promise<Invoice | undefined> {
-    return this.invoices.get(id);
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
   }
   
-  async getInvoiceWithItems(id: number): Promise<InvoiceWithItems | undefined> {
-    const invoice = this.invoices.get(id);
-    if (!invoice) return undefined;
+  async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: InvoiceItem[]; client?: Client } | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
     
-    const items = await this.getInvoiceItems(id);
-    const client = await this.getClient(invoice.clientId);
-    
-    if (!client) return undefined;
-    
-    return { ...invoice, items, client };
-  }
-  
-  async getInvoices(userId: number): Promise<Invoice[]> {
-    return Array.from(this.invoices.values()).filter(
-      (invoice) => invoice.userId === userId
-    );
-  }
-  
-  async getRecentInvoices(userId: number, limit: number): Promise<Invoice[]> {
-    return Array.from(this.invoices.values())
-      .filter(invoice => invoice.userId === userId)
-      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())
-      .slice(0, limit);
-  }
-  
-  async getOpenInvoices(userId: number): Promise<Invoice[]> {
-    return Array.from(this.invoices.values()).filter(
-      (invoice) => invoice.userId === userId && 
-        (invoice.status === 'sent' || invoice.status === 'overdue')
-    );
-  }
-  
-  async createInvoice(invoice: InsertInvoice, items: InsertInvoiceItem[]): Promise<Invoice> {
-    const id = this.currentInvoiceId++;
-    const newInvoice: Invoice = { ...invoice, id };
-    this.invoices.set(id, newInvoice);
-    
-    // Create invoice items
-    for (const item of items) {
-      await this.createInvoiceItem({ ...item, invoiceId: id });
-    }
-    
-    return newInvoice;
-  }
-  
-  async updateInvoice(id: number, updates: Partial<InsertInvoice>): Promise<Invoice> {
-    const invoice = this.invoices.get(id);
     if (!invoice) {
-      throw new Error(`Invoice with id ${id} not found`);
+      return undefined;
     }
     
-    const updatedInvoice = { ...invoice, ...updates };
-    this.invoices.set(id, updatedInvoice);
+    const items = await db
+      .select()
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, id))
+      .orderBy(invoiceItems.id);
+    
+    let client;
+    if (invoice.clientId) {
+      [client] = await db.select().from(clients).where(eq(clients.id, invoice.clientId));
+    }
+    
+    return { invoice, items, client };
+  }
+  
+  async getInvoices(storeId: number): Promise<Invoice[]> {
+    return db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.storeId, storeId))
+      .orderBy(desc(invoices.issueDate));
+  }
+  
+  async getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]> {
+    return db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.storeId, storeId))
+      .orderBy(desc(invoices.issueDate))
+      .limit(limit);
+  }
+  
+  async getOpenInvoices(storeId: number): Promise<Invoice[]> {
+    return db
+      .select()
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.storeId, storeId),
+          inArray(invoices.status, ["draft", "sent", "overdue"])
+        )
+      )
+      .orderBy(desc(invoices.issueDate));
+  }
+  
+  async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
+    // Use transaction to ensure all operations succeed or fail together
+    return withTransaction(async (tx) => {
+      // Create the invoice
+      const [newInvoice] = await tx
+        .insert(invoices)
+        .values(invoiceData)
+        .returning();
+      
+      // Calculate total profit for the invoice
+      let totalProfit = 0;
+      
+      // Process each item to allocate batches and calculate profits
+      for (const item of items) {
+        const productId = item.productId;
+        const quantityNeeded = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+        
+        // Create the invoice item
+        const [newItem] = await tx
+          .insert(invoiceItems)
+          .values({
+            ...item,
+            invoiceId: newInvoice.id,
+            quantity: quantityNeeded.toString()
+          })
+          .returning();
+        
+        // If this is a real invoice (not draft), allocate from batches and calculate profit
+        if (invoiceData.status !== 'draft') {
+          // Get available batches for this product, ordered by purchase date (FIFO)
+          const availableBatches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, productId),
+                eq(productBatches.storeId, invoiceData.storeId),
+                gte(productBatches.remainingQuantity, 0)
+              )
+            )
+            .orderBy(productBatches.purchaseDate);
+          
+          let remainingQuantity = quantityNeeded;
+          let itemProfit = 0;
+          
+          // Allocate from each batch until we've fulfilled the quantity
+          for (const batch of availableBatches) {
+            if (remainingQuantity <= 0) break;
+            
+            // Calculate how much we can take from this batch
+            const quantityFromBatch = Math.min(
+              remainingQuantity,
+              parseFloat(batch.remainingQuantity.toString())
+            );
+            
+            if (quantityFromBatch <= 0) continue;
+            
+            // Update the batch's remaining quantity
+            await tx
+              .update(productBatches)
+              .set({ 
+                remainingQuantity: (parseFloat(batch.remainingQuantity.toString()) - quantityFromBatch).toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
+            
+            // Record which batch was used for this item
+            const batchCost = parseFloat(batch.capitalCost.toString());
+            await tx
+              .insert(invoiceItemBatches)
+              .values({
+                invoiceItemId: newItem.id,
+                batchId: batch.id,
+                quantity: quantityFromBatch.toString(),
+                capitalCost: batch.capitalCost
+              });
+            
+            // Calculate profit for this portion of the item
+            const sellingPrice = parseFloat(item.unitPrice.toString());
+            const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
+            itemProfit += batchProfit;
+            
+            // Reduce the remaining quantity needed
+            remainingQuantity -= quantityFromBatch;
+          }
+          
+          // Update the item with its profit
+          await tx
+            .update(invoiceItems)
+            .set({ profit: itemProfit.toString() })
+            .where(eq(invoiceItems.id, newItem.id));
+          
+          totalProfit += itemProfit;
+        }
+      }
+      
+      // Update the invoice with the total profit
+      if (invoiceData.status !== 'draft') {
+        await tx
+          .update(invoices)
+          .set({ totalProfit: totalProfit.toString() })
+          .where(eq(invoices.id, newInvoice.id));
+        
+        // Create a transaction record for this invoice
+        await tx
+          .insert(transactions)
+          .values({
+            storeId: invoiceData.storeId,
+            type: 'income',
+            date: invoiceData.issueDate,
+            amount: invoiceData.totalAmount,
+            description: `Invoice #${invoiceData.invoiceNumber}`,
+            invoiceId: newInvoice.id,
+            referenceNumber: invoiceData.invoiceNumber,
+          });
+      }
+      
+      // Return the invoice with the updated total profit
+      const [updatedInvoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, newInvoice.id));
+      
+      return updatedInvoice;
+    });
+  }
+  
+  async updateInvoice(id: number, invoiceData: Partial<InsertInvoice>): Promise<Invoice> {
+    const [updatedInvoice] = await db
+      .update(invoices)
+      .set({ ...invoiceData, updatedAt: new Date() })
+      .where(eq(invoices.id, id))
+      .returning();
     return updatedInvoice;
   }
   
   async updateInvoiceStatus(id: number, status: string): Promise<Invoice> {
-    return this.updateInvoice(id, { status: status as any });
+    const [invoice] = await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id));
+    
+    if (!invoice) {
+      throw new Error(`Invoice with ID ${id} not found`);
+    }
+    
+    // If changing from draft to another status, we need to allocate batches and calculate profits
+    if (invoice.status === 'draft' && status !== 'draft') {
+      return withTransaction(async (tx) => {
+        // Get all items for this invoice
+        const items = await tx
+          .select()
+          .from(invoiceItems)
+          .where(eq(invoiceItems.invoiceId, id));
+        
+        let totalProfit = 0;
+        
+        // Process each item to allocate batches and calculate profits
+        for (const item of items) {
+          const quantityNeeded = parseFloat(item.quantity.toString());
+          
+          // Get available batches for this product, ordered by purchase date (FIFO)
+          const availableBatches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, item.productId),
+                eq(productBatches.storeId, invoice.storeId),
+                gte(productBatches.remainingQuantity, 0)
+              )
+            )
+            .orderBy(productBatches.purchaseDate);
+          
+          let remainingQuantity = quantityNeeded;
+          let itemProfit = 0;
+          
+          // Allocate from each batch until we've fulfilled the quantity
+          for (const batch of availableBatches) {
+            if (remainingQuantity <= 0) break;
+            
+            // Calculate how much we can take from this batch
+            const quantityFromBatch = Math.min(
+              remainingQuantity,
+              parseFloat(batch.remainingQuantity.toString())
+            );
+            
+            if (quantityFromBatch <= 0) continue;
+            
+            // Update the batch's remaining quantity
+            await tx
+              .update(productBatches)
+              .set({ 
+                remainingQuantity: (parseFloat(batch.remainingQuantity.toString()) - quantityFromBatch).toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
+            
+            // Record which batch was used for this item
+            const batchCost = parseFloat(batch.capitalCost.toString());
+            await tx
+              .insert(invoiceItemBatches)
+              .values({
+                invoiceItemId: item.id,
+                batchId: batch.id,
+                quantity: quantityFromBatch.toString(),
+                capitalCost: batch.capitalCost
+              });
+            
+            // Calculate profit for this portion of the item
+            const sellingPrice = parseFloat(item.unitPrice.toString());
+            const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
+            itemProfit += batchProfit;
+            
+            // Reduce the remaining quantity needed
+            remainingQuantity -= quantityFromBatch;
+          }
+          
+          // Update the item with its profit
+          await tx
+            .update(invoiceItems)
+            .set({ profit: itemProfit.toString() })
+            .where(eq(invoiceItems.id, item.id));
+          
+          totalProfit += itemProfit;
+        }
+        
+        // Update the invoice with its new status and total profit
+        const [updatedInvoice] = await tx
+          .update(invoices)
+          .set({ 
+            status: status as any, 
+            totalProfit: totalProfit.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(invoices.id, id))
+          .returning();
+        
+        // Create a transaction record for this invoice if not exist yet
+        const [existingTransaction] = await tx
+          .select()
+          .from(transactions)
+          .where(eq(transactions.invoiceId, id));
+        
+        if (!existingTransaction) {
+          await tx
+            .insert(transactions)
+            .values({
+              storeId: invoice.storeId,
+              type: 'income',
+              date: invoice.issueDate,
+              amount: invoice.totalAmount,
+              description: `Invoice #${invoice.invoiceNumber}`,
+              invoiceId: invoice.id,
+              referenceNumber: invoice.invoiceNumber,
+            });
+        }
+        
+        return updatedInvoice;
+      });
+    } else {
+      // Simple status update
+      const [updatedInvoice] = await db
+        .update(invoices)
+        .set({ 
+          status: status as any,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, id))
+        .returning();
+      
+      return updatedInvoice;
+    }
   }
   
   async deleteInvoice(id: number): Promise<void> {
-    await this.deleteInvoiceItems(id);
-    this.invoices.delete(id);
+    return withTransaction(async (tx) => {
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, id));
+      
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${id} not found`);
+      }
+      
+      // If the invoice is not a draft, we need to restore quantities to batches
+      if (invoice.status !== 'draft') {
+        // Get all invoice item batch allocations
+        const allocations = await tx
+          .select()
+          .from(invoiceItemBatches)
+          .innerJoin(
+            invoiceItems,
+            eq(invoiceItemBatches.invoiceItemId, invoiceItems.id)
+          )
+          .where(eq(invoiceItems.invoiceId, id));
+        
+        // Restore quantities to each batch
+        for (const allocation of allocations) {
+          await tx
+            .update(productBatches)
+            .set({
+              remainingQuantity: sql`${productBatches.remainingQuantity} + ${allocation.quantity}`,
+              updatedAt: new Date()
+            })
+            .where(eq(productBatches.id, allocation.batchId));
+        }
+        
+        // Delete transaction record for this invoice
+        await tx
+          .delete(transactions)
+          .where(eq(transactions.invoiceId, id));
+      }
+      
+      // Delete invoice items and their batch allocations (cascading)
+      await tx
+        .delete(invoiceItems)
+        .where(eq(invoiceItems.invoiceId, id));
+      
+      // Delete the invoice
+      await tx
+        .delete(invoices)
+        .where(eq(invoices.id, id));
+    });
   }
   
-  // Invoice Item methods
-  async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
-    return Array.from(this.invoiceItems.values()).filter(
-      (item) => item.invoiceId === invoiceId
-    );
+  // Quotation methods
+  async getQuotation(id: number): Promise<Quotation | undefined> {
+    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+    return quotation;
   }
   
-  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
-    const id = this.currentInvoiceItemId++;
-    const newItem: InvoiceItem = { ...item, id };
-    this.invoiceItems.set(id, newItem);
-    return newItem;
-  }
-  
-  async updateInvoiceItem(id: number, updates: Partial<InsertInvoiceItem>): Promise<InvoiceItem> {
-    const item = this.invoiceItems.get(id);
-    if (!item) {
-      throw new Error(`Invoice item with id ${id} not found`);
+  async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: QuotationItem[]; client?: Client } | undefined> {
+    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+    
+    if (!quotation) {
+      return undefined;
     }
     
-    const updatedItem = { ...item, ...updates };
-    this.invoiceItems.set(id, updatedItem);
-    return updatedItem;
-  }
-  
-  async deleteInvoiceItem(id: number): Promise<void> {
-    this.invoiceItems.delete(id);
-  }
-  
-  async deleteInvoiceItems(invoiceId: number): Promise<void> {
-    const items = await this.getInvoiceItems(invoiceId);
-    for (const item of items) {
-      await this.deleteInvoiceItem(item.id);
+    const items = await db
+      .select()
+      .from(quotationItems)
+      .where(eq(quotationItems.quotationId, id))
+      .orderBy(quotationItems.id);
+    
+    let client;
+    if (quotation.clientId) {
+      [client] = await db.select().from(clients).where(eq(clients.id, quotation.clientId));
     }
+    
+    return { quotation, items, client };
+  }
+  
+  async getQuotations(storeId: number): Promise<Quotation[]> {
+    return db
+      .select()
+      .from(quotations)
+      .where(eq(quotations.storeId, storeId))
+      .orderBy(desc(quotations.issueDate));
+  }
+  
+  async createQuotation(quotationData: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation> {
+    return withTransaction(async (tx) => {
+      // Create the quotation
+      const [newQuotation] = await tx
+        .insert(quotations)
+        .values(quotationData)
+        .returning();
+      
+      // Create all quotation items
+      for (const item of items) {
+        await tx
+          .insert(quotationItems)
+          .values({
+            ...item,
+            quotationId: newQuotation.id
+          });
+      }
+      
+      return newQuotation;
+    });
+  }
+  
+  async updateQuotation(id: number, quotationData: Partial<InsertQuotation>): Promise<Quotation> {
+    const [updatedQuotation] = await db
+      .update(quotations)
+      .set({ ...quotationData, updatedAt: new Date() })
+      .where(eq(quotations.id, id))
+      .returning();
+    return updatedQuotation;
+  }
+  
+  async convertQuotationToInvoice(id: number): Promise<Invoice> {
+    return withTransaction(async (tx) => {
+      // Get the quotation with its items
+      const [quotation] = await tx
+        .select()
+        .from(quotations)
+        .where(eq(quotations.id, id));
+      
+      if (!quotation) {
+        throw new Error(`Quotation with ID ${id} not found`);
+      }
+      
+      const quotationItems = await tx
+        .select()
+        .from(quotationItems)
+        .where(eq(quotationItems.quotationId, id));
+      
+      // Generate a new invoice number
+      const today = new Date();
+      const year = today.getFullYear().toString().slice(-2);
+      const month = (today.getMonth() + 1).toString().padStart(2, '0');
+      const invoiceCount = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.storeId, quotation.storeId),
+            sql`DATE_PART('year', ${invoices.issueDate}) = DATE_PART('year', CURRENT_DATE)`,
+            sql`DATE_PART('month', ${invoices.issueDate}) = DATE_PART('month', CURRENT_DATE)`
+          )
+        );
+      const sequence = (invoiceCount[0]?.count ?? 0) + 1;
+      const invoiceNumber = `INV-${year}${month}-${sequence.toString().padStart(4, '0')}`;
+      
+      // Create a new invoice based on the quotation
+      const [newInvoice] = await tx
+        .insert(invoices)
+        .values({
+          storeId: quotation.storeId,
+          invoiceNumber,
+          clientId: quotation.clientId,
+          issueDate: new Date(),
+          dueDate: new Date(today.setDate(today.getDate() + 30)), // 30 days from now
+          status: 'draft',
+          subtotal: quotation.subtotal,
+          taxRate: quotation.taxRate,
+          taxAmount: quotation.taxAmount,
+          discount: quotation.discount,
+          totalAmount: quotation.totalAmount,
+          paperSize: quotation.paperSize,
+          notes: quotation.notes,
+        })
+        .returning();
+      
+      // Copy all items from quotation to invoice
+      for (const item of quotationItems) {
+        await tx
+          .insert(invoiceItems)
+          .values({
+            invoiceId: newInvoice.id,
+            productId: item.productId,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxRate: item.taxRate,
+            taxAmount: item.taxAmount,
+            discount: item.discount,
+            subtotal: item.subtotal,
+            totalAmount: item.totalAmount,
+          });
+      }
+      
+      // Update the quotation to mark it as converted
+      await tx
+        .update(quotations)
+        .set({ 
+          status: 'accepted',
+          convertedToInvoiceId: newInvoice.id,
+          updatedAt: new Date()
+        })
+        .where(eq(quotations.id, id));
+      
+      return newInvoice;
+    });
+  }
+  
+  async deleteQuotation(id: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Delete quotation items (cascading)
+      await tx
+        .delete(quotationItems)
+        .where(eq(quotationItems.quotationId, id));
+      
+      // Delete the quotation
+      await tx
+        .delete(quotations)
+        .where(eq(quotations.id, id));
+    });
   }
   
   // Transaction methods
   async getTransaction(id: number): Promise<Transaction | undefined> {
-    return this.transactions.get(id);
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return transaction;
   }
   
-  async getTransactions(userId: number): Promise<Transaction[]> {
-    return Array.from(this.transactions.values()).filter(
-      (transaction) => transaction.userId === userId
-    );
+  async getTransactions(storeId: number): Promise<Transaction[]> {
+    return db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.storeId, storeId))
+      .orderBy(desc(transactions.date));
   }
   
-  async getTransactionsByType(userId: number, type: string): Promise<Transaction[]> {
-    return Array.from(this.transactions.values()).filter(
-      (transaction) => transaction.userId === userId && transaction.type === type
-    );
+  async getTransactionsByType(storeId: number, type: string): Promise<Transaction[]> {
+    return db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.storeId, storeId),
+          eq(transactions.type, type as any)
+        )
+      )
+      .orderBy(desc(transactions.date));
   }
   
-  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const id = this.currentTransactionId++;
-    const newTransaction: Transaction = { ...transaction, id };
-    this.transactions.set(id, newTransaction);
+  async createTransaction(transactionData: InsertTransaction): Promise<Transaction> {
+    const [newTransaction] = await db
+      .insert(transactions)
+      .values(transactionData)
+      .returning();
     return newTransaction;
   }
   
-  async updateTransaction(id: number, updates: Partial<InsertTransaction>): Promise<Transaction> {
-    const transaction = this.transactions.get(id);
-    if (!transaction) {
-      throw new Error(`Transaction with id ${id} not found`);
-    }
-    
-    const updatedTransaction = { ...transaction, ...updates };
-    this.transactions.set(id, updatedTransaction);
+  async updateTransaction(id: number, transactionData: Partial<InsertTransaction>): Promise<Transaction> {
+    const [updatedTransaction] = await db
+      .update(transactions)
+      .set({ ...transactionData, updatedAt: new Date() })
+      .where(eq(transactions.id, id))
+      .returning();
     return updatedTransaction;
   }
   
   async deleteTransaction(id: number): Promise<void> {
-    this.transactions.delete(id);
+    await db.delete(transactions).where(eq(transactions.id, id));
+  }
+  
+  // Settings methods
+  async getSetting(storeId: number, key: string): Promise<Setting | undefined> {
+    const [setting] = await db
+      .select()
+      .from(settings)
+      .where(
+        and(
+          eq(settings.storeId, storeId),
+          eq(settings.key, key)
+        )
+      );
+    return setting;
+  }
+  
+  async getSettings(storeId: number): Promise<Setting[]> {
+    return db
+      .select()
+      .from(settings)
+      .where(eq(settings.storeId, storeId));
+  }
+  
+  async setSetting(settingData: InsertSetting): Promise<Setting> {
+    // Check if setting exists
+    const [existingSetting] = await db
+      .select()
+      .from(settings)
+      .where(
+        and(
+          eq(settings.storeId, settingData.storeId),
+          eq(settings.key, settingData.key)
+        )
+      );
+    
+    if (existingSetting) {
+      // Update existing setting
+      const [updatedSetting] = await db
+        .update(settings)
+        .set({ 
+          value: settingData.value,
+          updatedAt: new Date()
+        })
+        .where(eq(settings.id, existingSetting.id))
+        .returning();
+      return updatedSetting;
+    } else {
+      // Create new setting
+      const [newSetting] = await db
+        .insert(settings)
+        .values(settingData)
+        .returning();
+      return newSetting;
+    }
+  }
+  
+  async deleteSetting(id: number): Promise<void> {
+    await db.delete(settings).where(eq(settings.id, id));
+  }
+  
+  // Import/Export methods
+  async createImportExportLog(logData: InsertImportExportLog): Promise<ImportExportLog> {
+    const [newLog] = await db
+      .insert(importExportLogs)
+      .values(logData)
+      .returning();
+    return newLog;
+  }
+  
+  async getImportExportLogs(userId: number): Promise<ImportExportLog[]> {
+    return db
+      .select()
+      .from(importExportLogs)
+      .where(eq(importExportLogs.userId, userId))
+      .orderBy(desc(importExportLogs.completedAt));
   }
   
   // Dashboard metrics
-  async getDashboardStats(userId: number): Promise<DashboardStats> {
-    const incomeTransactions = await this.getTransactionsByType(userId, 'income');
-    const expenseTransactions = await this.getTransactionsByType(userId, 'expense');
-    const openInvoices = await this.getOpenInvoices(userId);
-    const clients = await this.getClients(userId);
+  async getDashboardStats(storeId: number): Promise<DashboardStats> {
+    // Get current date
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
     
-    const totalIncome = incomeTransactions.reduce(
-      (sum, transaction) => sum + Number(transaction.amount), 0
-    );
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday of current week
+    startOfWeek.setHours(0, 0, 0, 0);
     
-    const totalExpenses = expenseTransactions.reduce(
-      (sum, transaction) => sum + Number(transaction.amount), 0
-    );
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    const openInvoicesValue = openInvoices.reduce(
-      (sum, invoice) => sum + Number(invoice.total), 0
-    );
+    // Calculate total revenue and expenses
+    const revenueResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE store_id = ${storeId} AND type = 'income'
+    `);
+    
+    const expensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE store_id = ${storeId} AND type = 'expense'
+    `);
+    
+    // Calculate open invoices
+    const openInvoicesResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(total_amount::numeric), 0) as value
+      FROM ${invoices}
+      WHERE store_id = ${storeId} AND status IN ('sent', 'overdue')
+    `);
+    
+    // Count clients
+    const clientsResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${clients}
+      WHERE store_id = ${storeId}
+    `);
+    
+    // Count products
+    const productsResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM ${products} p
+      JOIN ${productBatches} pb ON p.id = pb.product_id
+      WHERE pb.store_id = ${storeId} AND p.is_active = true
+    `);
+    
+    // Count products with low stock
+    const lowStockResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM ${products} p
+      JOIN ${productBatches} pb ON p.id = pb.product_id
+      WHERE pb.store_id = ${storeId} AND p.is_active = true
+      GROUP BY p.id
+      HAVING SUM(pb.remaining_quantity::numeric) <= p.min_stock
+    `);
+    
+    // Count sales by periods
+    const salesTodayResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfDay}
+    `);
+    
+    const salesThisWeekResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfWeek}
+    `);
+    
+    const salesThisMonthResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfMonth}
+    `);
+    
+    // Calculate total profit
+    const profitResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_profit::numeric), 0) as total
+      FROM ${invoices}
+      WHERE store_id = ${storeId} AND status = 'paid'
+    `);
     
     return {
-      totalIncome,
-      totalExpenses,
+      totalRevenue: parseFloat(revenueResult[0]?.total || '0'),
+      totalExpenses: parseFloat(expensesResult[0]?.total || '0'),
+      totalProfit: parseFloat(profitResult[0]?.total || '0'),
       openInvoices: {
-        count: openInvoices.length,
-        value: openInvoicesValue
+        count: parseInt(openInvoicesResult[0]?.count || '0'),
+        value: parseFloat(openInvoicesResult[0]?.value || '0')
       },
-      totalClients: clients.length
+      totalClients: parseInt(clientsResult[0]?.count || '0'),
+      productsCount: parseInt(productsResult[0]?.count || '0'),
+      lowStockCount: parseInt(lowStockResult[0]?.count || '0'),
+      salesCount: {
+        today: parseInt(salesTodayResult[0]?.count || '0'),
+        thisWeek: parseInt(salesThisWeekResult[0]?.count || '0'),
+        thisMonth: parseInt(salesThisMonthResult[0]?.count || '0')
+      }
     };
   }
   
-  async getTopClients(userId: number, limit: number): Promise<ClientWithInvoiceSummary[]> {
-    const clients = await this.getClients(userId);
-    const allInvoices = await this.getInvoices(userId);
+  async getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]> {
+    const result = await db.execute(sql`
+      WITH client_stats AS (
+        SELECT 
+          c.id,
+          c.name,
+          c.email,
+          COUNT(DISTINCT i.id) as invoice_count,
+          COALESCE(SUM(i.total_amount::numeric), 0) as total_spent,
+          MAX(i.issue_date) as last_purchase_date
+        FROM ${clients} c
+        LEFT JOIN ${invoices} i ON c.id = i.client_id AND i.status = 'paid'
+        WHERE c.store_id = ${storeId}
+        GROUP BY c.id, c.name, c.email
+      )
+      SELECT 
+        id,
+        name,
+        email,
+        invoice_count,
+        total_spent,
+        CASE 
+          WHEN invoice_count > 0 THEN total_spent / invoice_count 
+          ELSE 0 
+        END as average_spend,
+        last_purchase_date
+      FROM client_stats
+      ORDER BY total_spent DESC
+      LIMIT ${limit}
+    `);
     
-    const clientSummaries = await Promise.all(
-      clients.map(async (client) => {
-        const clientInvoices = allInvoices.filter(invoice => invoice.clientId === client.id);
-        const totalValue = clientInvoices.reduce((sum, invoice) => sum + Number(invoice.total), 0);
-        const initials = client.name.split(' ')
-          .map(word => word.charAt(0).toUpperCase())
-          .slice(0, 2)
-          .join('');
-        
-        return {
-          id: client.id,
-          name: client.name,
-          email: client.email,
-          totalValue,
-          invoiceCount: clientInvoices.length,
-          initials
-        };
-      })
-    );
-    
-    // Sort by total value and take the top ones
-    return clientSummaries
-      .sort((a, b) => b.totalValue - a.totalValue)
-      .slice(0, limit);
+    return result.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      invoiceCount: parseInt(row.invoice_count || '0'),
+      totalSpent: parseFloat(row.total_spent || '0'),
+      averageSpend: parseFloat(row.average_spend || '0'),
+      lastPurchaseDate: row.last_purchase_date
+    }));
   }
   
-  async getRevenueOverview(userId: number, months: number = 6): Promise<RevenueData> {
-    const now = new Date();
-    const labels: string[] = [];
-    const income: number[] = Array(months).fill(0);
-    const expenses: number[] = Array(months).fill(0);
-    
-    // Generate labels for the last 'months' months
-    for (let i = 0; i < months; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - (months - 1) + i);
-      labels.push(d.toLocaleString('default', { month: 'short' }));
+  async getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData> {
+    // Generate series of dates between start and end
+    const dateList = [];
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      dateList.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    const transactions = await this.getTransactions(userId);
+    // Format dates for display
+    const dateLabels = dateList.map(date => {
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      return `${day}/${month}`;
+    });
     
-    // Group transactions by month
-    transactions.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const monthIndex = date.getMonth();
-      const yearMonthKey = `${date.getFullYear()}-${monthIndex}`;
-      const currentYearMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+    // Get revenue data
+    const revenueResult = await db.execute(sql`
+      SELECT 
+        DATE(date) as date,
+        COALESCE(SUM(CASE WHEN type = 'income' THEN amount::numeric ELSE 0 END), 0) as income,
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount::numeric ELSE 0 END), 0) as expenses
+      FROM ${transactions}
+      WHERE 
+        store_id = ${storeId} AND
+        date >= ${start} AND
+        date <= ${end}
+      GROUP BY DATE(date)
+      ORDER BY DATE(date)
+    `);
+    
+    // Initialize data arrays
+    const revenueData = Array(dateList.length).fill(0);
+    const expenseData = Array(dateList.length).fill(0);
+    const profitData = Array(dateList.length).fill(0);
+    
+    // Populate data arrays from query results
+    revenueResult.forEach(row => {
+      const rowDate = new Date(row.date);
+      const index = dateList.findIndex(date => 
+        date.getDate() === rowDate.getDate() &&
+        date.getMonth() === rowDate.getMonth() &&
+        date.getFullYear() === rowDate.getFullYear()
+      );
       
-      // Calculate how many months ago this transaction was
-      let monthsAgo = 0;
-      if (yearMonthKey === currentYearMonthKey) {
-        monthsAgo = 0;
-      } else {
-        const yearDiff = now.getFullYear() - date.getFullYear();
-        monthsAgo = yearDiff * 12 + (now.getMonth() - monthIndex);
-      }
-      
-      // Only include transactions within the last 'months' months
-      if (monthsAgo < months) {
-        const amount = Number(transaction.amount);
-        const index = months - 1 - monthsAgo;
-        
-        if (transaction.type === 'income') {
-          income[index] += amount;
-        } else {
-          expenses[index] += amount;
-        }
+      if (index !== -1) {
+        revenueData[index] = parseFloat(row.income || '0');
+        expenseData[index] = parseFloat(row.expenses || '0');
+        profitData[index] = revenueData[index] - expenseData[index];
       }
     });
     
-    return { labels, income, expenses };
+    return {
+      dates: dateLabels,
+      revenue: revenueData,
+      expenses: expenseData,
+      profit: profitData
+    };
   }
   
-  async getInvoiceStatusSummary(userId: number): Promise<InvoiceStatusSummary> {
-    const allInvoices = await this.getInvoices(userId);
+  async getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]> {
+    const result = await db.execute(sql`
+      WITH product_sales AS (
+        SELECT 
+          p.id,
+          p.name,
+          p.sku,
+          SUM(ii.quantity::numeric) as total_sold,
+          SUM(ii.total_amount::numeric) as total_revenue,
+          SUM(ii.profit::numeric) as total_profit
+        FROM ${products} p
+        JOIN ${invoiceItems} ii ON p.id = ii.product_id
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        WHERE i.store_id = ${storeId} AND i.status = 'paid'
+        GROUP BY p.id, p.name, p.sku
+      )
+      SELECT 
+        id,
+        name,
+        sku,
+        total_sold,
+        total_revenue,
+        total_profit,
+        CASE 
+          WHEN total_revenue > 0 THEN (total_profit / total_revenue) * 100 
+          ELSE 0 
+        END as profit_margin
+      FROM product_sales
+      ORDER BY total_profit DESC
+      LIMIT ${limit}
+    `);
     
-    const paid = allInvoices.filter(invoice => invoice.status === 'paid').length;
-    const pending = allInvoices.filter(invoice => invoice.status === 'sent').length;
-    const overdue = allInvoices.filter(invoice => invoice.status === 'overdue').length;
-    const total = allInvoices.length;
-    
-    return { paid, pending, overdue, total };
+    return result.map(row => ({
+      id: row.id,
+      name: row.name,
+      sku: row.sku,
+      totalSold: parseFloat(row.total_sold || '0'),
+      totalRevenue: parseFloat(row.total_revenue || '0'),
+      totalProfit: parseFloat(row.total_profit || '0'),
+      profitMargin: parseFloat(row.profit_margin || '0')
+    }));
   }
   
-  // Helper method to setup demo data
-  private async setupDemoData() {
-    const userId = 1;
+  async getInventoryValueStats(storeId: number): Promise<InventoryValueStats> {
+    // Get inventory summary stats
+    const summaryResult = await db.execute(sql`
+      SELECT 
+        COUNT(DISTINCT p.id) as total_items,
+        COUNT(pb.id) as batches_count,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as total_value,
+        CASE 
+          WHEN SUM(pb.remaining_quantity::numeric) > 0 
+          THEN SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric) / SUM(pb.remaining_quantity::numeric)
+          ELSE 0 
+        END as average_cost
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
+    `);
     
-    // Create demo clients
-    const acmeClient = await this.createClient({
-      userId,
-      name: "Acme Corporation",
-      email: "contact@acme.com",
-      phone: "123-456-7890",
-      address: "123 Acme St, Anytown, USA",
-      taxNumber: "ACM-12345",
-      notes: "Important client"
-    });
+    // Get value by category
+    const categoryResult = await db.execute(sql`
+      SELECT 
+        COALESCE(c.name, 'Uncategorized') as category,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as value
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      LEFT JOIN ${categories} c ON p.category_id = c.id
+      WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
+      GROUP BY c.name
+      ORDER BY value DESC
+    `);
     
-    const starkClient = await this.createClient({
-      userId,
-      name: "Stark Industries",
-      email: "billing@stark.com",
-      phone: "987-654-3210",
-      address: "890 Innovation Dr, Tech City, USA",
-      taxNumber: "STARK-54321",
-      notes: "Regular client"
-    });
+    return {
+      totalItems: parseInt(summaryResult[0]?.total_items || '0'),
+      totalValue: parseFloat(summaryResult[0]?.total_value || '0'),
+      batchesCount: parseInt(summaryResult[0]?.batches_count || '0'),
+      averageCost: parseFloat(summaryResult[0]?.average_cost || '0'),
+      valueByCategory: categoryResult.map(row => ({
+        category: row.category,
+        value: parseFloat(row.value || '0')
+      }))
+    };
+  }
+  
+  async getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]> {
+    // Generate SQL for optionally filtering by product ID
+    const productFilter = productId 
+      ? sql`AND pb.product_id = ${productId}` 
+      : sql``;
     
-    const globexClient = await this.createClient({
-      userId,
-      name: "Globex Industries",
-      email: "accounting@globex.com",
-      phone: "555-123-4567",
-      address: "456 Global Ave, Metro City, USA",
-      taxNumber: "GLO-67890",
-      notes: ""
-    });
+    const result = await db.execute(sql`
+      WITH batch_sales AS (
+        SELECT 
+          iib.batch_id,
+          SUM(iib.quantity::numeric) as sold_quantity,
+          SUM(ii.unit_price::numeric * iib.quantity::numeric) as sales_value,
+          SUM(iib.capital_cost::numeric * iib.quantity::numeric) as cost_value
+        FROM ${invoiceItemBatches} iib
+        JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        WHERE i.store_id = ${storeId} AND i.status = 'paid'
+        GROUP BY iib.batch_id
+      )
+      SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        pb.batch_number,
+        pb.capital_cost,
+        pb.purchase_date,
+        COALESCE(bs.sold_quantity, 0) as sold_quantity,
+        CASE 
+          WHEN COALESCE(bs.sold_quantity, 0) > 0 
+          THEN bs.sales_value / bs.sold_quantity 
+          ELSE 0 
+        END as avg_selling_price,
+        CASE 
+          WHEN COALESCE(bs.cost_value, 0) > 0 
+          THEN (bs.sales_value - bs.cost_value) / bs.cost_value * 100
+          ELSE 0 
+        END as profit_margin,
+        COALESCE(bs.sales_value - bs.cost_value, 0) as total_profit
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      LEFT JOIN batch_sales bs ON pb.id = bs.batch_id
+      WHERE pb.store_id = ${storeId} ${productFilter}
+      ORDER BY 
+        CASE WHEN ${productId ? true : false} THEN pb.purchase_date ELSE p.name END,
+        CASE WHEN ${productId ? true : false} THEN NULL ELSE p.name END,
+        pb.purchase_date DESC
+    `);
     
-    const wayneClient = await this.createClient({
-      userId,
-      name: "Wayne Enterprises",
-      email: "finance@wayne.com",
-      phone: "555-987-6543",
-      address: "1 Wayne Tower, Gotham City, USA",
-      taxNumber: "WAY-13579",
-      notes: "VIP client"
-    });
-    
-    const umbrellaClient = await this.createClient({
-      userId,
-      name: "Umbrella Corp",
-      email: "payments@umbrella.com",
-      phone: "555-246-8101",
-      address: "789 Research Blvd, Raccoon City, USA",
-      taxNumber: "UMB-24680",
-      notes: ""
-    });
-    
-    // Create demo products
-    const product1 = await this.createProduct({
-      userId,
-      name: "Web Development",
-      description: "Full website development services",
-      price: "1200",
-      taxRate: "0"
-    });
-    
-    const product2 = await this.createProduct({
-      userId,
-      name: "Logo Design",
-      description: "Professional logo design",
-      price: "500",
-      taxRate: "0"
-    });
-    
-    const product3 = await this.createProduct({
-      userId,
-      name: "SEO Services",
-      description: "Search engine optimization",
-      price: "800",
-      taxRate: "0"
-    });
-    
-    // Create demo invoices
-    // Invoice 1
-    const invoice1 = await this.createInvoice({
-      userId,
-      invoiceNumber: "INV-2023-0045",
-      clientId: acmeClient.id,
-      issueDate: new Date("2023-08-18"),
-      dueDate: new Date("2023-09-17"),
-      status: "paid",
-      subtotal: "2850",
-      tax: "0",
-      discount: "0",
-      total: "2850",
-      notes: "Thank you for your business!"
-    }, [
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Web Development",
-        quantity: "1",
-        price: "2000",
-        taxRate: "0",
-        subtotal: "2000",
-        tax: "0",
-        total: "2000",
-        productId: product1.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Logo Design",
-        quantity: "1",
-        price: "850",
-        taxRate: "0",
-        subtotal: "850",
-        tax: "0",
-        total: "850",
-        productId: product2.id
-      }
-    ]);
-    
-    // Invoice 2
-    const invoice2 = await this.createInvoice({
-      userId,
-      invoiceNumber: "INV-2023-0044",
-      clientId: globexClient.id,
-      issueDate: new Date("2023-08-15"),
-      dueDate: new Date("2023-09-14"),
-      status: "sent",
-      subtotal: "1200",
-      tax: "0",
-      discount: "0",
-      total: "1200",
-      notes: ""
-    }, [
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Web Development",
-        quantity: "1",
-        price: "1200",
-        taxRate: "0",
-        subtotal: "1200",
-        tax: "0",
-        total: "1200",
-        productId: product1.id
-      }
-    ]);
-    
-    // Invoice 3
-    const invoice3 = await this.createInvoice({
-      userId,
-      invoiceNumber: "INV-2023-0043",
-      clientId: starkClient.id,
-      issueDate: new Date("2023-08-12"),
-      dueDate: new Date("2023-09-11"),
-      status: "paid",
-      subtotal: "3450",
-      tax: "0",
-      discount: "0",
-      total: "3450",
-      notes: ""
-    }, [
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Web Development",
-        quantity: "1",
-        price: "1200",
-        taxRate: "0",
-        subtotal: "1200",
-        tax: "0",
-        total: "1200",
-        productId: product1.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "SEO Services",
-        quantity: "2",
-        price: "800",
-        taxRate: "0",
-        subtotal: "1600",
-        tax: "0",
-        total: "1600",
-        productId: product3.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Logo Design",
-        quantity: "1.3",
-        price: "500",
-        taxRate: "0",
-        subtotal: "650",
-        tax: "0",
-        total: "650",
-        productId: product2.id
-      }
-    ]);
-    
-    // Invoice 4
-    const invoice4 = await this.createInvoice({
-      userId,
-      invoiceNumber: "INV-2023-0042",
-      clientId: wayneClient.id,
-      issueDate: new Date("2023-08-10"),
-      dueDate: new Date("2023-09-09"),
-      status: "overdue",
-      subtotal: "1800",
-      tax: "0",
-      discount: "0",
-      total: "1800",
-      notes: ""
-    }, [
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "SEO Services",
-        quantity: "2",
-        price: "800",
-        taxRate: "0",
-        subtotal: "1600",
-        tax: "0",
-        total: "1600",
-        productId: product3.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Content Updates",
-        quantity: "1",
-        price: "200",
-        taxRate: "0",
-        subtotal: "200",
-        tax: "0",
-        total: "200",
-        productId: null
-      }
-    ]);
-    
-    // Invoice 5
-    const invoice5 = await this.createInvoice({
-      userId,
-      invoiceNumber: "INV-2023-0041",
-      clientId: umbrellaClient.id,
-      issueDate: new Date("2023-08-08"),
-      dueDate: new Date("2023-09-07"),
-      status: "paid",
-      subtotal: "2100",
-      tax: "0",
-      discount: "0",
-      total: "2100",
-      notes: ""
-    }, [
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Web Development",
-        quantity: "1",
-        price: "1200",
-        taxRate: "0",
-        subtotal: "1200",
-        tax: "0",
-        total: "1200",
-        productId: product1.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Logo Design",
-        quantity: "1",
-        price: "500",
-        taxRate: "0",
-        subtotal: "500",
-        tax: "0",
-        total: "500",
-        productId: product2.id
-      },
-      {
-        invoiceId: 0, // Will be set by createInvoiceItem
-        description: "Hosting Setup",
-        quantity: "1",
-        price: "400",
-        taxRate: "0",
-        subtotal: "400",
-        tax: "0",
-        total: "400",
-        productId: null
-      }
-    ]);
-    
-    // Create transactions for paid invoices
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-19"),
-      description: `Payment for invoice ${invoice1.invoiceNumber}`,
-      amount: "2850",
-      type: "income",
-      invoiceId: invoice1.id,
-      category: "Sales"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-13"),
-      description: `Payment for invoice ${invoice3.invoiceNumber}`,
-      amount: "3450",
-      type: "income",
-      invoiceId: invoice3.id,
-      category: "Sales"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-09"),
-      description: `Payment for invoice ${invoice5.invoiceNumber}`,
-      amount: "2100",
-      type: "income",
-      invoiceId: invoice5.id,
-      category: "Sales"
-    });
-    
-    // Create expense transactions
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-05"),
-      description: "Office Rent",
-      amount: "1500",
-      type: "expense",
-      invoiceId: null,
-      category: "Rent"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-07"),
-      description: "Software Subscriptions",
-      amount: "120",
-      type: "expense",
-      invoiceId: null,
-      category: "Software"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-12"),
-      description: "Utilities",
-      amount: "200",
-      type: "expense",
-      invoiceId: null,
-      category: "Utilities"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-08-15"),
-      description: "Office Supplies",
-      amount: "85",
-      type: "expense",
-      invoiceId: null,
-      category: "Supplies"
-    });
-    
-    // Create additional income transactions
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-07-25"),
-      description: "Consulting Services",
-      amount: "1200",
-      type: "income",
-      invoiceId: null,
-      category: "Consulting"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-07-15"),
-      description: "Training Session",
-      amount: "800",
-      type: "income",
-      invoiceId: null,
-      category: "Training"
-    });
-    
-    // Create additional expense transactions for previous months
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-07-05"),
-      description: "Office Rent",
-      amount: "1500",
-      type: "expense",
-      invoiceId: null,
-      category: "Rent"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-07-07"),
-      description: "Software Subscriptions",
-      amount: "120",
-      type: "expense",
-      invoiceId: null,
-      category: "Software"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-06-05"),
-      description: "Office Rent",
-      amount: "1500",
-      type: "expense",
-      invoiceId: null,
-      category: "Rent"
-    });
-    
-    await this.createTransaction({
-      userId,
-      date: new Date("2023-06-12"),
-      description: "Marketing Campaign",
-      amount: "500",
-      type: "expense",
-      invoiceId: null,
-      category: "Marketing"
-    });
+    return result.map(row => ({
+      productId: row.product_id,
+      productName: row.product_name,
+      batchNumber: row.batch_number,
+      capitalCost: parseFloat(row.capital_cost || '0'),
+      avgSellingPrice: parseFloat(row.avg_selling_price || '0'),
+      profitMargin: parseFloat(row.profit_margin || '0'),
+      soldQuantity: parseFloat(row.sold_quantity || '0'),
+      totalProfit: parseFloat(row.total_profit || '0'),
+      purchaseDate: new Date(row.purchase_date)
+    }));
   }
 }
 
-export const storage = new MemStorage();
+// Create and export the storage instance
+export const storage = new DatabaseStorage();

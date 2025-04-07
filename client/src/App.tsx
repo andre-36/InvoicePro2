@@ -35,7 +35,7 @@ function App() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch('/api/user', {
+        const res = await fetch('/api/auth/user', {
           credentials: 'include'
         });
         
@@ -50,7 +50,7 @@ function App() {
         } else {
           // Auto login for demo purposes - in a real application, we'd redirect to login
           try {
-            const loginRes = await apiRequest('POST', '/api/login', {
+            const loginRes = await apiRequest('POST', '/api/auth/login', {
               username: 'admin',
               password: 'password'
             });
