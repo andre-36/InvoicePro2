@@ -79,8 +79,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     <span>New Invoice</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl h-[90vh] p-0">
+                <DialogContent className="max-w-4xl h-[90vh] p-0" aria-describedby="desktop-invoice-form-description">
                   <div className="overflow-auto h-full">
+                    <div id="desktop-invoice-form-description" className="sr-only">Create a new invoice form</div>
                     <InvoiceForm onSuccess={() => setCreateDialogOpen(false)} />
                   </div>
                 </DialogContent>
@@ -106,8 +107,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     <Plus className="h-5 w-5" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl h-[90vh] p-0">
+                <DialogContent className="max-w-4xl h-[90vh] p-0" aria-describedby="mobile-invoice-form-description">
                   <div className="overflow-auto h-full">
+                    <div id="mobile-invoice-form-description" className="sr-only">Create a new invoice form</div>
                     <InvoiceForm onSuccess={() => setCreateDialogOpen(false)} />
                   </div>
                 </DialogContent>

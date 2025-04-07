@@ -66,7 +66,7 @@ export function InvoiceItemRow({
       subtotal,
       tax,
       total,
-      productId: productId ? parseInt(productId) : null
+      productId: productId && productId !== "0" ? parseInt(productId) : null
     };
     
     updateItem(index, updatedItem);
@@ -75,7 +75,8 @@ export function InvoiceItemRow({
   // Handle product selection
   const handleProductChange = (value: string) => {
     setProductId(value);
-    onProductSelect(index, value ? parseInt(value) : null);
+    // If value is "0", it means "Enter manually"
+    onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
   };
   
   return (
@@ -90,7 +91,7 @@ export function InvoiceItemRow({
               <SelectValue placeholder="Select a product or enter details manually" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Enter manually</SelectItem>
+              <SelectItem value="0">Enter manually</SelectItem>
               {products.map((product) => (
                 <SelectItem key={product.id} value={product.id.toString()}>
                   {product.name}
