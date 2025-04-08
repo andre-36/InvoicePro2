@@ -11,3 +11,46 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Custom styles for Excel-like tables */
+@layer components {
+  .excel-table {
+    @apply border-collapse border border-gray-200 rounded-lg shadow-sm;
+  }
+  
+  .excel-table th {
+    @apply bg-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-b border-gray-200 py-2 px-3;
+  }
+  
+  .excel-table th:last-child {
+    @apply border-r-0;
+  }
+  
+  .excel-table td {
+    @apply border-r border-b border-gray-200 py-2 px-3;
+  }
+  
+  .excel-table td:last-child {
+    @apply border-r-0;
+  }
+  
+  .excel-table tr:nth-child(even) {
+    @apply bg-gray-50;
+  }
+  
+  .excel-table tr:hover {
+    @apply bg-blue-50;
+  }
+  
+  .excel-cell-input {
+    @apply text-sm h-8 px-2 w-full focus:ring-blue-500 border-gray-200 hover:border-gray-300;
+  }
+  
+  .excel-cell-input-right {
+    @apply excel-cell-input text-right;
+  }
+  
+  .excel-header-cell {
+    @apply sticky top-0 z-10 bg-gray-100;
+  }
+}

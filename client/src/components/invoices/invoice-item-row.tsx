@@ -49,6 +49,7 @@ export function InvoiceItemRow({
   const [price, setPrice] = useState(item.price || "0");
   const [taxRate, setTaxRate] = useState(item.taxRate || "0");
   const [productId, setProductId] = useState<string>(item.productId?.toString() || "");
+  const [open, setOpen] = useState(false);
   
   // Calculate totals when inputs change
   useEffect(() => {
@@ -81,28 +82,34 @@ export function InvoiceItemRow({
     // If value is "0", it means "Enter manually"
     onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
   };
-  
-  const [open, setOpen] = useState(false)
 
   return (
-    <tr>
-      <td className="px-4 py-3">
+    <tr className={index % 2 === 0 ? "bg-white" : "bg-gray-50 hover:bg-blue-50"}>
+      {/* Row number */}
+      <td className="text-center text-sm text-gray-500">
+        {index + 1}
+      </td>
+      
+      {/* Product selection and description */}
+      <td>
         <div className="space-y-2">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button
-                variant="outline"
+                variant="ghost"
                 role="combobox"
                 aria-expanded={open}
-                className="w-full justify-between text-sm"
+                className="w-full justify-between text-sm h-8 px-2 border border-transparent hover:border-gray-300 hover:bg-gray-50"
               >
-                {productId && productId !== "0" 
-                  ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
-                  : "Select a product or enter manually"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <span className="truncate text-left">
+                  {productId && productId !== "0" 
+                    ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
+                    : "Select a product"}
+                </span>
+                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0">
+            <PopoverContent className="w-[300px] p-0">
               <Command>
                 <CommandInput placeholder="Search product..." className="h-9" />
                 <CommandEmpty>No product found.</CommandEmpty>
@@ -148,24 +155,28 @@ export function InvoiceItemRow({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Item description"
-            className="text-sm"
+            className="excel-cell-input"
           />
         </div>
       </td>
-      <td className="px-4 py-3">
+      
+      {/* Quantity */}
+      <td>
         <Input
           type="number"
           min="0.01"
           step="0.01"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          className="w-20 text-sm"
+          className="excel-cell-input-right"
         />
       </td>
-      <td className="px-4 py-3">
-        <div className="relative rounded-md">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="text-gray-500 sm:text-sm">$</span>
+      
+      {/* Price */}
+      <td>
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <span className="text-gray-500 sm:text-xs">$</span>
           </div>
           <Input
             type="number"
@@ -173,16 +184,18 @@ export function InvoiceItemRow({
             step="0.01"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="pl-7 w-28 text-sm"
+            className="excel-cell-input-right pl-5"
           />
         </div>
       </td>
-      <td className="px-4 py-3">
+      
+      {/* Tax Rate */}
+      <td>
         <Select
           value={taxRate}
           onValueChange={setTaxRate}
         >
-          <SelectTrigger className="w-20 text-sm">
+          <SelectTrigger className="excel-cell-input-right">
             <SelectValue placeholder="0%" />
           </SelectTrigger>
           <SelectContent>
@@ -195,18 +208,27 @@ export function InvoiceItemRow({
           </SelectContent>
         </Select>
       </td>
-      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+      
+      {/* Subtotal */}
+      <td className="text-right text-sm font-medium text-gray-900">
+        ${parseFloat(item.subtotal || "0").toFixed(2)}
+      </td>
+      
+      {/* Total */}
+      <td className="text-right text-sm font-medium text-gray-900">
         ${parseFloat(item.total || "0").toFixed(2)}
       </td>
-      <td className="px-4 py-3 text-right text-sm font-medium">
+      
+      {/* Actions */}
+      <td className="text-center">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => removeItem(index)}
-          className="text-gray-400 hover:text-red-600 p-1"
+          className="text-gray-400 hover:text-red-600 p-1 h-8 w-8"
         >
-          <Trash2 className="h-5 w-5" />
+          <Trash2 className="h-4 w-4" />
           <span className="sr-only">Delete item</span>
         </Button>
       </td>
