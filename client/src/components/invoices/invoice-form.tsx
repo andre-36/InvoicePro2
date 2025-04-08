@@ -275,27 +275,39 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     if (!productId || !products) return;
     
     const product = products.find(p => p.id === productId);
-    if (!product) return;
+    if (!product) {
+      console.error(`Product with id ${productId} not found`);
+      return;
+    }
     
-    const quantity = items[index].quantity;
-    const price = product.price.toString();
-    const taxRate = product.taxRate.toString();
-    const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
-    const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
-    const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
-    
-    const updatedItem: InvoiceItem = {
-      ...items[index],
-      description: product.name,
-      price,
-      taxRate,
-      subtotal,
-      tax,
-      total,
-      productId
-    };
-    
-    updateItem(index, updatedItem);
+    try {
+      const quantity = items[index].quantity || "1";
+      const price = (product.price || "0").toString();
+      const taxRate = (product.taxRate || "0").toString();
+      const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
+      const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
+      const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
+      
+      const updatedItem: InvoiceItem = {
+        ...items[index],
+        description: product.name || "",
+        price,
+        taxRate,
+        subtotal,
+        tax,
+        total,
+        productId
+      };
+      
+      updateItem(index, updatedItem);
+    } catch (error) {
+      console.error("Error updating item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update item with product data",
+        variant: "destructive",
+      });
+    }
   };
 
   // Submit the form
@@ -322,7 +334,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
     
     const values = form.getValues();
-    const client = clients?.find(c => c.id === values.invoice.clientId);
+    
+    // Check if clients data is loaded
+    if (!clients || !Array.isArray(clients)) {
+      toast({
+        title: "Error",
+        description: "Client data is not available yet. Please try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the selected client
+    const client = clients.find(c => c.id === values.invoice.clientId);
     
     if (!client) {
       toast({
@@ -334,14 +358,37 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
     
     try {
-      await generatePDF({
-        invoice: {
-          ...values.invoice,
-          issueDate: format(values.invoice.issueDate, 'MMM dd, yyyy'),
-          dueDate: format(values.invoice.dueDate, 'MMM dd, yyyy'),
-        },
+      // Prepare safe data for PDF
+      const safeClient = {
+        name: client.name || "Client Name",
+        email: client.email || "client@example.com",
+        phone: client.phone,
+        address: client.address,
+        taxNumber: client.taxNumber,
+      };
+
+      const safeInvoice = {
+        invoiceNumber: values.invoice.invoiceNumber || `INV-${Date.now()}`,
+        issueDate: format(values.invoice.issueDate || new Date(), 'MMM dd, yyyy'),
+        dueDate: format(values.invoice.dueDate || new Date(), 'MMM dd, yyyy'),
+        status: values.invoice.status || "draft",
+        subtotal: values.invoice.subtotal || "0",
+        tax: values.invoice.tax || "0",
+        discount: values.invoice.discount || "0",
+        total: values.invoice.total || "0",
+        notes: values.invoice.notes,
+      };
+      
+      console.log("Generating PDF with:", { 
+        invoice: safeInvoice,
         items: values.items,
-        client
+        client: safeClient
+      });
+
+      await generatePDF({
+        invoice: safeInvoice,
+        items: values.items || [],
+        client: safeClient
       });
       
       toast({
@@ -349,9 +396,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         description: "Invoice PDF has been generated",
       });
     } catch (error) {
+      console.error("PDF generation error:", error);
       toast({
         title: "Error",
-        description: "Failed to generate PDF",
+        description: `Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     }

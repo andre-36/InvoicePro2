@@ -79,8 +79,14 @@ export function InvoiceItemRow({
   // Handle product selection
   const handleProductChange = (value: string) => {
     setProductId(value);
-    // If value is "0", it means "Enter manually"
-    onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
+    
+    try {
+      console.log("Selected product ID:", value);
+      // If value is "0", it means "Enter manually"
+      onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
+    } catch (error) {
+      console.error("Error selecting product:", error);
+    }
   };
 
   return (
