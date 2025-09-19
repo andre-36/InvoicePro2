@@ -9,13 +9,18 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(amount: string | number): string {
   const value = typeof amount === 'string' ? parseFloat(amount) : amount;
   
-  if (isNaN(value)) return '$0.00';
-  
-  return new Intl.NumberFormat('en-US', {
+  if (isNaN(value)) return new Intl.NumberFormat('id-ID', {
     style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(0);
+  
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(value);
 }
 

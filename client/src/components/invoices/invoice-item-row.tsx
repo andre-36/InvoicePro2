@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { formatCurrency } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -57,9 +58,9 @@ export function InvoiceItemRow({
     const prc = parseFloat(price) || 0;
     const rate = parseFloat(taxRate) || 0;
     
-    const subtotal = (qty * prc).toFixed(2);
-    const tax = (parseFloat(subtotal) * rate / 100).toFixed(2);
-    const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
+    const subtotal = (qty * prc).toString();
+    const tax = (parseFloat(subtotal) * rate / 100).toString();
+    const total = (parseFloat(subtotal) + parseFloat(tax)).toString();
     
     const updatedItem: InvoiceItem = {
       ...item,
@@ -182,7 +183,7 @@ export function InvoiceItemRow({
       <td>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-            <span className="text-gray-500 sm:text-xs">$</span>
+            <span className="text-gray-500 sm:text-xs">Rp</span>
           </div>
           <Input
             type="number"
@@ -217,12 +218,12 @@ export function InvoiceItemRow({
       
       {/* Subtotal */}
       <td className="text-right text-sm font-medium text-gray-900">
-        ${parseFloat(item.subtotal || "0").toFixed(2)}
+        {formatCurrency(item.subtotal || "0")}
       </td>
       
       {/* Total */}
       <td className="text-right text-sm font-medium text-gray-900">
-        ${parseFloat(item.total || "0").toFixed(2)}
+        {formatCurrency(item.total || "0")}
       </td>
       
       {/* Actions */}

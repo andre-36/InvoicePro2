@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/utils";
 import {
   AreaChart,
   Area,
@@ -89,13 +90,13 @@ export function RevenueChart() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis 
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value) => formatCurrency(value)}
                 tickLine={false}
                 axisLine={false}
-                width={80}
+                width={100}
               />
               <Tooltip 
-                formatter={(value) => [`$${value}`, '']}
+                formatter={(value) => [formatCurrency(typeof value === 'number' ? value : 0), '']}
                 contentStyle={{ 
                   backgroundColor: 'white',
                   borderColor: '#e2e8f0',

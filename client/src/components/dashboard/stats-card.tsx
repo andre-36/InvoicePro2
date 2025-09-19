@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -20,12 +20,7 @@ interface StatsCardProps {
 export function StatsCard({ title, value, change, secondaryText, status }: StatsCardProps) {
   const formatValue = (val: string | number) => {
     if (typeof val === 'number') {
-      return val.toLocaleString('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
+      return formatCurrency(val);
     }
     return val;
   };

@@ -139,11 +139,11 @@ export default function ReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" />
                       <YAxis 
-                        tickFormatter={(value) => `$${value}`}
-                        width={80}
+                        tickFormatter={(value) => formatCurrency(value)}
+                        width={100}
                       />
                       <Tooltip 
-                        formatter={(value) => [`$${value}`, '']}
+                        formatter={(value) => [formatCurrency(typeof value === 'number' ? value : 0), '']}
                         contentStyle={{ 
                           backgroundColor: 'white',
                           borderColor: '#e2e8f0',
@@ -198,7 +198,7 @@ export default function ReportsPage() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -271,7 +271,7 @@ export default function ReportsPage() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
