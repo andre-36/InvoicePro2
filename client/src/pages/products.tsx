@@ -53,6 +53,7 @@ import { formatCurrency } from "@/lib/utils";
 type Product = {
   id: number;
   name: string;
+  sku: string;
   description: string;
   price: string;
   taxRate: string;
@@ -61,6 +62,7 @@ type Product = {
 // Schema for product form validation
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  sku: z.string().min(1, "SKU is required"),
   description: z.string().optional(),
   price: z.string().min(1, "Price is required"),
   taxRate: z.string().default("0"),
@@ -142,6 +144,7 @@ export default function ProductsPage() {
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
+      sku: "",
       description: "",
       price: "",
       taxRate: "0",
@@ -153,6 +156,7 @@ export default function ProductsPage() {
     setEditingProduct(product);
     form.reset({
       name: product.name,
+      sku: product.sku,
       description: product.description,
       price: product.price,
       taxRate: product.taxRate
@@ -165,6 +169,7 @@ export default function ProductsPage() {
     setEditingProduct(null);
     form.reset({
       name: "",
+      sku: "",
       description: "",
       price: "",
       taxRate: "0"
@@ -240,7 +245,7 @@ export default function ProductsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[300px]">Name</TableHead>
-                    <TableHead className="w-[300px]">Description</TableHead>
+                    <TableHead className="w-[150px]">SKU/Code</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Tax Rate</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -250,8 +255,8 @@ export default function ProductsPage() {
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id} className="group">
                       <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="text-gray-500 truncate max-w-xs">
-                        {product.description || "—"}
+                      <TableCell className="font-mono text-sm text-gray-600">
+                        {product.sku || "—"}
                       </TableCell>
                       <TableCell>{formatCurrency(product.price)}</TableCell>
                       <TableCell>{product.taxRate}%</TableCell>
@@ -329,6 +334,20 @@ export default function ProductsPage() {
                     <FormLabel>Name*</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter product name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU/Code*</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter product SKU or code" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

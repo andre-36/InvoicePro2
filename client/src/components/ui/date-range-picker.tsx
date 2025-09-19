@@ -178,12 +178,12 @@ export function DateRangePicker({
                   onSelect={onDateChange}
                   numberOfMonths={2}
                   className="rdp-months_flex_row"
-                  styles={{
-                    months: { display: 'flex', gap: '1rem' },
-                    month: { width: 'auto' },
-                    table: { fontSize: '0.875rem' },
-                    day_selected: { backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' },
-                    day_range_middle: { backgroundColor: 'hsl(var(--primary) / 0.1)' }
+                  classNames={{
+                    months: "flex gap-4",
+                    month: "w-auto",
+                    table: "text-sm",
+                    day_selected: "bg-primary text-primary-foreground",
+                    day_range_middle: "bg-primary/10"
                   }}
                 />
               </CardContent>
