@@ -858,6 +858,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get next invoice number preview
+  app.get("/api/invoices/next-number", requireAuth, async (req, res) => {
+    try {
+      const issueDate = req.query.issueDate ? new Date(req.query.issueDate as string) : new Date();
+      const nextNumber = await storage.getNextInvoiceNumber(issueDate);
+      res.json({ invoiceNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next invoice number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get next quotation number preview  
+  app.get("/api/quotations/next-number", requireAuth, async (req, res) => {
+    try {
+      const nextNumber = await storage.getNextQuotationNumber();
+      res.json({ quotationNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next quotation number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.delete("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const quotationId = parseInt(req.params.id);

@@ -88,7 +88,13 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     enabled: !!quotationId,
   });
 
-  // Server generates quotation numbers automatically
+  // For new quotations, fetch the next quotation number preview
+  const { data: nextQuotationNumberData } = useQuery({
+    queryKey: ['/api/quotations/next-number'],
+    enabled: !quotationId, // Only for new quotations
+  });
+  
+  const nextQuotationNumber = nextQuotationNumberData?.quotationNumber;
 
   // Form setup
   const form = useForm<QuotationFormValues>({
@@ -290,7 +296,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                 <div>
                   <FormLabel>Quotation Number</FormLabel>
                   <Input 
-                    value={quotationId ? (quotationData?.quotation?.quotationNumber ?? "") : "Will be auto-generated"}
+                    value={quotationId ? (quotationData?.quotation?.quotationNumber ?? "") : (nextQuotationNumber || "Loading...")}
                     readOnly 
                     className="bg-gray-50 dark:bg-gray-800" 
                     data-testid="input-quotation-number"

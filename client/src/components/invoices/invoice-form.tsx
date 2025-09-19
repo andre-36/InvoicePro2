@@ -97,7 +97,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
-  // For new invoices, server will auto-generate the invoice number
+  // For new invoices, fetch the next invoice number preview
+  const { data: nextInvoiceNumberData } = useQuery({
+    queryKey: ['/api/invoices/next-number'],
+    enabled: !invoiceId, // Only for new invoices
+  });
+  
+  const nextInvoiceNumber = nextInvoiceNumberData?.invoiceNumber;
 
   // Form setup with conditional schema
   const invoiceFormSchema = getInvoiceFormSchema(!!invoiceId);
@@ -491,9 +497,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   <div>
                     <FormLabel>Invoice Number</FormLabel>
                     <Input 
-                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : "Will be auto-generated"}
+                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || "Loading...")}
                       readOnly 
-                      className="bg-gray-50" 
+                      className="bg-gray-50 dark:bg-gray-800" 
                       data-testid="input-invoice-number"
                     />
                   </div>

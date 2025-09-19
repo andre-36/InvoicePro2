@@ -85,6 +85,10 @@ export interface IStorage {
   convertQuotationToInvoice(id: number): Promise<Invoice>;
   deleteQuotation(id: number): Promise<void>;
   
+  // Preview number generation methods
+  getNextInvoiceNumber(issueDate?: Date): Promise<string>;
+  getNextQuotationNumber(): Promise<string>;
+  
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
   getTransactions(storeId: number): Promise<Transaction[]>;
@@ -192,8 +196,13 @@ async function generateNextNumber(prefix: string, yearMonth: string, table: any,
   let nextNumber = 1;
   if (result.length > 0 && result[0].number) {
     const lastNumber = result[0].number;
-    const numericPart = lastNumber.split('-')[2];
-    nextNumber = parseInt(numericPart, 10) + 1;
+    const parts = lastNumber.split('-');
+    if (parts.length >= 3 && parts[2]) {
+      const numericPart = parseInt(parts[2], 10);
+      if (!isNaN(numericPart)) {
+        nextNumber = numericPart + 1;
+      }
+    }
   }
 
   return `${prefix}-${yearMonth}-${nextNumber.toString().padStart(4, '0')}`;
@@ -1527,6 +1536,28 @@ export class DatabaseStorage implements IStorage {
       totalProfit: parseFloat(row.total_profit || '0'),
       purchaseDate: new Date(row.purchase_date)
     }));
+  }
+
+  // Preview number generation methods
+  async getNextInvoiceNumber(issueDate: Date = new Date()): Promise<string> {
+    return withTransaction(async (tx) => {
+      const year = issueDate.getFullYear().toString().slice(-2);
+      const month = (issueDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+      
+      return await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
+    });
+  }
+
+  async getNextQuotationNumber(): Promise<string> {
+    return withTransaction(async (tx) => {
+      const currentDate = new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+      
+      return await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
+    });
   }
 }
 
