@@ -487,22 +487,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Only show invoice number field when editing existing invoices */}
-                  {invoiceId && (
-                    <FormField
-                      control={form.control}
-                      name="invoice.invoiceNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Invoice Number</FormLabel>
-                          <FormControl>
-                            <Input {...field} readOnly className="bg-gray-50" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                  {/* Invoice Number field - auto-generated for new invoices, display for existing */}
+                  <div>
+                    <FormLabel>Invoice Number</FormLabel>
+                    <Input 
+                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : "Will be auto-generated"}
+                      readOnly 
+                      className="bg-gray-50" 
+                      data-testid="input-invoice-number"
                     />
-                  )}
+                  </div>
                   
                   <FormField
                     control={form.control}
