@@ -29,6 +29,11 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   total: z.string().optional(),
 });
 
+// For editing existing invoices, we need to include the invoice number for display
+const editingInvoiceSchema = extendedInvoiceSchema.extend({
+  invoiceNumber: z.string(),
+});
+
 // Schema for invoice items
 const invoiceItemSchema = z.object({
   id: z.number().optional(),
@@ -42,13 +47,16 @@ const invoiceItemSchema = z.object({
   productId: z.number().nullable().optional(),
 });
 
-// Schema for the complete form
-const invoiceFormSchema = z.object({
-  invoice: extendedInvoiceSchema,
+// Schema for the complete form - conditional based on whether editing
+const getInvoiceFormSchema = (isEditing: boolean) => z.object({
+  invoice: isEditing ? editingInvoiceSchema : extendedInvoiceSchema,
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
 });
 
-type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
+type InvoiceFormValues = {
+  invoice: any;
+  items: InvoiceItem[];
+};
 type InvoiceItem = z.infer<typeof invoiceItemSchema>;
 
 interface InvoiceFormProps {
@@ -89,23 +97,21 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
-  // Generate a new invoice number (only for new invoices)
-  const { data: recentInvoices } = useQuery({
-    queryKey: ['/api/dashboard/recent-invoices'],
-    enabled: !invoiceId,
-  });
+  // For new invoices, server will auto-generate the invoice number
 
-  // Form setup
+  // Form setup with conditional schema
+  const invoiceFormSchema = getInvoiceFormSchema(!!invoiceId);
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       invoice: {
-        invoiceNumber: "",
+        ...(invoiceId && { invoiceNumber: "" }),
+        storeId: 1,
         clientId: 0,
-        userId: 0,
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         status: "draft",
+        totalAmount: "0",
         subtotal: "0",
         tax: "0",
         discount: "0",
@@ -120,13 +126,18 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
       // Format dates as ISO strings
+      let invoiceData = {
+        ...values.invoice,
+        issueDate: values.invoice.issueDate.toISOString(),
+        dueDate: values.invoice.dueDate.toISOString(),
+      };
+      
+      // For new invoices, don't send invoiceNumber - let server generate it
+      // The schema already excludes invoiceNumber for new invoices
+
       const formattedValues = {
         ...values,
-        invoice: {
-          ...values.invoice,
-          issueDate: values.invoice.issueDate.toISOString(),
-          dueDate: values.invoice.dueDate.toISOString(),
-        }
+        invoice: invoiceData
       };
 
       if (invoiceId) {
@@ -155,26 +166,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   });
 
-  // Set up the form when data is loaded
+  // Set up the form when data is loaded  
   useEffect(() => {
-    if (!invoiceId && recentInvoices) {
-      // Generate a new invoice number
-      let lastInvoiceNumber = "INV-2023-0000";
-      if (recentInvoices.length > 0) {
-        lastInvoiceNumber = recentInvoices[0].invoiceNumber;
-      }
-      
-      // Extract the number part and increment
-      const matches = lastInvoiceNumber.match(/(\d+)$/);
-      if (matches && matches[1]) {
-        const nextNumber = (parseInt(matches[1]) + 1).toString().padStart(4, '0');
-        const prefix = lastInvoiceNumber.substring(0, lastInvoiceNumber.length - matches[1].length);
-        form.setValue('invoice.invoiceNumber', prefix + nextNumber);
-      } else {
-        form.setValue('invoice.invoiceNumber', 'INV-2023-0001');
-      }
-    }
-
     if (invoiceData) {
       // Populate form with existing invoice data
       const invoice = {
@@ -204,7 +197,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         form.setValue('items', formattedItems);
       }
     }
-  }, [invoiceData, recentInvoices, invoiceId, form]);
+  }, [invoiceData, invoiceId, form]);
 
   // Calculate totals whenever items change
   useEffect(() => {
@@ -494,19 +487,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="invoice.invoiceNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Invoice Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} readOnly className="bg-gray-50" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Only show invoice number field when editing existing invoices */}
+                  {invoiceId && (
+                    <FormField
+                      control={form.control}
+                      name="invoice.invoiceNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Invoice Number</FormLabel>
+                          <FormControl>
+                            <Input {...field} readOnly className="bg-gray-50" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   
                   <FormField
                     control={form.control}
