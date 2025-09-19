@@ -179,13 +179,13 @@ export type BatchProfitabilityData = {
 };
 
 // Helper function to generate unique numbers with retry logic for concurrency
-async function generateNextNumber(prefix: string, year: number, table: any, column: any, tx: any): Promise<string> {
-  // Find the highest number for this year using the transaction
-  const yearPrefix = `${prefix}-${year}-`;
+async function generateNextNumber(prefix: string, yearMonth: string, table: any, column: any, tx: any): Promise<string> {
+  // Find the highest number for this year-month using the transaction
+  const yearMonthPrefix = `${prefix}-${yearMonth}-`;
   const result = await tx
     .select({ number: column })
     .from(table)
-    .where(sql`${column} LIKE ${yearPrefix + '%'}`)
+    .where(sql`${column} LIKE ${yearMonthPrefix + '%'}`)
     .orderBy(sql`${column} DESC`)
     .limit(1);
 
@@ -196,7 +196,7 @@ async function generateNextNumber(prefix: string, year: number, table: any, colu
     nextNumber = parseInt(numericPart, 10) + 1;
   }
 
-  return `${prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
+  return `${prefix}-${yearMonth}-${nextNumber.toString().padStart(4, '0')}`;
 }
 
 // Helper function to safely create records with unique number generation and retry logic
@@ -211,12 +211,15 @@ async function createWithUniqueNumber<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await withTransaction(async (tx) => {
-        // Get year from date field or current year
-        const year = dateField && data[dateField] ? 
-          new Date(data[dateField]).getFullYear() : 
-          new Date().getFullYear();
+        // Get year and month from date field or current date
+        const date = dateField && data[dateField] ? 
+          new Date(data[dateField]) : 
+          new Date();
+        const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
+        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
+        const yearMonth = year + month;
         
-        const uniqueNumber = await generateNextNumber(prefix, year, table, column, tx);
+        const uniqueNumber = await generateNextNumber(prefix, yearMonth, table, column, tx);
         
         const [newRecord] = await tx
           .insert(table)
@@ -527,12 +530,13 @@ export class DatabaseStorage implements IStorage {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await withTransaction(async (tx) => {
-          // Get year from issue date or current year
-          const year = invoiceData.issueDate ? 
-            new Date(invoiceData.issueDate).getFullYear() : 
-            new Date().getFullYear();
+          // Get year and month from issue date or current date
+          const issueDate = invoiceData.issueDate ? new Date(invoiceData.issueDate) : new Date();
+          const year = issueDate.getFullYear().toString().slice(-2); // Get last 2 digits of year
+          const month = (issueDate.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
+          const yearMonth = year + month;
           
-          const invoiceNumber = await generateNextNumber("INV", year, invoices, invoices.invoiceNumber, tx);
+          const invoiceNumber = await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
           
           // Create the invoice with auto-generated number
           const [newInvoice] = await tx
@@ -914,9 +918,12 @@ export class DatabaseStorage implements IStorage {
   
   async createQuotation(quotationData: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation> {
     return withTransaction(async (tx) => {
-      // Generate unique quotation number
-      const currentYear = new Date().getFullYear();
-      const quotationNumber = await generateNextNumber("QUO", currentYear, quotations, quotations.quotationNumber);
+      // Generate unique quotation number with YYMM format
+      const currentDate = new Date();
+      const year = currentDate.getFullYear().toString().slice(-2); // Get last 2 digits of year
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
+      const yearMonth = year + month;
+      const quotationNumber = await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
       
       // Create the quotation
       const [newQuotation] = await tx
@@ -967,22 +974,13 @@ export class DatabaseStorage implements IStorage {
         .from(quotationItems)
         .where(eq(quotationItems.quotationId, id));
       
-      // Generate a new invoice number
+      // Generate a unique invoice number using the standard generation function
       const today = new Date();
       const year = today.getFullYear().toString().slice(-2);
       const month = (today.getMonth() + 1).toString().padStart(2, '0');
-      const invoiceCount = await tx
-        .select({ count: sql<number>`count(*)` })
-        .from(invoices)
-        .where(
-          and(
-            eq(invoices.storeId, quotation.storeId),
-            sql`DATE_PART('year', ${invoices.issueDate}) = DATE_PART('year', CURRENT_DATE)`,
-            sql`DATE_PART('month', ${invoices.issueDate}) = DATE_PART('month', CURRENT_DATE)`
-          )
-        );
-      const sequence = (invoiceCount[0]?.count ?? 0) + 1;
-      const invoiceNumber = `INV-${year}${month}-${sequence.toString().padStart(4, '0')}`;
+      const yearMonth = year + month;
+      
+      const invoiceNumber = await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
       
       // Create a new invoice based on the quotation
       const [newInvoice] = await tx
