@@ -1540,24 +1540,38 @@ export class DatabaseStorage implements IStorage {
 
   // Preview number generation methods
   async getNextInvoiceNumber(issueDate: Date = new Date()): Promise<string> {
-    return withTransaction(async (tx) => {
+    try {
       const year = issueDate.getFullYear().toString().slice(-2);
       const month = (issueDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
       
-      return await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
-    });
+      console.log('Generating invoice number for yearMonth:', yearMonth);
+      
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextInvoiceNumber:', error);
+      throw error;
+    }
   }
 
   async getNextQuotationNumber(): Promise<string> {
-    return withTransaction(async (tx) => {
+    try {
       const currentDate = new Date();
       const year = currentDate.getFullYear().toString().slice(-2);
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
       
-      return await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
-    });
+      console.log('Generating quotation number for yearMonth:', yearMonth);
+      
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextQuotationNumber:', error);
+      throw error;
+    }
   }
 }
 

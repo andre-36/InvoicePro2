@@ -97,13 +97,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
-  // For new invoices, fetch the next invoice number preview
-  const { data: nextInvoiceNumberData } = useQuery({
+  // For new invoices, fetch the next invoice number preview with fallback
+  const { data: nextInvoiceNumberData, isError: isNumberError } = useQuery({
     queryKey: ['/api/invoices/next-number'],
     enabled: !invoiceId, // Only for new invoices
   });
   
-  const nextInvoiceNumber = nextInvoiceNumberData?.invoiceNumber;
+  // Generate fallback number if API fails
+  const generateFallbackInvoiceNumber = () => {
+    const today = new Date();
+    const year = today.getFullYear().toString().slice(-2);
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    return `INV-${year}${month}-0001`;
+  };
+  
+  const nextInvoiceNumber = nextInvoiceNumberData?.invoiceNumber || 
+    (isNumberError ? generateFallbackInvoiceNumber() : null);
 
   // Form setup with conditional schema
   const invoiceFormSchema = getInvoiceFormSchema(!!invoiceId);
@@ -497,7 +506,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   <div>
                     <FormLabel>Invoice Number</FormLabel>
                     <Input 
-                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || "Loading...")}
+                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || generateFallbackInvoiceNumber())}
                       readOnly 
                       className="bg-gray-50 dark:bg-gray-800" 
                       data-testid="input-invoice-number"

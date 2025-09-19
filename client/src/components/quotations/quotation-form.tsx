@@ -88,13 +88,22 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     enabled: !!quotationId,
   });
 
-  // For new quotations, fetch the next quotation number preview
-  const { data: nextQuotationNumberData } = useQuery({
+  // For new quotations, fetch the next quotation number preview with fallback
+  const { data: nextQuotationNumberData, isError: isNumberError } = useQuery({
     queryKey: ['/api/quotations/next-number'],
     enabled: !quotationId, // Only for new quotations
   });
   
-  const nextQuotationNumber = nextQuotationNumberData?.quotationNumber;
+  // Generate fallback number if API fails
+  const generateFallbackQuotationNumber = () => {
+    const today = new Date();
+    const year = today.getFullYear().toString().slice(-2);
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    return `QUO-${year}${month}-0001`;
+  };
+  
+  const nextQuotationNumber = nextQuotationNumberData?.quotationNumber || 
+    (isNumberError ? generateFallbackQuotationNumber() : null);
 
   // Form setup
   const form = useForm<QuotationFormValues>({
@@ -296,7 +305,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                 <div>
                   <FormLabel>Quotation Number</FormLabel>
                   <Input 
-                    value={quotationId ? (quotationData?.quotation?.quotationNumber ?? "") : (nextQuotationNumber || "Loading...")}
+                    value={quotationId ? (quotationData?.quotation?.quotationNumber ?? "") : (nextQuotationNumber || generateFallbackQuotationNumber())}
                     readOnly 
                     className="bg-gray-50 dark:bg-gray-800" 
                     data-testid="input-quotation-number"
