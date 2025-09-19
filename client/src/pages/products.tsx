@@ -363,14 +363,14 @@ export default function ProductsPage() {
                       <FormControl>
                         <div className="relative">
                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <span className="text-gray-500 sm:text-sm">$</span>
+                            <span className="text-gray-500 sm:text-sm">Rp</span>
                           </div>
                           <Input 
-                            placeholder="0.00" 
+                            placeholder="0" 
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
-                            className="pl-7"
+                            className="pl-8"
                             {...field} 
                           />
                         </div>

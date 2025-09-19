@@ -96,10 +96,8 @@ export default function QuotationsPage() {
         title: "Quotation converted",
         description: "The quotation has been converted to an invoice successfully.",
       });
-      // Navigate to the new invoice
-      if (invoice?.id) {
-        navigate(`/invoices/${invoice.id}`);
-      }
+      // Navigate to the invoices page
+      navigate("/invoices");
     },
     onError: () => {
       toast({

@@ -157,7 +157,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
 
   // Generate quotation number for new quotations
   useEffect(() => {
-    if (!quotationId && recentQuotations) {
+    if (!quotationId && recentQuotations && Array.isArray(recentQuotations)) {
       const today = new Date();
       const year = today.getFullYear().toString().slice(-2);
       const month = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -170,7 +170,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
 
   // Load existing quotation data for editing
   useEffect(() => {
-    if (quotationData && quotationId) {
+    if (quotationData && quotationId && typeof quotationData === 'object' && 'quotation' in quotationData) {
       const { quotation, items: quotationItems } = quotationData;
       
       // Set quotation data
@@ -337,7 +337,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {clients?.map((client: any) => (
+                          {Array.isArray(clients) && clients.map((client: any) => (
                             <SelectItem key={client.id} value={client.id.toString()}>
                               {client.name}
                             </SelectItem>

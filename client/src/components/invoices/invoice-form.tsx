@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Check, Plus, Trash2 } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertInvoiceSchema } from "@shared/schema";
@@ -16,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { generatePDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 // Extend the schema for client-side validation
 const extendedInvoiceSchema = insertInvoiceSchema.extend({
@@ -423,19 +424,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card className="border-0 shadow-none">
           <CardHeader className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-            <CardTitle className="text-xl font-semibold text-gray-900">
-              {invoiceId ? "Edit Invoice" : "Create New Invoice"}
-            </CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={onSuccess}
                 className="h-9"
               >
-                <X className="mr-1.5 h-4 w-4" />
-                <span>Cancel</span>
+                <ArrowLeft className="h-4 w-4" />
               </Button>
+              <CardTitle className="text-xl font-semibold text-gray-900">
+                {invoiceId ? "Edit Invoice" : "Create New Invoice"}
+              </CardTitle>
             </div>
           </CardHeader>
           
@@ -605,11 +606,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Subtotal:</span>
-                      <span className="text-gray-900">${form.watch('invoice.subtotal')}</span>
+                      <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.subtotal') || '0'))}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Tax:</span>
-                      <span className="text-gray-900">${form.watch('invoice.tax')}</span>
+                      <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.tax') || '0'))}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Discount:</span>
@@ -630,12 +631,12 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                             </FormItem>
                           )}
                         />
-                        <span className="text-gray-900">-${form.watch('invoice.discount')}</span>
+                        <span className="text-gray-900">-{formatCurrency(parseFloat(form.watch('invoice.discount') || '0'))}</span>
                       </div>
                     </div>
                     <div className="flex justify-between text-base pt-2 border-t border-gray-200">
                       <span className="font-semibold text-gray-900">Total:</span>
-                      <span className="font-bold text-gray-900">${form.watch('invoice.total')}</span>
+                      <span className="font-bold text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.total') || '0'))}</span>
                     </div>
                   </div>
                 </div>
@@ -668,26 +669,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={onSuccess}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
               onClick={handleGeneratePDF}
-              className="bg-gray-50 hover:bg-gray-100 text-gray-800"
-            >
-              Preview PDF
-            </Button>
-            <Button
-              type="button"
-              onClick={saveAsDraft}
-              variant="secondary"
               disabled={mutation.isPending}
             >
-              <Save className="mr-1.5 h-4 w-4" />
-              <span>Save as Draft</span>
+              <Printer className="mr-1.5 h-4 w-4" />
+              <span>Print Invoice</span>
             </Button>
             <Button
               type="button"
@@ -695,7 +681,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               disabled={mutation.isPending}
             >
               <Check className="mr-1.5 h-4 w-4" />
-              <span>Save & Send</span>
+              <span>{invoiceId ? 'Update Invoice' : 'Create Invoice'}</span>
             </Button>
           </CardFooter>
         </Card>
