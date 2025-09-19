@@ -178,39 +178,72 @@ export type BatchProfitabilityData = {
   purchaseDate: Date;
 };
 
-// Helper function to generate unique numbers with retry logic
-async function generateNextNumber(prefix: string, year: number, table: any, column: any): Promise<string> {
-  const maxRetries = 5;
-  
+// Helper function to generate unique numbers with retry logic for concurrency
+async function generateNextNumber(prefix: string, year: number, table: any, column: any, tx: any): Promise<string> {
+  // Find the highest number for this year using the transaction
+  const yearPrefix = `${prefix}-${year}-`;
+  const result = await tx
+    .select({ number: column })
+    .from(table)
+    .where(sql`${column} LIKE ${yearPrefix + '%'}`)
+    .orderBy(sql`${column} DESC`)
+    .limit(1);
+
+  let nextNumber = 1;
+  if (result.length > 0 && result[0].number) {
+    const lastNumber = result[0].number;
+    const numericPart = lastNumber.split('-')[2];
+    nextNumber = parseInt(numericPart, 10) + 1;
+  }
+
+  return `${prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
+}
+
+// Helper function to safely create records with unique number generation and retry logic
+async function createWithUniqueNumber<T>(
+  table: any,
+  column: any,
+  prefix: string,
+  data: any,
+  dateField?: string,
+  maxRetries: number = 5
+): Promise<T> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Find the highest number for this year
-      const yearPrefix = `${prefix}-${year}-`;
-      const result = await db
-        .select({ number: column })
-        .from(table)
-        .where(sql`${column} LIKE ${yearPrefix + '%'}`)
-        .orderBy(sql`${column} DESC`)
-        .limit(1);
-
-      let nextNumber = 1;
-      if (result.length > 0 && result[0].number) {
-        const lastNumber = result[0].number;
-        const numericPart = lastNumber.split('-')[2];
-        nextNumber = parseInt(numericPart, 10) + 1;
+      return await withTransaction(async (tx) => {
+        // Get year from date field or current year
+        const year = dateField && data[dateField] ? 
+          new Date(data[dateField]).getFullYear() : 
+          new Date().getFullYear();
+        
+        const uniqueNumber = await generateNextNumber(prefix, year, table, column, tx);
+        
+        const [newRecord] = await tx
+          .insert(table)
+          .values({
+            ...data,
+            [column.name]: uniqueNumber
+          })
+          .returning();
+          
+        return newRecord;
+      });
+    } catch (error: any) {
+      // Check if this is a unique constraint violation
+      if (error?.code === '23505' && error?.detail?.includes(column.name)) {
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to create record with unique ${prefix} number after ${maxRetries} attempts due to concurrency conflicts`);
+        }
+        // Wait with exponential backoff before retry
+        await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+        continue;
       }
-
-      return `${prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
-    } catch (error) {
-      if (attempt === maxRetries) {
-        throw new Error(`Failed to generate unique ${prefix} number after ${maxRetries} attempts: ${error}`);
-      }
-      // Wait briefly before retry (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+      // For other errors, don't retry
+      throw error;
     }
   }
   
-  throw new Error(`Failed to generate unique ${prefix} number`);
+  throw new Error(`Failed to create record with unique ${prefix} number`);
 }
 
 export class DatabaseStorage implements IStorage {
@@ -293,18 +326,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createClient(client: InsertClient): Promise<Client> {
-    return await withTransaction(async (tx) => {
-      const currentYear = new Date().getFullYear();
-      const clientNumber = await generateNextNumber("CL", currentYear, clients, clients.clientNumber);
-      
-      const clientData = {
-        ...client,
-        clientNumber
-      };
-      
-      const [newClient] = await tx.insert(clients).values(clientData).returning();
-      return newClient;
-    });
+    return createWithUniqueNumber<Client>(clients, clients.clientNumber, "CL", client);
   }
   
   async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
@@ -499,20 +521,27 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
-    // Use transaction to ensure all operations succeed or fail together
-    return withTransaction(async (tx) => {
-      // Generate unique invoice number
-      const currentYear = new Date().getFullYear();
-      const invoiceNumber = await generateNextNumber("INV", currentYear, invoices, invoices.invoiceNumber);
-      
-      // Create the invoice with auto-generated number
-      const [newInvoice] = await tx
-        .insert(invoices)
-        .values({
-          ...invoiceData,
-          invoiceNumber
-        })
-        .returning();
+    // Use the safe number generation for the base invoice, then process items
+    const maxRetries = 5;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await withTransaction(async (tx) => {
+          // Get year from issue date or current year
+          const year = invoiceData.issueDate ? 
+            new Date(invoiceData.issueDate).getFullYear() : 
+            new Date().getFullYear();
+          
+          const invoiceNumber = await generateNextNumber("INV", year, invoices, invoices.invoiceNumber, tx);
+          
+          // Create the invoice with auto-generated number
+          const [newInvoice] = await tx
+            .insert(invoices)
+            .values({
+              ...invoiceData,
+              invoiceNumber
+            })
+            .returning();
       
       // Calculate total profit for the invoice
       let totalProfit = 0;
@@ -629,9 +658,25 @@ export class DatabaseStorage implements IStorage {
         .where(eq(invoices.id, newInvoice.id));
       
       return updatedInvoice;
-    });
+        });
+      } catch (error: any) {
+        // Check if this is a unique constraint violation
+        if (error?.code === '23505' && error?.detail?.includes('invoiceNumber')) {
+          if (attempt === maxRetries) {
+            throw new Error(`Failed to create invoice with unique number after ${maxRetries} attempts due to concurrency conflicts`);
+          }
+          // Wait with exponential backoff before retry
+          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+          continue;
+        }
+        // For other errors, don't retry
+        throw error;
+      }
+    }
+    
+    throw new Error(`Failed to create invoice with unique number`);
   }
-  
+
   async updateInvoice(id: number, invoiceData: Partial<InsertInvoice>): Promise<Invoice> {
     const [updatedInvoice] = await db
       .update(invoices)

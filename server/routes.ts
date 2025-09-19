@@ -724,6 +724,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertInvoiceSchema.partial(), req, res);
       if (!validatedData) return;
       
+      // Prevent modification of invoice number to prevent fraud
+      if (validatedData.invoiceNumber !== undefined) {
+        return res.status(400).json({ error: "Invoice number cannot be modified" });
+      }
+      
       const updatedInvoice = await storage.updateInvoice(invoiceId, validatedData);
       res.json(updatedInvoice);
     } catch (error) {
@@ -828,6 +833,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotationId = parseInt(req.params.id);
       const validatedData = validateRequestBody(insertQuotationSchema.partial(), req, res);
       if (!validatedData) return;
+      
+      // Prevent modification of quotation number to prevent fraud
+      if (validatedData.quotationNumber !== undefined) {
+        return res.status(400).json({ error: "Quotation number cannot be modified" });
+      }
       
       const updatedQuotation = await storage.updateQuotation(quotationId, validatedData);
       res.json(updatedQuotation);
