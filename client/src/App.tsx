@@ -11,6 +11,9 @@ import Dashboard from "@/pages/dashboard";
 import InvoicesPage from "@/pages/invoices";
 import InvoiceDetailPage from "@/pages/invoices/invoice-detail";
 import CreateInvoicePage from "@/pages/invoices/create";
+import QuotationsPage from "@/pages/quotations";
+import QuotationDetailPage from "@/pages/quotations/quotation-detail";
+import CreateQuotationPage from "@/pages/quotations/create";
 import ClientsPage from "@/pages/clients";
 import CreateClientPage from "@/pages/clients/create";
 import ProductsPage from "@/pages/products";
@@ -120,6 +123,11 @@ function App() {
               <Route path="/invoices/create" component={CreateInvoicePage} />
               <Route path="/invoices/:id">
                 {params => <InvoiceDetailPage id={parseInt(params.id)} />}
+              </Route>
+              <Route path="/quotations" component={QuotationsPage} />
+              <Route path="/quotations/create" component={CreateQuotationPage} />
+              <Route path="/quotations/:id">
+                {params => <QuotationDetailPage id={parseInt(params.id)} />}
               </Route>
               <Route path="/clients" component={ClientsPage} />
               <Route path="/clients/create" component={CreateClientPage} />

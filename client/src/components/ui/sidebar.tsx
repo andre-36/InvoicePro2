@@ -12,6 +12,7 @@ import {
   CreditCard,
   LogOut,
   Menu,
+  FileEdit,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -123,6 +124,22 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   isActive("/invoices") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
                 )} />
                 <span>Invoices</span>
+              </Link>
+              
+              <Link 
+                href="/quotations"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/quotations") 
+                    ? "text-white bg-primary" 
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                )}
+              >
+                <FileEdit className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/quotations") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                )} />
+                <span>Quotations</span>
               </Link>
               
               <Link 
