@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { subDays, format } from "date-fns";
+import { DateRange } from "react-day-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { InvoiceStatusChart } from "@/components/dashboard/invoice-status-chart";
 import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { TopClientsList } from "@/components/dashboard/top-clients-list";
 
-type DateRange = "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
 
 type DashboardStats = {
   totalIncome: number;
@@ -22,35 +23,50 @@ type DashboardStats = {
 };
 
 export default function Dashboard() {
-  const [dateRange, setDateRange] = useState<DateRange>("this_month");
+  // Initialize with last 30 days
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 29),
+    to: new Date(),
+  });
+
+  // Format dates for API queries
+  const queryDates = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) {
+      return {
+        start: format(subDays(new Date(), 29), 'yyyy-MM-dd'),
+        end: format(new Date(), 'yyyy-MM-dd'),
+      };
+    }
+    return {
+      start: format(dateRange.from, 'yyyy-MM-dd'),
+      end: format(dateRange.to, 'yyyy-MM-dd'),
+    };
+  }, [dateRange]);
   
   const { data, isLoading, error } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats'],
+    queryKey: ['/api/stores/1/dashboard/stats', queryDates],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('start', queryDates.start);
+      params.set('end', queryDates.end);
+      
+      const response = await fetch(`/api/stores/1/dashboard/stats?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
   });
   
   
   return (
     <div className="space-y-6">
       {/* Page Title */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="inline-flex items-center rounded-md">
-          <Select
-            value={dateRange}
-            onValueChange={(value) => setDateRange(value as DateRange)}
-          >
-            <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="This Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="this_month">This Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
-              <SelectItem value="this_quarter">This Quarter</SelectItem>
-              <SelectItem value="this_year">This Year</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <DateRangePicker
+          date={dateRange}
+          onDateChange={setDateRange}
+          className="w-full sm:w-auto"
+        />
       </div>
       
       {/* Stats Cards */}
@@ -143,7 +159,7 @@ export default function Dashboard() {
       
       {/* Charts and Graphs Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <RevenueChart />
+        <RevenueChart startDate={queryDates.start} endDate={queryDates.end} />
         <InvoiceStatusChart />
       </div>
       

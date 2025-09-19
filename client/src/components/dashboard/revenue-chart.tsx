@@ -19,9 +19,23 @@ interface RevenueData {
   expenses: number[];
 }
 
-export function RevenueChart() {
+interface RevenueChartProps {
+  startDate?: string;
+  endDate?: string;
+}
+
+export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
   const { data, isLoading, error } = useQuery<RevenueData>({
-    queryKey: ['/api/dashboard/revenue-overview'],
+    queryKey: ['/api/stores/1/dashboard/revenue', startDate, endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set('start', startDate);
+      if (endDate) params.set('end', endDate);
+      
+      const response = await fetch(`/api/stores/1/dashboard/revenue?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch revenue data');
+      return response.json();
+    },
   });
 
   if (isLoading) {
