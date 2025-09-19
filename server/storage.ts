@@ -178,6 +178,41 @@ export type BatchProfitabilityData = {
   purchaseDate: Date;
 };
 
+// Helper function to generate unique numbers with retry logic
+async function generateNextNumber(prefix: string, year: number, table: any, column: any): Promise<string> {
+  const maxRetries = 5;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Find the highest number for this year
+      const yearPrefix = `${prefix}-${year}-`;
+      const result = await db
+        .select({ number: column })
+        .from(table)
+        .where(sql`${column} LIKE ${yearPrefix + '%'}`)
+        .orderBy(sql`${column} DESC`)
+        .limit(1);
+
+      let nextNumber = 1;
+      if (result.length > 0 && result[0].number) {
+        const lastNumber = result[0].number;
+        const numericPart = lastNumber.split('-')[2];
+        nextNumber = parseInt(numericPart, 10) + 1;
+      }
+
+      return `${prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to generate unique ${prefix} number after ${maxRetries} attempts: ${error}`);
+      }
+      // Wait briefly before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+    }
+  }
+  
+  throw new Error(`Failed to generate unique ${prefix} number`);
+}
+
 export class DatabaseStorage implements IStorage {
   // Session store for PostgreSQL
   sessionStore: session.Store;
@@ -258,8 +293,18 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createClient(client: InsertClient): Promise<Client> {
-    const [newClient] = await db.insert(clients).values(client).returning();
-    return newClient;
+    return await withTransaction(async (tx) => {
+      const currentYear = new Date().getFullYear();
+      const clientNumber = await generateNextNumber("CL", currentYear, clients, clients.clientNumber);
+      
+      const clientData = {
+        ...client,
+        clientNumber
+      };
+      
+      const [newClient] = await tx.insert(clients).values(clientData).returning();
+      return newClient;
+    });
   }
   
   async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
@@ -456,10 +501,17 @@ export class DatabaseStorage implements IStorage {
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
     // Use transaction to ensure all operations succeed or fail together
     return withTransaction(async (tx) => {
-      // Create the invoice
+      // Generate unique invoice number
+      const currentYear = new Date().getFullYear();
+      const invoiceNumber = await generateNextNumber("INV", currentYear, invoices, invoices.invoiceNumber);
+      
+      // Create the invoice with auto-generated number
       const [newInvoice] = await tx
         .insert(invoices)
-        .values(invoiceData)
+        .values({
+          ...invoiceData,
+          invoiceNumber
+        })
         .returning();
       
       // Calculate total profit for the invoice
@@ -817,10 +869,17 @@ export class DatabaseStorage implements IStorage {
   
   async createQuotation(quotationData: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation> {
     return withTransaction(async (tx) => {
+      // Generate unique quotation number
+      const currentYear = new Date().getFullYear();
+      const quotationNumber = await generateNextNumber("QUO", currentYear, quotations, quotations.quotationNumber);
+      
       // Create the quotation
       const [newQuotation] = await tx
         .insert(quotations)
-        .values(quotationData)
+        .values({
+          ...quotationData,
+          quotationNumber
+        })
         .returning();
       
       // Create all quotation items
