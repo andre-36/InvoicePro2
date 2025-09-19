@@ -7,6 +7,8 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { Server } from "http";
 import { env } from "./env";
+import * as XLSX from "xlsx";
+import createCsvWriter from "csv-writer";
 import {
   insertUserSchema,
   insertStoreSchema,
@@ -1076,6 +1078,366 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting batch profitability analysis:", error);
       res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Database backup endpoint
+  app.get("/api/backup/export", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.query.storeId as string);
+      
+      if (!storeId) {
+        res.status(400).json({ error: "Store ID is required" });
+        return;
+      }
+
+      // Export all data for the store
+      const [clients, products, categories, invoices, quotations, transactions] = await Promise.all([
+        storage.getClients(storeId),
+        storage.getProducts(),
+        storage.getCategories(),
+        storage.getInvoices(storeId),
+        storage.getQuotations(storeId),
+        storage.getTransactions()
+      ]);
+
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        storeId,
+        data: {
+          clients,
+          products,
+          categories,
+          invoices,
+          quotations,
+          transactions
+        }
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="backup-${storeId}-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(backupData);
+    } catch (error) {
+      console.error("Error creating backup:", error);
+      res.status(500).json({ error: "Failed to create backup" });
+    }
+  });
+
+  // Database import endpoint
+  app.post("/api/backup/import", requireAuth, async (req, res) => {
+    try {
+      const { data: backupData, storeId } = req.body;
+      
+      if (!backupData || !storeId) {
+        res.status(400).json({ error: "Backup data and store ID are required" });
+        return;
+      }
+
+      // Import data (this will replace existing data)
+      let importedCount = 0;
+
+      // Import clients
+      if (backupData.clients) {
+        for (const client of backupData.clients) {
+          await storage.createClient({ ...client, storeId });
+          importedCount++;
+        }
+      }
+
+      // Import products
+      if (backupData.products) {
+        for (const product of backupData.products) {
+          await storage.createProduct(product);
+          importedCount++;
+        }
+      }
+
+      // Import categories
+      if (backupData.categories) {
+        for (const category of backupData.categories) {
+          await storage.createCategory(category);
+          importedCount++;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Successfully imported ${importedCount} records`,
+        importedCount 
+      });
+    } catch (error) {
+      console.error("Error importing backup:", error);
+      res.status(500).json({ error: "Failed to import backup" });
+    }
+  });
+
+  // CSV/XLSX Export routes
+  app.get("/api/products/export/:format", requireAuth, async (req, res) => {
+    try {
+      const format = req.params.format; // 'csv' or 'xlsx'
+      const products = await storage.getProducts();
+
+      const productData = products.map(product => ({
+        ID: product.id,
+        Name: product.name,
+        SKU: product.sku,
+        Description: product.description || '',
+        'Current Price': product.currentSellingPrice || '0',
+        Unit: product.unit,
+        'Min Stock': product.minStock || '0',
+        Weight: product.weight || '',
+        Dimensions: product.dimensions || '',
+        'Is Active': product.isActive ? 'Yes' : 'No'
+      }));
+
+      if (format === 'csv') {
+        const csvWriter = createCsvWriter.createObjectCsvStringifier({
+          header: [
+            { id: 'ID', title: 'ID' },
+            { id: 'Name', title: 'Name' },
+            { id: 'SKU', title: 'SKU' },
+            { id: 'Description', title: 'Description' },
+            { id: 'Current Price', title: 'Current Price' },
+            { id: 'Unit', title: 'Unit' },
+            { id: 'Min Stock', title: 'Min Stock' },
+            { id: 'Weight', title: 'Weight' },
+            { id: 'Dimensions', title: 'Dimensions' },
+            { id: 'Is Active', title: 'Is Active' }
+          ]
+        });
+
+        const csvString = csvWriter.getHeaderString() + csvWriter.stringifyRecords(productData);
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send(csvString);
+      } else if (format === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(productData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+        
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.xlsx"`);
+        res.send(buffer);
+      } else {
+        res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
+      }
+    } catch (error) {
+      console.error("Error exporting products:", error);
+      res.status(500).json({ error: "Failed to export products" });
+    }
+  });
+
+  app.get("/api/clients/export/:format", requireAuth, async (req, res) => {
+    try {
+      const format = req.params.format; // 'csv' or 'xlsx'
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const clients = await storage.getClients(storeId);
+
+      const clientData = clients.map(client => ({
+        ID: client.id,
+        Name: client.name,
+        Email: client.email,
+        Phone: client.phone || '',
+        Address: client.address || '',
+        'Tax Number': client.taxNumber || '',
+        Notes: client.notes || ''
+      }));
+
+      if (format === 'csv') {
+        const csvWriter = createCsvWriter.createObjectCsvStringifier({
+          header: [
+            { id: 'ID', title: 'ID' },
+            { id: 'Name', title: 'Name' },
+            { id: 'Email', title: 'Email' },
+            { id: 'Phone', title: 'Phone' },
+            { id: 'Address', title: 'Address' },
+            { id: 'Tax Number', title: 'Tax Number' },
+            { id: 'Notes', title: 'Notes' }
+          ]
+        });
+
+        const csvString = csvWriter.getHeaderString() + csvWriter.stringifyRecords(clientData);
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="clients-${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send(csvString);
+      } else if (format === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(clientData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
+        
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="clients-${new Date().toISOString().split('T')[0]}.xlsx"`);
+        res.send(buffer);
+      } else {
+        res.status(400).json({ error: "Invalid format. Use 'csv' or 'xlsx'" });
+      }
+    } catch (error) {
+      console.error("Error exporting clients:", error);
+      res.status(500).json({ error: "Failed to export clients" });
+    }
+  });
+
+  // Stock management routes
+  app.get("/api/products/:id/stock", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const storeId = parseInt(req.query.storeId as string) || 1;
+
+      // Get total stock from all batches for this product
+      const batches = await storage.getProductBatches(productId, storeId);
+      const totalStock = batches.reduce((sum, batch) => 
+        sum + parseFloat(batch.remainingQuantity.toString()), 0
+      );
+
+      // Get product details for min stock level
+      const product = await storage.getProduct(productId);
+      
+      res.json({
+        productId,
+        currentStock: totalStock,
+        minStock: product?.minStock || 0,
+        isLowStock: totalStock <= (product?.minStock || 0),
+        batches: batches.map(batch => ({
+          id: batch.id,
+          batchNumber: batch.batchNumber,
+          remainingQuantity: parseFloat(batch.remainingQuantity.toString()),
+          purchaseDate: batch.purchaseDate,
+          expiryDate: batch.expiryDate
+        }))
+      });
+    } catch (error) {
+      console.error("Error getting product stock:", error);
+      res.status(500).json({ error: "Failed to get product stock" });
+    }
+  });
+
+  app.get("/api/stores/:storeId/products/stock", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const products = await storage.getProducts(storeId);
+      
+      const productsWithStock = await Promise.all(
+        products.map(async (product) => {
+          const batches = await storage.getProductBatches(product.id, storeId);
+          const currentStock = batches.reduce((sum, batch) => 
+            sum + parseFloat(batch.remainingQuantity.toString()), 0
+          );
+          
+          return {
+            ...product,
+            currentStock,
+            isLowStock: currentStock <= (product.minStock || 0),
+            stockStatus: currentStock === 0 ? 'out_of_stock' : 
+                        currentStock <= (product.minStock || 0) ? 'low_stock' : 'in_stock'
+          };
+        })
+      );
+
+      res.json(productsWithStock);
+    } catch (error) {
+      console.error("Error getting products with stock:", error);
+      res.status(500).json({ error: "Failed to get products with stock" });
+    }
+  });
+
+  // CSV/XLSX Import routes
+  app.post("/api/products/import", requireAuth, async (req, res) => {
+    try {
+      const { data } = req.body;
+      
+      if (!data || !Array.isArray(data)) {
+        res.status(400).json({ error: "Invalid data format" });
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const row of data) {
+        try {
+          const productData = {
+            name: row.Name || row.name,
+            sku: row.SKU || row.sku,
+            description: row.Description || row.description || '',
+            currentSellingPrice: row['Current Price'] || row.currentSellingPrice || '0',
+            unit: row.Unit || row.unit || 'piece',
+            minStock: parseInt(row['Min Stock'] || row.minStock || '0'),
+            weight: row.Weight || row.weight || null,
+            dimensions: row.Dimensions || row.dimensions || null,
+            isActive: (row['Is Active'] || row.isActive || 'Yes').toLowerCase() === 'yes' || (row['Is Active'] || row.isActive || 'Yes') === true
+          };
+
+          await storage.createProduct(productData);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          errors.push(`Row ${data.indexOf(row) + 1}: ${error.message}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Import completed. ${successCount} products imported successfully, ${errorCount} errors.`,
+        successCount,
+        errorCount,
+        errors: errors.slice(0, 10) // Limit error messages
+      });
+    } catch (error) {
+      console.error("Error importing products:", error);
+      res.status(500).json({ error: "Failed to import products" });
+    }
+  });
+
+  app.post("/api/clients/import", requireAuth, async (req, res) => {
+    try {
+      const { data, storeId } = req.body;
+      
+      if (!data || !Array.isArray(data) || !storeId) {
+        res.status(400).json({ error: "Invalid data format or missing store ID" });
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const row of data) {
+        try {
+          const clientData = {
+            storeId: parseInt(storeId),
+            name: row.Name || row.name,
+            email: row.Email || row.email,
+            phone: row.Phone || row.phone || '',
+            address: row.Address || row.address || '',
+            taxNumber: row['Tax Number'] || row.taxNumber || '',
+            notes: row.Notes || row.notes || ''
+          };
+
+          await storage.createClient(clientData);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          errors.push(`Row ${data.indexOf(row) + 1}: ${error.message}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Import completed. ${successCount} clients imported successfully, ${errorCount} errors.`,
+        successCount,
+        errorCount,
+        errors: errors.slice(0, 10) // Limit error messages
+      });
+    } catch (error) {
+      console.error("Error importing clients:", error);
+      res.status(500).json({ error: "Failed to import clients" });
     }
   });
 

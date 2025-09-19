@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Package } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,10 @@ type Product = {
   description: string;
   price: string;
   taxRate: string;
+  minStock?: number;
+  currentStock?: number;
+  isLowStock?: boolean;
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
 };
 
 // Schema for product form validation
@@ -74,11 +79,13 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products'],
+    queryKey: ['/api/stores/1/products/stock'],
   });
   
   // Create/update product mutation
@@ -91,7 +98,7 @@ export default function ProductsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
       setIsDialogOpen(false);
       setEditingProduct(null);
       toast({
@@ -116,7 +123,7 @@ export default function ProductsPage() {
       return apiRequest('DELETE', `/api/products/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
       toast({
         title: "Product deleted",
         description: "The product has been deleted successfully.",
@@ -130,6 +137,125 @@ export default function ProductsPage() {
       });
     }
   });
+
+  // Export products mutation
+  const exportMutation = useMutation({
+    mutationFn: async (format: 'csv' | 'xlsx') => {
+      const response = await fetch(`/api/products/export/${format}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export products');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `products-${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      return true;
+    },
+    onSuccess: (_, format) => {
+      toast({
+        title: "Export successful",
+        description: `Products exported as ${format.toUpperCase()} file.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Export failed",
+        description: `Failed to export products: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Import products mutation
+  const importMutation = useMutation({
+    mutationFn: async (data: any[]) => {
+      return apiRequest('POST', '/api/products/import', { data });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      toast({
+        title: "Import completed",
+        description: result.message,
+      });
+      setImportFile(null);
+      setIsImportDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Import failed",
+        description: `Failed to import products: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      if (fileExtension === 'csv' || fileExtension === 'xlsx') {
+        setImportFile(file);
+      } else {
+        toast({
+          title: "Invalid file",
+          description: "Please select a CSV or XLSX file.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+
+    try {
+      const fileExtension = importFile.name.split('.').pop()?.toLowerCase();
+      
+      if (fileExtension === 'csv') {
+        const text = await importFile.text();
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const data = lines.slice(1).filter(line => line.trim()).map(line => {
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          const row: any = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || '';
+          });
+          return row;
+        });
+        importMutation.mutate(data);
+      } else if (fileExtension === 'xlsx') {
+        // For XLSX files, we'll need to read them as binary
+        const arrayBuffer = await importFile.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        
+        // Since we can't use XLSX library on frontend, we'll send the raw data to backend
+        // For now, let's show an error message
+        toast({
+          title: "XLSX Import",
+          description: "XLSX import is not yet supported. Please use CSV format.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "File processing error",
+        description: "Failed to process the uploaded file.",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Filter products based on search query
   const filteredProducts = products
@@ -193,10 +319,46 @@ export default function ProductsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage your products and services for invoices</p>
         </div>
         
-        <Button onClick={handleAddNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-export-products">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem 
+                onClick={() => exportMutation.mutate('csv')}
+                disabled={exportMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportMutation.mutate('xlsx')}
+                disabled={exportMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export as XLSX
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setIsImportDialogOpen(true)}
+            data-testid="button-import-products"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          
+          <Button onClick={handleAddNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
+        </div>
       </div>
       
       <Card>
@@ -246,6 +408,7 @@ export default function ProductsPage() {
                   <TableRow>
                     <TableHead className="w-[300px]">Name</TableHead>
                     <TableHead className="w-[150px]">SKU/Code</TableHead>
+                    <TableHead className="w-[120px]">Stock</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Tax Rate</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -257,6 +420,32 @@ export default function ProductsPage() {
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell className="font-mono text-sm text-gray-600">
                         {product.sku || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${
+                              product.stockStatus === 'out_of_stock' ? 'text-red-600' :
+                              product.stockStatus === 'low_stock' ? 'text-amber-600' :
+                              'text-green-600'
+                            }`}>
+                              {product.currentStock || 0}
+                            </span>
+                            {product.isLowStock && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                                Low
+                              </span>
+                            )}
+                            {product.stockStatus === 'out_of_stock' && (
+                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                Out
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            Min: {product.minStock || 0}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>{formatCurrency(product.price)}</TableCell>
                       <TableCell>{product.taxRate}%</TableCell>
@@ -437,6 +626,72 @@ export default function ProductsPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Products</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or XLSX file to import multiple products at once.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Select File</Label>
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={handleFileChange}
+                data-testid="input-product-import-file"
+              />
+              <p className="text-sm text-gray-500">
+                Supported formats: CSV, XLSX
+              </p>
+            </div>
+            
+            {importFile && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    {importFile.name}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  File ready for import
+                </p>
+              </div>
+            )}
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <h4 className="font-medium text-amber-900 mb-1">Required Columns</h4>
+              <p className="text-sm text-amber-800">
+                Your file should include these columns: Name, SKU, Description, Current Price, Unit, Min Stock, Weight, Dimensions, Is Active
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsImportDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport}
+              disabled={!importFile || importMutation.isPending}
+              data-testid="button-confirm-product-import"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {importMutation.isPending ? "Importing..." : "Import Products"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

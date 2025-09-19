@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,6 +61,7 @@ type SecurityFormValues = z.infer<typeof securitySchema>;
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
+  const [importFile, setImportFile] = useState<File | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -235,6 +236,91 @@ export default function SettingsPage() {
   const onSecuritySubmit = (data: SecurityFormValues) => {
     passwordMutation.mutate(data);
   };
+
+  // Export backup mutation
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/backup/export?storeId=1', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export backup');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Backup exported",
+        description: "Your database backup has been downloaded successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Export failed",
+        description: `Failed to export backup: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Import backup mutation
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+      
+      return apiRequest('POST', '/api/backup/import', {
+        data: backupData.data,
+        storeId: 1
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Import successful",
+        description: data.message,
+      });
+      setImportFile(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Import failed",
+        description: `Failed to import backup: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'application/json') {
+      setImportFile(file);
+    } else {
+      toast({
+        title: "Invalid file",
+        description: "Please select a valid JSON backup file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImport = () => {
+    if (importFile) {
+      importMutation.mutate(importFile);
+    }
+  };
   
   // Get user initials for avatar
   const getUserInitials = (name: string = "") => {
@@ -284,6 +370,10 @@ export default function SettingsPage() {
             <TabsTrigger value="security" className="gap-2">
               <Settings className="h-4 w-4" />
               <span>Security</span>
+            </TabsTrigger>
+            <TabsTrigger value="backup" className="gap-2">
+              <Database className="h-4 w-4" />
+              <span>Backup</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -670,6 +760,100 @@ export default function SettingsPage() {
                   </div>
                 </form>
               </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="backup" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-blue-600" />
+                Database Backup
+              </CardTitle>
+              <CardDescription>
+                Export and import your data for backup and migration purposes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Export Section */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Export Data
+                </Label>
+                <p className="text-sm text-gray-600">
+                  Download a complete backup of your invoices, clients, products, and other data as a JSON file.
+                </p>
+                <Button 
+                  onClick={() => exportMutation.mutate()}
+                  disabled={exportMutation.isPending}
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  data-testid="button-export-backup"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {exportMutation.isPending ? "Exporting..." : "Export Backup"}
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Import Section */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Import Data
+                </Label>
+                <p className="text-sm text-gray-600">
+                  Import data from a previously exported backup file. This will add the data to your existing records.
+                </p>
+                <div className="space-y-3">
+                  <div className="grid w-full max-w-sm items-center gap-1.5">
+                    <Input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileChange}
+                      data-testid="input-backup-file"
+                    />
+                  </div>
+                  {importFile && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>Selected: {importFile.name}</span>
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handleImport}
+                    disabled={!importFile || importMutation.isPending}
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    data-testid="button-import-backup"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {importMutation.isPending ? "Importing..." : "Import Backup"}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Security Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Backup Guidelines</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Regular backups help protect against data loss</li>
+                  <li>• Store backup files in a secure location</li>
+                  <li>• Test backup restoration periodically</li>
+                  <li>• Backup files contain sensitive business data</li>
+                </ul>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-medium text-amber-900 mb-2">Import Warning</h4>
+                <p className="text-sm text-amber-800">
+                  Importing data will add records to your existing database. Make sure to create a backup before importing if you want to preserve your current state.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
