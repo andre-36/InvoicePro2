@@ -88,18 +88,13 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     enabled: !!quotationId,
   });
 
-  // Generate a new quotation number (only for new quotations)
-  const { data: recentQuotations } = useQuery({
-    queryKey: ['/api/stores/1/quotations'],
-    enabled: !quotationId,
-  });
+  // Server generates quotation numbers automatically
 
   // Form setup
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationFormSchema),
     defaultValues: {
       quotation: {
-        quotationNumber: "",
         clientId: 0,
         storeId: 1, // Default store
         issueDate: new Date(),
@@ -155,18 +150,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     },
   });
 
-  // Generate quotation number for new quotations
-  useEffect(() => {
-    if (!quotationId && recentQuotations && Array.isArray(recentQuotations)) {
-      const today = new Date();
-      const year = today.getFullYear().toString().slice(-2);
-      const month = (today.getMonth() + 1).toString().padStart(2, '0');
-      const quotationCount = recentQuotations.length;
-      const newQuotationNumber = `QUO-${year}${month}-${(quotationCount + 1).toString().padStart(4, '0')}`;
-      
-      form.setValue('quotation.quotationNumber', newQuotationNumber);
-    }
-  }, [recentQuotations, quotationId, form]);
+  // Client-side number generation is no longer needed since server generates numbers automatically
 
   // Load existing quotation data for editing
   useEffect(() => {
@@ -303,23 +287,15 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quotation.quotationNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quotation Number</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="QUO-2025-0001"
-                          data-testid="input-quotation-number"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <FormLabel>Quotation Number</FormLabel>
+                  <Input 
+                    value={quotationId ? (quotationData?.quotation?.quotationNumber ?? "") : "Will be auto-generated"}
+                    readOnly 
+                    className="bg-gray-50 dark:bg-gray-800" 
+                    data-testid="input-quotation-number"
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
