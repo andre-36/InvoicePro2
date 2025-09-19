@@ -40,8 +40,9 @@ export const stores = pgTable("stores", {
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  clientNumber: varchar("client_number", { length: 50 }).notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 100 }).notNull(),
+  email: varchar("email", { length: 100 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   taxNumber: varchar("tax_number", { length: 50 }),
@@ -51,7 +52,8 @@ export const clients = pgTable("clients", {
 }, (table) => {
   return {
     storeIdIdx: index("clients_store_id_idx").on(table.storeId),
-    emailIdx: index("clients_email_idx").on(table.email)
+    emailIdx: index("clients_email_idx").on(table.email),
+    clientNumberIdx: uniqueIndex("clients_client_number_idx").on(table.clientNumber)
   };
 });
 
@@ -284,14 +286,14 @@ export const importExportLogs = pgTable("import_export_logs", {
 // Define the insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, invoiceNumber: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemBatchSchema = createInsertSchema(invoiceItemBatches).omit({ id: true, createdAt: true });
-export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, quotationNumber: true, createdAt: true, updatedAt: true });
 export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, createdAt: true, updatedAt: true });
