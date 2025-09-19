@@ -326,6 +326,53 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     form.setValue('invoice.status', 'sent');
     form.handleSubmit(onSubmit)();
   };
+
+  const handleBackClick = () => {
+    // Get the current form data
+    const formData = form.getValues();
+    
+    // Check if there are any filled items worth saving as draft
+    const hasValidItems = formData.items.some(item => 
+      item.description.trim() !== '' || 
+      (item.quantity !== '1' && item.quantity !== '0') ||
+      (item.price !== '0' && item.price !== '')
+    );
+    
+    // Check if basic invoice data is filled
+    const hasBasicData = formData.invoice.clientId || 
+                        formData.invoice.notes?.trim();
+
+    // If there's meaningful data and this is a new invoice, save as draft
+    if ((hasValidItems || hasBasicData) && !invoiceId) {
+      // Filter out empty items - keep items with description, productId, or modified values
+      const validItems = formData.items.filter(item => 
+        item.description.trim() !== '' || 
+        item.productId !== null ||
+        (item.quantity !== '1' && item.quantity !== '0') ||
+        (item.price !== '0' && item.price !== '')
+      );
+
+      // Only save if there are items to save
+      if (validItems.length > 0) {
+        toast({
+          title: "Saving Draft",
+          description: "Saving your progress as draft...",
+        });
+        
+        form.setValue('invoice.status', 'draft');
+        form.setValue('items', validItems);
+        
+        form.handleSubmit(onSubmit, () => {
+          // On error, still navigate back
+          onSuccess?.();
+        })();
+        return;
+      }
+    }
+    
+    // If no meaningful data or this is an edit, just navigate back
+    onSuccess?.();
+  };
   
   // Handle invoice PDF generation
   const handleGeneratePDF = async () => {
@@ -424,20 +471,20 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card className="border-0 shadow-none">
           <CardHeader className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-            <div className="flex items-center space-x-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onSuccess}
-                className="h-9"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <CardTitle className="text-xl font-semibold text-gray-900">
-                {invoiceId ? "Edit Invoice" : "Create New Invoice"}
-              </CardTitle>
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleBackClick}
+              className="h-9"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              {invoiceId ? "Edit Invoice" : "Create New Invoice"}
+            </CardTitle>
+            <div className="w-9"></div> {/* Spacer to center title */}
           </CardHeader>
           
           <CardContent className="p-4 md:p-6">
