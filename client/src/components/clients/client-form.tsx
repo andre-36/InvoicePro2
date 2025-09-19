@@ -13,12 +13,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save, X } from "lucide-react";
 import { useLocation } from "wouter";
 
-// Extend the schema for validation
+// Extend the schema for validation with proper email preprocessing
 const extendedClientSchema = insertClientSchema
   .omit({ userId: true })
   .extend({
     name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Please enter a valid email address"),
+    email: z.preprocess(
+      (val) => {
+        if (typeof val === 'string') {
+          const trimmed = val.trim();
+          return trimmed === '' ? undefined : trimmed;
+        }
+        return val;
+      },
+      z.string().email("Please enter a valid email address").optional()
+    ),
     phone: z.string().optional(),
     address: z.string().optional(),
     taxNumber: z.string().optional(),
@@ -58,7 +67,14 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
 
   // Update form when client data is loaded
   if (clientId && clientData && !form.formState.isDirty) {
-    form.reset(clientData);
+    form.reset({
+      ...clientData,
+      email: clientData.email ?? "",
+      phone: clientData.phone ?? "",
+      address: clientData.address ?? "",
+      taxNumber: clientData.taxNumber ?? "",
+      notes: clientData.notes ?? "",
+    });
   }
 
   // Create/update client mutation
@@ -116,6 +132,16 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
             <CardTitle>{clientId ? "Edit Client" : "Add New Client"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Display client number for existing clients */}
+            {clientId && clientData?.clientNumber && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                <div className="text-sm font-medium text-gray-700">Client Number</div>
+                <div className="text-lg font-mono text-gray-900" data-testid="text-client-number">
+                  {clientData.clientNumber}
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -136,7 +162,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address*</FormLabel>
+                    <FormLabel>Email Address</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter email address" type="email" {...field} />
                     </FormControl>
