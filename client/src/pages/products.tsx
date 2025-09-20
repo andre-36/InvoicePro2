@@ -416,7 +416,12 @@ export default function ProductsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product) => (
-                    <TableRow key={product.id} className="group">
+                    <TableRow 
+                      key={product.id} 
+                      className="group cursor-pointer hover:bg-muted/50" 
+                      onDoubleClick={() => handleEdit(product)}
+                      data-testid={`row-product-${product.id}`}
+                    >
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell className="font-mono text-sm text-gray-600">
                         {product.sku || "—"}
