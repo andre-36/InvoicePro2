@@ -72,19 +72,19 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
       )}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out border-r border-gray-200",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-background dark:bg-card shadow-lg transform transition-transform duration-300 ease-in-out border-r border-border",
           mobileView ? (open ? "translate-x-0" : "-translate-x-full") : "translate-x-0"
         )}
       >
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+          <div className="flex items-center justify-between h-16 px-4 border-b border-border">
             <div className="flex items-center">
               <FileText className="w-8 h-8 text-primary" />
-              <span className="ml-2 text-xl font-semibold text-gray-800">InvoiceHub</span>
+              <span className="ml-2 text-xl font-semibold text-foreground">InvoiceHub</span>
             </div>
             <button 
-              className="md:hidden rounded-md p-2 text-gray-500 hover:text-gray-900 focus:outline-none"
+              className="md:hidden rounded-md p-2 text-muted-foreground hover:text-foreground focus:outline-none"
               onClick={onToggle}
             >
               <Menu className="h-5 w-5" />
@@ -99,13 +99,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/dashboard") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <BarChart2 className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/dashboard") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/dashboard") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Dashboard</span>
               </Link>
@@ -115,13 +115,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/invoices") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <FileText className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/invoices") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/invoices") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Invoices</span>
               </Link>
@@ -131,13 +131,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/quotations") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <FileEdit className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/quotations") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/quotations") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Quotations</span>
               </Link>
@@ -147,13 +147,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/clients") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <Users className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/clients") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/clients") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Clients</span>
               </Link>
@@ -163,13 +163,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/transactions") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <DollarSign className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/transactions") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/transactions") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Transactions</span>
               </Link>
@@ -179,13 +179,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/reports") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <PieChart className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/reports") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/reports") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Reports</span>
               </Link>
@@ -195,33 +195,49 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 className={cn(
                   "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                   isActive("/products") 
-                    ? "text-white bg-primary" 
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 <Package2 className={cn(
                   "mr-3 h-5 w-5",
-                  isActive("/products") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                  isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Products</span>
+              </Link>
+              
+              <Link 
+                href="/purchase-orders"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/purchase-orders") 
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                <FileText className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>Purchase Orders</span>
               </Link>
             </div>
             
             <div className="mt-8">
-              <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Settings</h3>
+              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
               <div className="mt-2 px-2 space-y-1">
                 <Link 
                   href="/settings"
                   className={cn(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                     isActive("/settings") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
                   )}
                 >
                   <Settings className={cn(
                     "mr-3 h-5 w-5",
-                    isActive("/settings") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                    isActive("/settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>General</span>
                 </Link>
@@ -231,13 +247,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   className={cn(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                     isActive("/settings/payment-methods") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
                   )}
                 >
                   <CreditCard className={cn(
                     "mr-3 h-5 w-5",
-                    isActive("/settings/payment-methods") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                    isActive("/settings/payment-methods") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>Payment Methods</span>
                 </Link>
@@ -247,13 +263,13 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   className={cn(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
                     isActive("/settings/account") 
-                      ? "text-white bg-primary" 
-                      : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
                   )}
                 >
                   <UserCog className={cn(
                     "mr-3 h-5 w-5",
-                    isActive("/settings/account") ? "text-white" : "text-gray-500 group-hover:text-gray-700"
+                    isActive("/settings/account") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>Account</span>
                 </Link>
@@ -262,19 +278,19 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
           </nav>
           
           {/* User Profile Section */}
-          <div className="flex items-center p-4 border-t border-gray-200">
+          <div className="flex items-center p-4 border-t border-border">
             <div className="flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white">
+              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                 {user.fullName.charAt(0)}
               </div>
             </div>
             <div className="ml-3 overflow-hidden">
-              <p className="text-sm font-medium text-gray-800 truncate">{user.fullName}</p>
-              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              <p className="text-sm font-medium text-foreground truncate">{user.fullName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
             <button 
               onClick={handleLogout}
-              className="ml-auto p-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+              className="ml-auto p-1 text-muted-foreground hover:text-foreground focus:outline-none"
               aria-label="Logout"
             >
               <LogOut className="h-5 w-5" />

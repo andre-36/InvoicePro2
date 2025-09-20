@@ -60,11 +60,11 @@
 /* Custom styles for Excel-like tables */
 @layer components {
   .excel-table {
-    @apply border-collapse border border-gray-200 rounded-lg shadow-sm;
+    @apply border-collapse border border-border rounded-lg shadow-sm bg-background;
   }
   
   .excel-table th {
-    @apply bg-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-b border-gray-200 py-2 px-3;
+    @apply bg-muted text-xs font-medium text-muted-foreground uppercase tracking-wider border-r border-b border-border py-2 px-3;
   }
   
   .excel-table th:last-child {
@@ -72,7 +72,7 @@
   }
   
   .excel-table td {
-    @apply border-r border-b border-gray-200 py-2 px-3;
+    @apply border-r border-b border-border py-2 px-3;
   }
   
   .excel-table td:last-child {
@@ -80,15 +80,15 @@
   }
   
   .excel-table tr:nth-child(even) {
-    @apply bg-gray-50;
+    @apply bg-muted/50;
   }
   
   .excel-table tr:hover {
-    @apply bg-blue-50;
+    @apply bg-accent;
   }
   
   .excel-cell-input {
-    @apply text-sm h-8 px-2 w-full focus:ring-blue-500 border-gray-200 hover:border-gray-300;
+    @apply text-sm h-8 px-2 w-full focus:ring-primary border-border hover:border-primary bg-background text-foreground;
   }
   
   .excel-cell-input-right {
@@ -96,6 +96,6 @@
   }
   
   .excel-header-cell {
-    @apply sticky top-0 z-10 bg-gray-100;
+    @apply sticky top-0 z-10 bg-muted;
   }
 }
