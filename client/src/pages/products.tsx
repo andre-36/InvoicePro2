@@ -466,7 +466,10 @@ export default function ProductsPage() {
                           <DropdownMenuContent align="end" className="w-[160px]">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem asChild>
-                              <Link href={`/products/${product.id}/dashboard`}>
+                              <Link 
+                                href={`/products/${product.id}/dashboard`}
+                                data-testid={`link-view-dashboard-${product.id}`}
+                              >
                                 <BarChart3 className="mr-2 h-4 w-4" />
                                 <span>View Dashboard</span>
                               </Link>
