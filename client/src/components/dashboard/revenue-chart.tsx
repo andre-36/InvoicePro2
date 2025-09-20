@@ -14,9 +14,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface RevenueData {
-  labels: string[];
-  income: number[];
+  dates: string[];
+  revenue: number[];
   expenses: number[];
+  profit: number[];
 }
 
 interface RevenueChartProps {
@@ -67,9 +68,9 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
     );
   }
 
-  const chartData = data.labels.map((month, i) => ({
-    name: month,
-    income: data.income[i],
+  const chartData = data.dates.map((date, i) => ({
+    name: date,
+    income: data.revenue[i],
     expenses: data.expenses[i],
   }));
 

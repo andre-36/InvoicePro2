@@ -1193,6 +1193,11 @@ export class DatabaseStorage implements IStorage {
     
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
+    // Format dates as strings for PostgreSQL
+    const startOfDayStr = startOfDay.toISOString().split('T')[0];
+    const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
+    const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+    
     // Calculate total revenue and expenses
     const revenueResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as total
@@ -1246,7 +1251,7 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoices}
       WHERE store_id = ${storeId} 
         AND status = 'paid'
-        AND issue_date >= ${startOfDay}
+        AND issue_date >= ${startOfDayStr}
     `);
     
     const salesThisWeekResult = await db.execute(sql`
@@ -1254,7 +1259,7 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoices}
       WHERE store_id = ${storeId} 
         AND status = 'paid'
-        AND issue_date >= ${startOfWeek}
+        AND issue_date >= ${startOfWeekStr}
     `);
     
     const salesThisMonthResult = await db.execute(sql`
@@ -1262,7 +1267,7 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoices}
       WHERE store_id = ${storeId} 
         AND status = 'paid'
-        AND issue_date >= ${startOfMonth}
+        AND issue_date >= ${startOfMonthStr}
     `);
     
     // Calculate total profit
@@ -1349,6 +1354,10 @@ export class DatabaseStorage implements IStorage {
       return `${day}/${month}`;
     });
     
+    // Format dates as strings for PostgreSQL
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+    
     // Get revenue data
     const revenueResult = await db.execute(sql`
       SELECT 
@@ -1358,8 +1367,8 @@ export class DatabaseStorage implements IStorage {
       FROM ${transactions}
       WHERE 
         store_id = ${storeId} AND
-        date >= ${start} AND
-        date <= ${end}
+        date >= ${startStr} AND
+        date <= ${endStr}
       GROUP BY DATE(date)
       ORDER BY DATE(date)
     `);
