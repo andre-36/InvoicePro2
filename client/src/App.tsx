@@ -20,6 +20,7 @@ import ProductsPage from "@/pages/products";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import { useMobile } from "./hooks/use-mobile";
+import { ThemeProvider } from "@/components/theme-provider";
 
 type User = {
   id: number;
@@ -87,9 +88,11 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-      </div>
+      <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
+        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      </ThemeProvider>
     );
   }
 
@@ -97,50 +100,54 @@ function App() {
     // Auto-login is still in progress or failed
     // For this demo, we'll just show a loading state since we're auto-logging in
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-      </div>
+      <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
+        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      </ThemeProvider>
     );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
-        <Sidebar 
-          user={user} 
-          open={sidebarOpen} 
-          onToggle={toggleSidebar}
-          mobileView={isMobile}
-        />
-        
-        <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
-          <Header toggleSidebar={toggleSidebar} />
+    <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
+      <QueryClientProvider client={queryClient}>
+        <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+          <Sidebar 
+            user={user} 
+            open={sidebarOpen} 
+            onToggle={toggleSidebar}
+            mobileView={isMobile}
+          />
           
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
-            <Switch>
-              <Route path="/dashboard" component={Dashboard} />
-              <Route path="/invoices" component={InvoicesPage} />
-              <Route path="/invoices/create" component={CreateInvoicePage} />
-              <Route path="/invoices/:id">
-                {params => <InvoiceDetailPage id={parseInt(params.id)} />}
-              </Route>
-              <Route path="/quotations" component={QuotationsPage} />
-              <Route path="/quotations/create" component={CreateQuotationPage} />
-              <Route path="/quotations/:id">
-                {params => <QuotationDetailPage id={parseInt(params.id)} />}
-              </Route>
-              <Route path="/clients" component={ClientsPage} />
-              <Route path="/clients/create" component={CreateClientPage} />
-              <Route path="/products" component={ProductsPage} />
-              <Route path="/reports" component={ReportsPage} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route component={NotFound} />
-            </Switch>
-          </main>
+          <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
+            <Header toggleSidebar={toggleSidebar} />
+            
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900">
+              <Switch>
+                <Route path="/dashboard" component={Dashboard} />
+                <Route path="/invoices" component={InvoicesPage} />
+                <Route path="/invoices/create" component={CreateInvoicePage} />
+                <Route path="/invoices/:id">
+                  {params => <InvoiceDetailPage id={parseInt(params.id)} />}
+                </Route>
+                <Route path="/quotations" component={QuotationsPage} />
+                <Route path="/quotations/create" component={CreateQuotationPage} />
+                <Route path="/quotations/:id">
+                  {params => <QuotationDetailPage id={parseInt(params.id)} />}
+                </Route>
+                <Route path="/clients" component={ClientsPage} />
+                <Route path="/clients/create" component={CreateClientPage} />
+                <Route path="/products" component={ProductsPage} />
+                <Route path="/reports" component={ReportsPage} />
+                <Route path="/settings" component={SettingsPage} />
+                <Route component={NotFound} />
+              </Switch>
+            </main>
+          </div>
         </div>
-      </div>
-      <Toaster />
-    </QueryClientProvider>
+        <Toaster />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
