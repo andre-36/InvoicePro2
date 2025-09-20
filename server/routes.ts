@@ -566,6 +566,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product dashboard stats endpoint
+  app.get("/api/products/:id/stats", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const stats = await storage.getProductStats(productId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting product stats:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product sales history endpoint
+  app.get("/api/products/:id/sales", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const salesHistory = await storage.getProductSalesHistory(productId);
+      res.json(salesHistory);
+    } catch (error) {
+      console.error("Error getting product sales history:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product purchase history endpoint  
+  app.get("/api/products/:id/purchases", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const purchaseHistory = await storage.getProductPurchaseHistory(productId);
+      res.json(purchaseHistory);
+    } catch (error) {
+      console.error("Error getting product purchase history:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Product Batches routes
   app.get("/api/products/:productId/stores/:storeId/batches", requireAuth, async (req, res) => {
     try {

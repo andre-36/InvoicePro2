@@ -58,6 +58,11 @@ export interface IStorage {
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   
+  // Product dashboard methods
+  getProductStats(productId: number): Promise<ProductStats>;
+  getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]>;
+  getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]>;
+  
   // Product batch methods
   getProductBatch(id: number): Promise<ProductBatch | undefined>;
   getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]>;
@@ -180,6 +185,40 @@ export type BatchProfitabilityData = {
   soldQuantity: number;
   totalProfit: number;
   purchaseDate: Date;
+};
+
+// Product dashboard types
+export type ProductStats = {
+  totalSales: number;
+  totalRevenue: string;
+  totalPurchases: number;
+  totalCost: string;
+  currentStock: number;
+  averageSellingPrice: string;
+  averageCost: string;
+  profitMargin: string;
+};
+
+export type ProductSalesHistory = {
+  id: number;
+  invoiceNumber: string;
+  clientName: string;
+  quantity: number;
+  unitPrice: string;
+  total: string;
+  date: string;
+  status: 'paid' | 'pending' | 'overdue';
+};
+
+export type ProductPurchaseHistory = {
+  id: number;
+  purchaseOrderNumber: string;
+  supplierName: string;
+  quantity: number;
+  unitCost: string;
+  total: string;
+  date: string;
+  status: 'received' | 'pending' | 'cancelled';
 };
 
 // Helper function to generate unique numbers with retry logic for concurrency
@@ -436,6 +475,93 @@ export class DatabaseStorage implements IStorage {
   
   async deleteProduct(id: number): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  // Product dashboard methods
+  async getProductStats(productId: number): Promise<ProductStats> {
+    // Get current stock from product batches
+    const stockResult = await db.execute(sql`
+      SELECT COALESCE(SUM(quantity), 0) as current_stock
+      FROM ${productBatches}
+      WHERE product_id = ${productId}
+    `);
+    const currentStock = parseInt(stockResult[0]?.current_stock?.toString() || '0');
+
+    // Get sales statistics from invoice items
+    const salesResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CAST(quantity AS DECIMAL)), 0) as total_sales,
+        COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total_revenue,
+        COALESCE(AVG(CAST(price AS DECIMAL)), 0) as avg_price,
+        COUNT(*) as sales_count
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+    `);
+
+    const totalSales = parseInt(salesResult[0]?.total_sales?.toString() || '0');
+    const totalRevenue = salesResult[0]?.total_revenue?.toString() || '0';
+    const avgPrice = salesResult[0]?.avg_price?.toString() || '0';
+
+    // Calculate average cost from product batches
+    const costResult = await db.execute(sql`
+      SELECT COALESCE(AVG(CAST(unit_cost AS DECIMAL)), 0) as avg_cost
+      FROM ${productBatches}
+      WHERE product_id = ${productId}
+    `);
+    const avgCost = costResult[0]?.avg_cost?.toString() || '0';
+
+    // Calculate profit margin
+    const avgPriceNum = parseFloat(avgPrice);
+    const avgCostNum = parseFloat(avgCost);
+    const profitMargin = avgPriceNum > 0 ? (((avgPriceNum - avgCostNum) / avgPriceNum) * 100).toFixed(2) + '%' : '0%';
+
+    return {
+      totalSales,
+      totalRevenue,
+      totalPurchases: 0, // TODO: Implement when purchase orders are added
+      totalCost: '0',
+      currentStock,
+      averageSellingPrice: avgPrice,
+      averageCost: avgCost,
+      profitMargin
+    };
+  }
+
+  async getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]> {
+    const salesHistory = await db.execute(sql`
+      SELECT 
+        ii.id,
+        i.invoice_number,
+        c.name as client_name,
+        CAST(ii.quantity AS DECIMAL) as quantity,
+        ii.price as unit_price,
+        ii.total,
+        i.issue_date as date,
+        i.status
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      LEFT JOIN ${clients} c ON i.client_id = c.id
+      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+      ORDER BY i.issue_date DESC
+    `);
+
+    return salesHistory.map((row: any) => ({
+      id: row.id,
+      invoiceNumber: row.invoice_number,
+      clientName: row.client_name || 'Unknown Client',
+      quantity: parseInt(row.quantity?.toString() || '0'),
+      unitPrice: row.unit_price || '0',
+      total: row.total || '0',
+      date: row.date ? new Date(row.date).toISOString().split('T')[0] : '',
+      status: row.status || 'pending'
+    }));
+  }
+
+  async getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]> {
+    // For now, return empty array since purchase orders are not implemented yet
+    // TODO: Implement when purchase orders feature is added
+    return [];
   }
   
   // Product batch methods

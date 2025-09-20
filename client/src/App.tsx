@@ -17,6 +17,7 @@ import CreateQuotationPage from "@/pages/quotations/create";
 import ClientsPage from "@/pages/clients";
 import CreateClientPage from "@/pages/clients/create";
 import ProductsPage from "@/pages/products";
+import ProductDashboard from "@/pages/products/dashboard";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import { useMobile } from "./hooks/use-mobile";
@@ -138,6 +139,9 @@ function App() {
                 <Route path="/clients" component={ClientsPage} />
                 <Route path="/clients/create" component={CreateClientPage} />
                 <Route path="/products" component={ProductsPage} />
+                <Route path="/products/:id/dashboard">
+                  {params => <ProductDashboard id={parseInt(params.id)} />}
+                </Route>
                 <Route path="/reports" component={ReportsPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route component={NotFound} />
