@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -51,6 +51,8 @@ export function InvoiceItemRow({
   const [taxRate, setTaxRate] = useState(item.taxRate || "0");
   const [productId, setProductId] = useState<string>(item.productId?.toString() || "");
   const [open, setOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const commandRef = useRef<HTMLDivElement>(null);
   
   // Calculate totals when inputs change
   useEffect(() => {
@@ -116,15 +118,44 @@ export function InvoiceItemRow({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
-            <Command>
-              <CommandInput placeholder="Search product..." className="h-9" />
+            <Command
+              ref={commandRef}
+              onKeyDown={(e) => {
+                const items = [{ id: "0", name: "Enter manually" }, ...products];
+                
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedIndex(prev => Math.min(prev + 1, items.length - 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedIndex(prev => Math.max(prev - 1, -1));
+                } else if (e.key === "Enter" && selectedIndex >= 0) {
+                  e.preventDefault();
+                  const selectedItem = items[selectedIndex];
+                  if (selectedItem) {
+                    handleProductChange(selectedItem.id.toString());
+                    setOpen(false);
+                    setSelectedIndex(-1);
+                  }
+                }
+              }}
+            >
+              <CommandInput 
+                placeholder="Search product..." 
+                className="h-9"
+                onFocus={() => setSelectedIndex(-1)}
+              />
               <CommandEmpty>No product found.</CommandEmpty>
               <CommandGroup>
                 <CommandItem
                   value="manual"
+                  className={cn(
+                    selectedIndex === 0 && "bg-accent"
+                  )}
                   onSelect={() => {
                     handleProductChange("0");
                     setOpen(false);
+                    setSelectedIndex(-1);
                   }}
                 >
                   <Check
@@ -135,13 +166,17 @@ export function InvoiceItemRow({
                   />
                   Enter manually
                 </CommandItem>
-                {products.map((product) => (
+                {products.map((product, idx) => (
                   <CommandItem
                     key={product.id}
                     value={product.name}
+                    className={cn(
+                      selectedIndex === idx + 1 && "bg-accent"
+                    )}
                     onSelect={() => {
                       handleProductChange(product.id.toString());
                       setOpen(false);
+                      setSelectedIndex(-1);
                     }}
                   >
                     <Check
@@ -183,7 +218,7 @@ export function InvoiceItemRow({
             step="0.01"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="excel-cell-input-right pl-5"
+            className="excel-cell-input-right pl-5 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
           />
         </div>
       </td>
