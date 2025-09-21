@@ -612,9 +612,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
                           Subtotal
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
-                          Total
-                        </th>
                         <th scope="col" className="excel-header-cell text-center" style={{ width: '50px' }}>
                           <span className="sr-only">Actions</span>
                         </th>
@@ -634,7 +631,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       ))}
                       {/* Add row button inside the table */}
                       <tr>
-                        <td colSpan={8} className="px-3 py-2 border-t border-gray-200">
+                        <td colSpan={7} className="px-3 py-2 border-t border-gray-200">
                           <Button
                             type="button"
                             variant="ghost"

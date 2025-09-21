@@ -213,11 +213,6 @@ export function InvoiceItemRow({
         {formatCurrency(item.subtotal || "0")}
       </td>
       
-      {/* Total */}
-      <td className="text-right text-sm font-medium text-gray-900">
-        {formatCurrency(item.total || "0")}
-      </td>
-      
       {/* Actions */}
       <td className="text-center">
         <Button
