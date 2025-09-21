@@ -66,131 +66,127 @@ export function DateRangePicker({
   };
 
   return (
-    <div className={cn("flex flex-col sm:flex-row gap-3", className)}>
-      {/* Quick Presets */}
-      <div className="flex flex-wrap gap-2 sm:order-2">
-        <Badge 
-          variant={selectedPreset === "today" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-primary/10 transition-colors"
-          onClick={() => handlePresetChange("today")}
-        >
-          Today
-        </Badge>
+    <div className={cn("flex items-center gap-3", className)}>
+      {/* Simplified Quick Presets */}
+      <div className="flex items-center gap-2">
         <Badge 
           variant={selectedPreset === "last-7-days" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-primary/10 transition-colors"
+          className="cursor-pointer hover:bg-primary/10 transition-colors text-xs"
           onClick={() => handlePresetChange("last-7-days")}
         >
           7 days
         </Badge>
         <Badge 
           variant={selectedPreset === "last-30-days" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-primary/10 transition-colors"
+          className="cursor-pointer hover:bg-primary/10 transition-colors text-xs"
           onClick={() => handlePresetChange("last-30-days")}
         >
           30 days
         </Badge>
         <Badge 
           variant={selectedPreset === "this-month" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-primary/10 transition-colors"
+          className="cursor-pointer hover:bg-primary/10 transition-colors text-xs"
           onClick={() => handlePresetChange("this-month")}
         >
           This month
         </Badge>
       </div>
 
-      <Separator orientation="vertical" className="hidden sm:block h-6 self-center" />
-      
       {/* Custom Date Range Picker */}
-      <div className="sm:order-1">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="date"
-              variant={"outline"}
-              className={cn(
-                "w-[300px] justify-start text-left font-normal border-dashed hover:border-solid transition-all",
-                !date && "text-muted-foreground",
-                "data-[testid=button-date-range]:border-primary/50"
-              )}
-              data-testid="button-date-range"
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (
-                  <span className="font-medium">
-                    {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
-                  </span>
-                ) : (
-                  <span className="font-medium">{format(date.from, "MMM dd, yyyy")}</span>
-                )
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="date"
+            variant={"outline"}
+            className={cn(
+              "w-[280px] justify-start text-left font-normal",
+              !date && "text-muted-foreground"
+            )}
+            data-testid="button-date-range"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date?.from ? (
+              date.to ? (
+                <span>
+                  {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
+                </span>
               ) : (
-                <span>Select date range</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="mb-4">
-                  <h4 className="font-medium text-sm text-gray-900 mb-2">Quick select</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePresetChange("yesterday")}
-                      className="justify-start text-xs"
-                    >
-                      Yesterday
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePresetChange("last-month")}
-                      className="justify-start text-xs"
-                    >
-                      Last month
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePresetChange("this-quarter")}
-                      className="justify-start text-xs"
-                    >
-                      This quarter
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePresetChange("this-year")}
-                      className="justify-start text-xs"
-                    >
-                      This year
-                    </Button>
-                  </div>
+                <span>{format(date.from, "MMM dd, yyyy")}</span>
+              )
+            ) : (
+              <span>Select date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-3">
+              {/* Simplified preset options */}
+              <div className="mb-3">
+                <div className="flex flex-wrap gap-1.5">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handlePresetChange("today")}
+                    className="text-xs h-7"
+                  >
+                    Today
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handlePresetChange("yesterday")}
+                    className="text-xs h-7"
+                  >
+                    Yesterday
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handlePresetChange("last-month")}
+                    className="text-xs h-7"
+                  >
+                    Last month
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handlePresetChange("this-year")}
+                    className="text-xs h-7"
+                  >
+                    This year
+                  </Button>
                 </div>
-                <Separator className="mb-4" />
-                <DayPicker
-                  initialFocus
-                  mode="range"
-                  defaultMonth={date?.from}
-                  selected={date}
-                  onSelect={onDateChange}
-                  numberOfMonths={2}
-                  className="rdp-months_flex_row"
-                  classNames={{
-                    months: "flex gap-4",
-                    month: "w-auto",
-                    table: "text-sm",
-                    day_selected: "bg-primary text-primary-foreground",
-                    day_range_middle: "bg-primary/10"
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </PopoverContent>
-        </Popover>
-      </div>
+              </div>
+              <Separator className="mb-3" />
+              <DayPicker
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={onDateChange}
+                numberOfMonths={1}
+                className="m-0"
+                classNames={{
+                  months: "flex",
+                  month: "w-auto",
+                  table: "text-sm border-collapse",
+                  head_row: "flex",
+                  head_cell: "text-muted-foreground rounded-md w-8 font-normal text-xs flex-1",
+                  row: "flex w-full mt-1",
+                  cell: "h-8 w-8 text-center text-sm p-0 relative flex-1",
+                  day: "h-8 w-8 p-0 font-normal text-sm hover:bg-accent rounded-md",
+                  day_selected: "bg-primary text-primary-foreground hover:bg-primary",
+                  day_today: "bg-accent text-accent-foreground font-semibold",
+                  day_range_middle: "bg-primary/20 text-primary-foreground",
+                  day_range_start: "bg-primary text-primary-foreground rounded-l-md",
+                  day_range_end: "bg-primary text-primary-foreground rounded-r-md"
+                }}
+              />
+            </CardContent>
+          </Card>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
