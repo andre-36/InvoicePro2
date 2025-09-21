@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -518,7 +519,7 @@ export default function ProductsPage() {
       
       {/* Product dialog form */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
             <DialogDescription>
@@ -530,99 +531,115 @@ export default function ProductsPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter product name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU/Code*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter product SKU or code" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Enter product description" 
-                        rows={3}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price*</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <span className="text-gray-500 sm:text-sm">Rp</span>
+              <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                  <TabsTrigger value="pricing">Pricing & Tax</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="basic" className="space-y-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter product name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="sku"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SKU/Code*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter product SKU or code" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Enter product description" 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="pricing" className="space-y-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price*</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 sm:text-sm">Rp</span>
+                            </div>
+                            <Input 
+                              placeholder="0" 
+                              type="number"
+                              step="1"
+                              min="0"
+                              className="pl-8"
+                              {...field} 
+                            />
                           </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="taxRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tax Rate (%)</FormLabel>
+                        <FormControl>
                           <Input 
                             placeholder="0" 
                             type="number"
-                            step="1"
+                            step="0.1"
                             min="0"
-                            className="pl-8"
                             {...field} 
                           />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="taxRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tax Rate (%)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="0" 
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <h4 className="font-medium text-blue-900 mb-1">Pricing Information</h4>
+                    <p className="text-sm text-blue-800">
+                      Set the base price and tax rate for this product. These values will be used as defaults when adding this product to invoices.
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
               
               <DialogFooter className="pt-4">
                 <Button 
