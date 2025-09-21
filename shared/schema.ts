@@ -75,6 +75,8 @@ export const products = pgTable("products", {
   categoryId: integer("category_id").references(() => categories.id),
   unit: varchar("unit", { length: 20 }).default("piece").notNull(), // piece, meter, kg, etc.
   currentSellingPrice: numeric("current_selling_price", { precision: 15, scale: 2 }),
+  costPrice: numeric("cost_price", { precision: 15, scale: 2 }),
+  lowestPrice: numeric("lowest_price", { precision: 15, scale: 2 }),
   minStock: integer("min_stock").default(0),
   weight: numeric("weight", { precision: 10, scale: 2 }),
   dimensions: varchar("dimensions", { length: 100 }),

@@ -59,6 +59,8 @@ type Product = {
   sku: string;
   description: string;
   price: string;
+  costPrice?: string;
+  lowestPrice?: string;
   taxRate: string;
   minStock?: number;
   currentStock?: number;
@@ -72,7 +74,19 @@ const productSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   description: z.string().optional(),
   price: z.string().min(1, "Price is required"),
+  costPrice: z.string().optional(),
+  lowestPrice: z.string().optional(),
   taxRate: z.string().default("0"),
+}).refine((data) => {
+  if (data.lowestPrice && data.price) {
+    const price = parseFloat(data.price);
+    const lowestPrice = parseFloat(data.lowestPrice);
+    return price >= lowestPrice;
+  }
+  return true;
+}, {
+  message: "Unit price cannot be lower than lowest price",
+  path: ["price"],
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -275,6 +289,8 @@ export default function ProductsPage() {
       sku: "",
       description: "",
       price: "",
+      costPrice: "",
+      lowestPrice: "",
       taxRate: "0",
     }
   });
@@ -287,6 +303,8 @@ export default function ProductsPage() {
       sku: product.sku,
       description: product.description,
       price: product.price,
+      costPrice: product.costPrice || "",
+      lowestPrice: product.lowestPrice || "",
       taxRate: product.taxRate
     });
     setIsDialogOpen(true);
@@ -412,6 +430,8 @@ export default function ProductsPage() {
                     <TableHead className="w-[150px]">SKU/Code</TableHead>
                     <TableHead className="w-[120px]">Stock</TableHead>
                     <TableHead>Price</TableHead>
+                    <TableHead>Cost Price</TableHead>
+                    <TableHead>Lowest Price</TableHead>
                     <TableHead>Tax Rate</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -455,6 +475,8 @@ export default function ProductsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{formatCurrency(product.price)}</TableCell>
+                      <TableCell>{product.costPrice ? formatCurrency(product.costPrice) : "—"}</TableCell>
+                      <TableCell>{product.lowestPrice ? formatCurrency(product.lowestPrice) : "—"}</TableCell>
                       <TableCell>{product.taxRate}%</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -590,7 +612,7 @@ export default function ProductsPage() {
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Price*</FormLabel>
+                          <FormLabel>Unit Price*</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -601,7 +623,7 @@ export default function ProductsPage() {
                                 type="number"
                                 step="1"
                                 min="0"
-                                className="pl-8"
+                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
                                 {...field} 
                               />
                             </div>
@@ -625,6 +647,60 @@ export default function ProductsPage() {
                               min="0"
                               {...field} 
                             />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="costPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cost Price</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-gray-500 sm:text-sm">Rp</span>
+                              </div>
+                              <Input 
+                                placeholder="0" 
+                                type="number"
+                                step="1"
+                                min="0"
+                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                {...field} 
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="lowestPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lowest Price</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-gray-500 sm:text-sm">Rp</span>
+                              </div>
+                              <Input 
+                                placeholder="0" 
+                                type="number"
+                                step="1"
+                                min="0"
+                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                {...field} 
+                              />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
