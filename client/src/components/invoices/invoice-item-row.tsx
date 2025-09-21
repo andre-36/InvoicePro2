@@ -163,8 +163,8 @@ export function InvoiceItemRow({
       <td>
         <Input
           type="number"
-          min="0.01"
-          step="0.01"
+          min="1"
+          step="1"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           className="excel-cell-input-right"
