@@ -531,13 +531,13 @@ export default function ProductsPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <Tabs defaultValue="basic" className="w-full">
+              <Tabs defaultValue="edit" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                  <TabsTrigger value="pricing">Pricing & Tax</TabsTrigger>
+                  <TabsTrigger value="edit">Edit</TabsTrigger>
+                  <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="basic" className="space-y-4 mt-4">
+                <TabsContent value="edit" className="space-y-4 mt-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -583,61 +583,94 @@ export default function ProductsPage() {
                       </FormItem>
                     )}
                   />
-                </TabsContent>
-                
-                <TabsContent value="pricing" className="space-y-4 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Price*</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <span className="text-gray-500 sm:text-sm">Rp</span>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price*</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-gray-500 sm:text-sm">Rp</span>
+                              </div>
+                              <Input 
+                                placeholder="0" 
+                                type="number"
+                                step="1"
+                                min="0"
+                                className="pl-8"
+                                {...field} 
+                              />
                             </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="taxRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tax Rate (%)</FormLabel>
+                          <FormControl>
                             <Input 
                               placeholder="0" 
                               type="number"
-                              step="1"
+                              step="0.1"
                               min="0"
-                              className="pl-8"
                               {...field} 
                             />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="taxRate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tax Rate (%)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="0" 
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <h4 className="font-medium text-blue-900 mb-1">Pricing Information</h4>
-                    <p className="text-sm text-blue-800">
-                      Set the base price and tax rate for this product. These values will be used as defaults when adding this product to invoices.
-                    </p>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
+                </TabsContent>
+                
+                <TabsContent value="dashboard" className="space-y-4 mt-4">
+                  {editingProduct ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <h4 className="font-medium text-blue-900 mb-1">Current Price</h4>
+                          <p className="text-lg font-semibold text-blue-800">
+                            {formatCurrency(editingProduct.price)}
+                          </p>
+                        </div>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                          <h4 className="font-medium text-green-900 mb-1">Tax Rate</h4>
+                          <p className="text-lg font-semibold text-green-800">
+                            {editingProduct.taxRate}%
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Product Information</h4>
+                        <div className="space-y-2 text-sm text-gray-700">
+                          <div><span className="font-medium">SKU:</span> {editingProduct.sku}</div>
+                          <div><span className="font-medium">Description:</span> {editingProduct.description || "No description"}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <h4 className="font-medium text-yellow-900 mb-1">Quick Stats</h4>
+                        <p className="text-sm text-yellow-800">
+                          View detailed analytics and sales history for this product in the main Products dashboard.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                      <p className="text-gray-600">Dashboard will be available after creating the product.</p>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
               
