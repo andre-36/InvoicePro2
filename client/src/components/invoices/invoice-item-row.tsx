@@ -97,74 +97,66 @@ export function InvoiceItemRow({
         {index + 1}
       </td>
       
-      {/* Product selection and description */}
+      {/* Product selection */}
       <td>
-        <div className="space-y-2">
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full justify-between text-sm h-8 px-2 border border-transparent hover:border-gray-300 hover:bg-gray-50"
-              >
-                <span className="truncate text-left">
-                  {productId && productId !== "0" 
-                    ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
-                    : "Select a product"}
-                </span>
-                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0">
-              <Command>
-                <CommandInput placeholder="Search product..." className="h-9" />
-                <CommandEmpty>No product found.</CommandEmpty>
-                <CommandGroup>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between text-sm h-8 px-2 border border-transparent hover:border-gray-300 hover:bg-gray-50"
+            >
+              <span className="truncate text-left">
+                {productId && productId !== "0" 
+                  ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
+                  : "Select a product"}
+              </span>
+              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0">
+            <Command>
+              <CommandInput placeholder="Search product..." className="h-9" />
+              <CommandEmpty>No product found.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="manual"
+                  onSelect={() => {
+                    handleProductChange("0");
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      productId === "0" ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  Enter manually
+                </CommandItem>
+                {products.map((product) => (
                   <CommandItem
-                    value="manual"
+                    key={product.id}
+                    value={product.name}
                     onSelect={() => {
-                      handleProductChange("0");
+                      handleProductChange(product.id.toString());
                       setOpen(false);
                     }}
                   >
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        productId === "0" ? "opacity-100" : "opacity-0"
+                        productId === product.id.toString() ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    Enter manually
+                    {product.name}
                   </CommandItem>
-                  {products.map((product) => (
-                    <CommandItem
-                      key={product.id}
-                      value={product.name}
-                      onSelect={() => {
-                        handleProductChange(product.id.toString());
-                        setOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          productId === product.id.toString() ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      {product.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Item description"
-            className="excel-cell-input"
-          />
-        </div>
+                ))}
+              </CommandGroup>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </td>
       
       {/* Quantity */}
