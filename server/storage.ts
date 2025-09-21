@@ -247,6 +247,32 @@ async function generateNextNumber(prefix: string, yearMonth: string, table: any,
   return `${prefix}-${yearMonth}-${nextNumber.toString().padStart(4, '0')}`;
 }
 
+// Helper function for simple sequential numbering (like C-000001)
+async function generateSimpleSequentialNumber(prefix: string, table: any, column: any, tx: any): Promise<string> {
+  // Find the highest number with this prefix
+  const prefixPattern = `${prefix}-%`;
+  const result = await tx
+    .select({ number: column })
+    .from(table)
+    .where(sql`${column} LIKE ${prefixPattern}`)
+    .orderBy(sql`${column} DESC`)
+    .limit(1);
+
+  let nextNumber = 1;
+  if (result.length > 0 && result[0].number) {
+    const lastNumber = result[0].number;
+    const parts = lastNumber.split('-');
+    if (parts.length >= 2 && parts[1]) {
+      const numericPart = parseInt(parts[1], 10);
+      if (!isNaN(numericPart)) {
+        nextNumber = numericPart + 1;
+      }
+    }
+  }
+
+  return `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+}
+
 // Helper function to safely create records with unique number generation and retry logic
 async function createWithUniqueNumber<T>(
   table: any,
@@ -268,6 +294,47 @@ async function createWithUniqueNumber<T>(
         const yearMonth = year + month;
         
         const uniqueNumber = await generateNextNumber(prefix, yearMonth, table, column, tx);
+        
+        const [newRecord] = await tx
+          .insert(table)
+          .values({
+            ...data,
+            [column.name]: uniqueNumber
+          })
+          .returning();
+          
+        return newRecord;
+      });
+    } catch (error: any) {
+      // Check if this is a unique constraint violation
+      if (error?.code === '23505' && error?.detail?.includes(column.name)) {
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to create record with unique ${prefix} number after ${maxRetries} attempts due to concurrency conflicts`);
+        }
+        // Wait with exponential backoff before retry
+        await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+        continue;
+      }
+      // For other errors, don't retry
+      throw error;
+    }
+  }
+  
+  throw new Error(`Failed to create record with unique ${prefix} number`);
+}
+
+// Helper function for simple sequential numbering with retry logic  
+async function createWithSimpleSequentialNumber<T>(
+  table: any,
+  column: any,
+  prefix: string,
+  data: any,
+  maxRetries: number = 5
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await withTransaction(async (tx) => {
+        const uniqueNumber = await generateSimpleSequentialNumber(prefix, table, column, tx);
         
         const [newRecord] = await tx
           .insert(table)
@@ -377,7 +444,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createClient(client: InsertClient): Promise<Client> {
-    return createWithUniqueNumber<Client>(clients, clients.clientNumber, "CL", client);
+    return createWithSimpleSequentialNumber<Client>(clients, clients.clientNumber, "C", client);
   }
   
   async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
