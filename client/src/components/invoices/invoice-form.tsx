@@ -478,7 +478,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card className="border-0 shadow-none">
-          <CardHeader className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+          <CardHeader className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 sticky top-0 bg-white/95 backdrop-blur-sm border-b z-10 dark:bg-gray-900/95">
             <Button
               type="button"
               variant="ghost"
