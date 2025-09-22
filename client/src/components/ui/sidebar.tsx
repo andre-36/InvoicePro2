@@ -13,9 +13,11 @@ import {
   LogOut,
   Menu,
   FileEdit,
+  Bell,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface SidebarProps {
   user: {
@@ -83,12 +85,24 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
               <FileText className="w-8 h-8 text-primary" />
               <span className="ml-2 text-xl font-semibold text-foreground">InvoiceHub</span>
             </div>
-            <button 
-              className="md:hidden rounded-md p-2 text-muted-foreground hover:text-foreground focus:outline-none"
-              onClick={onToggle}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+            <div className="flex items-center space-x-2">
+              {/* Notifications */}
+              <button className="p-1.5 text-muted-foreground hover:text-foreground focus:outline-none relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-amber-500"></span>
+              </button>
+              
+              {/* Dark Mode Toggle */}
+              <ThemeToggle />
+              
+              {/* Mobile Menu Toggle */}
+              <button 
+                className="md:hidden rounded-md p-2 text-muted-foreground hover:text-foreground focus:outline-none"
+                onClick={onToggle}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           
           {/* Navigation */}
