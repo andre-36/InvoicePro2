@@ -21,6 +21,8 @@ import {
   insertQuotationSchema,
   insertQuotationItemSchema,
   insertTransactionSchema,
+  insertPurchaseOrderSchema,
+  insertPurchaseOrderItemSchema,
   insertSettingSchema,
   loginSchema
 } from "../shared/schema";
@@ -998,6 +1000,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting transaction:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Purchase Order routes
+  app.get("/api/stores/:storeId/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const purchaseOrders = await storage.getPurchaseOrders(storeId);
+      res.json(purchaseOrders);
+    } catch (error) {
+      console.error("Error getting purchase orders:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Get next purchase order number preview - MUST be before /:id route
+  app.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
+    try {
+      const orderDate = req.query.orderDate ? new Date(req.query.orderDate as string) : new Date();
+      const nextNumber = await storage.getNextPurchaseOrderNumber(orderDate);
+      res.json({ purchaseOrderNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next purchase order number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.id);
+      const purchaseOrder = await storage.getPurchaseOrderWithItems(purchaseOrderId);
+      
+      if (!purchaseOrder) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      
+      res.json(purchaseOrder);
+    } catch (error) {
+      console.error("Error getting purchase order:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const schema = z.object({
+        purchaseOrder: insertPurchaseOrderSchema,
+        items: z.array(
+          z.object({
+            description: z.string(),
+            productId: z.number(),
+            quantity: z.union([z.string(), z.number()]),
+            unitCost: z.union([z.string(), z.number()]),
+            taxRate: z.union([z.string(), z.number()]).optional(),
+            taxAmount: z.union([z.string(), z.number()]).optional(),
+            discount: z.union([z.string(), z.number()]).optional(),
+            subtotal: z.union([z.string(), z.number()]),
+            totalAmount: z.union([z.string(), z.number()])
+          })
+        )
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const newPurchaseOrder = await storage.createPurchaseOrder(
+        validatedData.purchaseOrder,
+        validatedData.items
+      );
+      
+      res.status(201).json(newPurchaseOrder);
+    } catch (error) {
+      console.error("Error creating purchase order:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.id);
+      const schema = z.object({
+        purchaseOrder: insertPurchaseOrderSchema.partial(),
+        items: z.array(
+          z.object({
+            id: z.number().optional(),
+            description: z.string(),
+            productId: z.number(),
+            quantity: z.union([z.string(), z.number()]),
+            unitCost: z.union([z.string(), z.number()]),
+            taxRate: z.union([z.string(), z.number()]).optional(),
+            taxAmount: z.union([z.string(), z.number()]).optional(),
+            discount: z.union([z.string(), z.number()]).optional(),
+            subtotal: z.union([z.string(), z.number()]),
+            totalAmount: z.union([z.string(), z.number()])
+          })
+        )
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedPurchaseOrder = await storage.updatePurchaseOrder(
+        purchaseOrderId, 
+        validatedData.purchaseOrder, 
+        validatedData.items
+      );
+      
+      res.json(updatedPurchaseOrder);
+    } catch (error) {
+      console.error("Error updating purchase order:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.id);
+      await storage.deletePurchaseOrder(purchaseOrderId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting purchase order:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id/status", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.id);
+      const schema = z.object({
+        status: z.enum(['draft', 'sent', 'received', 'partial', 'cancelled']),
+        deliveredDate: z.string().optional()
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedPurchaseOrder = await storage.updatePurchaseOrderStatus(
+        purchaseOrderId, 
+        validatedData.status,
+        validatedData.deliveredDate ? new Date(validatedData.deliveredDate) : undefined
+      );
+      
+      res.json(updatedPurchaseOrder);
+    } catch (error) {
+      console.error("Error updating purchase order status:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
