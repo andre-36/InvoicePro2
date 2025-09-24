@@ -1150,6 +1150,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Receive purchase order items route
+  app.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.id);
+      const schema = z.object({
+        items: z.array(z.object({
+          itemId: z.number(),
+          quantityReceived: z.number().min(0, "Quantity must be positive")
+        }))
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const result = await storage.receivePurchaseOrderItems(purchaseOrderId, validatedData.items);
+      res.json(result);
+    } catch (error) {
+      console.error("Error receiving purchase order items:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Settings routes
   app.get("/api/stores/:storeId/settings", requireAuth, async (req, res) => {
     try {

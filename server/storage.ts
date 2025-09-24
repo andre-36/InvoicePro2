@@ -98,6 +98,7 @@ export interface IStorage {
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
+  receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: number): Promise<void>;
   
   // Preview number generation methods
@@ -1388,6 +1389,137 @@ export class DatabaseStorage implements IStorage {
     return updatedPurchaseOrder;
   }
   
+  async receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder> {
+    return withTransaction(async (tx) => {
+      // Get the purchase order
+      const [purchaseOrder] = await tx
+        .select()
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.id, purchaseOrderId));
+      
+      if (!purchaseOrder) {
+        throw new Error(`Purchase order with ID ${purchaseOrderId} not found`);
+      }
+      
+      let allItemsFullyReceived = true;
+      
+      // Process each item
+      for (const item of items) {
+        // Get the current purchase order item
+        const [poItem] = await tx
+          .select()
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.id, item.itemId));
+        
+        if (!poItem) {
+          throw new Error(`Purchase order item with ID ${item.itemId} not found`);
+        }
+        
+        // Calculate new received quantity
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = currentReceived + item.quantityReceived;
+        const totalOrdered = parseFloat(poItem.quantity);
+        
+        // Prevent receiving more than ordered
+        if (newReceivedQuantity > totalOrdered) {
+          throw new Error(`Cannot receive ${item.quantityReceived} items. Maximum remaining: ${totalOrdered - currentReceived}`);
+        }
+        
+        // Update the purchase order item with new received quantity
+        await tx
+          .update(purchaseOrderItems)
+          .set({ 
+            receivedQuantity: newReceivedQuantity.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(purchaseOrderItems.id, item.itemId));
+        
+        // Create or update product batch to add inventory
+        if (item.quantityReceived > 0) {
+          // Find existing batch or create a new one
+          const batchReference = `PO-${purchaseOrder.purchaseOrderNumber}-${poItem.id}`;
+          const batchDescription = `Received from PO ${purchaseOrder.purchaseOrderNumber} - ${poItem.description}`;
+          
+          // Try to find existing batch for this PO item
+          const [existingBatch] = await tx
+            .select()
+            .from(productBatches)
+            .where(eq(productBatches.batchNumber, batchReference))
+            .limit(1);
+          
+          if (existingBatch) {
+            // Update existing batch
+            const newQuantity = parseFloat(existingBatch.totalQuantity) + item.quantityReceived;
+            const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + item.quantityReceived;
+            
+            await tx
+              .update(productBatches)
+              .set({
+                totalQuantity: newQuantity.toString(),
+                remainingQuantity: newRemainingQuantity.toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, existingBatch.id));
+          } else {
+            // Create new batch
+            await tx
+              .insert(productBatches)
+              .values({
+                productId: poItem.productId,
+                batchNumber: batchReference,
+                expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+                totalQuantity: item.quantityReceived.toString(),
+                remainingQuantity: item.quantityReceived.toString(),
+                costPrice: poItem.unitCost,
+                notes: batchDescription
+              });
+          }
+        }
+        
+        // Check if this item is fully received
+        if (newReceivedQuantity < totalOrdered) {
+          allItemsFullyReceived = false;
+        }
+      }
+      
+      // Determine new purchase order status
+      let newStatus: string;
+      if (allItemsFullyReceived) {
+        // Check if ALL items in the PO are fully received
+        const allItems = await tx
+          .select()
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+        
+        const allFullyReceived = allItems.every(item => 
+          parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity)
+        );
+        
+        newStatus = allFullyReceived ? 'received' : 'partial';
+      } else {
+        newStatus = 'partial';
+      }
+      
+      // Update purchase order status and delivered date if fully received
+      const updateData: any = {
+        status: newStatus as any,
+        updatedAt: new Date()
+      };
+      
+      if (newStatus === 'received') {
+        updateData.deliveredDate = new Date();
+      }
+      
+      const [updatedPurchaseOrder] = await tx
+        .update(purchaseOrders)
+        .set(updateData)
+        .where(eq(purchaseOrders.id, purchaseOrderId))
+        .returning();
+      
+      return updatedPurchaseOrder;
+    });
+  }
+
   async deletePurchaseOrder(id: number): Promise<void> {
     return withTransaction(async (tx) => {
       // Delete purchase order items (cascading)
