@@ -14,6 +14,7 @@ import {
   Menu,
   FileEdit,
   Bell,
+  Package,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -229,7 +230,7 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                     : "text-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
-                <FileText className={cn(
+                <Package className={cn(
                   "mr-3 h-5 w-5",
                   isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />

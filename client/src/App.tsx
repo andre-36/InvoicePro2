@@ -14,6 +14,8 @@ import CreateInvoicePage from "@/pages/invoices/create";
 import QuotationsPage from "@/pages/quotations";
 import QuotationDetailPage from "@/pages/quotations/quotation-detail";
 import CreateQuotationPage from "@/pages/quotations/create";
+import PurchaseOrdersPage from "@/pages/purchase-orders";
+import CreatePurchaseOrderPage from "@/pages/purchase-orders/create";
 import ClientsPage from "@/pages/clients";
 import CreateClientPage from "@/pages/clients/create";
 import ProductsPage from "@/pages/products";
@@ -136,6 +138,8 @@ function App() {
                 <Route path="/quotations/:id">
                   {params => <QuotationDetailPage id={parseInt(params.id)} />}
                 </Route>
+                <Route path="/purchase-orders" component={PurchaseOrdersPage} />
+                <Route path="/purchase-orders/create" component={CreatePurchaseOrderPage} />
                 <Route path="/clients" component={ClientsPage} />
                 <Route path="/clients/create" component={CreateClientPage} />
                 <Route path="/products" component={ProductsPage} />
