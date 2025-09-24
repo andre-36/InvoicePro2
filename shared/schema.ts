@@ -5,6 +5,7 @@ import { z } from "zod";
 // Enums
 export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'sent', 'paid', 'overdue', 'cancelled']);
 export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 'accepted', 'rejected', 'expired']);
+export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['draft', 'sent', 'received', 'partial', 'cancelled']);
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
 export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs']);
 
@@ -257,6 +258,60 @@ export const transactions = pgTable("transactions", {
   };
 });
 
+// Purchase Orders table
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  purchaseOrderNumber: varchar("purchase_order_number", { length: 50 }).notNull().unique(),
+  supplierName: varchar("supplier_name", { length: 100 }).notNull(),
+  supplierEmail: varchar("supplier_email", { length: 100 }),
+  supplierPhone: varchar("supplier_phone", { length: 50 }),
+  supplierAddress: text("supplier_address"),
+  orderDate: date("order_date").notNull(),
+  expectedDeliveryDate: date("expected_delivery_date"),
+  deliveredDate: date("delivered_date"),
+  status: purchaseOrderStatusEnum("status").default("draft").notNull(),
+  subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
+  discount: numeric("discount", { precision: 15, scale: 2 }).default("0"),
+  shipping: numeric("shipping", { precision: 15, scale: 2 }).default("0"),
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("purchase_orders_store_id_idx").on(table.storeId),
+    statusIdx: index("purchase_orders_status_idx").on(table.status),
+    orderDateIdx: index("purchase_orders_order_date_idx").on(table.orderDate),
+    supplierNameIdx: index("purchase_orders_supplier_name_idx").on(table.supplierName)
+  };
+});
+
+// Purchase Order Items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: serial("id").primaryKey(),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  receivedQuantity: numeric("received_quantity", { precision: 15, scale: 2 }).default("0"),
+  unitCost: numeric("unit_cost", { precision: 15, scale: 2 }).notNull(),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
+  discount: numeric("discount", { precision: 15, scale: 2 }).default("0"),
+  subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    purchaseOrderIdIdx: index("purchase_order_items_purchase_order_id_idx").on(table.purchaseOrderId),
+    productIdIdx: index("purchase_order_items_product_id_idx").on(table.productId)
+  };
+});
+
 // Settings table
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
@@ -298,6 +353,8 @@ export const insertInvoiceItemBatchSchema = createInsertSchema(invoiceItemBatche
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, quotationNumber: true, createdAt: true, updatedAt: true });
 export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, purchaseOrderNumber: true, createdAt: true, updatedAt: true });
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
 
@@ -338,6 +395,12 @@ export type InsertQuotationItem = z.infer<typeof insertQuotationItemSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 
@@ -348,8 +411,10 @@ export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
 export type ProductWithBatches = Product & { batches: ProductBatch[] };
 export type InvoiceWithItems = Invoice & { items: InvoiceItem[], client: Client };
 export type QuotationWithItems = Quotation & { items: QuotationItem[], client: Client };
+export type PurchaseOrderWithItems = PurchaseOrder & { items: PurchaseOrderItem[] };
 export type InvoiceItemWithProduct = InvoiceItem & { product: Product };
 export type QuotationItemWithProduct = QuotationItem & { product: Product };
+export type PurchaseOrderItemWithProduct = PurchaseOrderItem & { product: Product };
 
 // Auth schemas
 export const loginSchema = z.object({
