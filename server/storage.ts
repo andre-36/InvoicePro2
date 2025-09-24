@@ -3,13 +3,14 @@ import { db, withTransaction } from "./db";
 import {
   users, clients, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, quotations, quotationItems, transactions, stores,
-  settings, categories, importExportLogs,
+  settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems,
   
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Product, type InsertProduct,
   type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
+  type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog
 } from "../shared/schema";
@@ -90,9 +91,19 @@ export interface IStorage {
   convertQuotationToInvoice(id: number): Promise<Invoice>;
   deleteQuotation(id: number): Promise<void>;
   
+  // Purchase Order methods
+  getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
+  getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined>;
+  getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]>;
+  createPurchaseOrder(purchaseOrder: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
+  updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
+  deletePurchaseOrder(id: number): Promise<void>;
+  
   // Preview number generation methods
   getNextInvoiceNumber(issueDate?: Date): Promise<string>;
   getNextQuotationNumber(): Promise<string>;
+  getNextPurchaseOrderNumber(orderDate?: Date): Promise<string>;
   
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -1250,6 +1261,147 @@ export class DatabaseStorage implements IStorage {
     });
   }
   
+  // Purchase Order methods
+  async getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined> {
+    const [purchaseOrder] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+    return purchaseOrder;
+  }
+  
+  async getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined> {
+    const [purchaseOrder] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, id));
+    
+    if (!purchaseOrder) {
+      return undefined;
+    }
+    
+    const items = await db
+      .select()
+      .from(purchaseOrderItems)
+      .where(eq(purchaseOrderItems.purchaseOrderId, id))
+      .orderBy(purchaseOrderItems.id);
+    
+    return { purchaseOrder, items };
+  }
+  
+  async getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]> {
+    return db
+      .select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.storeId, storeId))
+      .orderBy(desc(purchaseOrders.orderDate));
+  }
+  
+  async createPurchaseOrder(purchaseOrderData: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder> {
+    return withTransaction(async (tx) => {
+      // Generate purchase order number using the standard generation function
+      const orderDate = purchaseOrderData.orderDate ? new Date(purchaseOrderData.orderDate) : new Date();
+      const year = orderDate.getFullYear().toString().slice(-2);
+      const month = (orderDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+      
+      const purchaseOrderNumber = await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
+      
+      // Create purchase order
+      const [newPurchaseOrder] = await tx
+        .insert(purchaseOrders)
+        .values({
+          ...purchaseOrderData,
+          purchaseOrderNumber
+        })
+        .returning();
+      
+      // Create purchase order items
+      for (const item of items) {
+        await tx
+          .insert(purchaseOrderItems)
+          .values({
+            ...item,
+            purchaseOrderId: newPurchaseOrder.id,
+            quantity: item.quantity.toString(),
+            unitCost: item.unitCost.toString(),
+            subtotal: item.subtotal.toString(),
+            totalAmount: item.totalAmount.toString(),
+            taxRate: item.taxRate?.toString() || '0',
+            taxAmount: item.taxAmount?.toString() || '0',
+            discount: item.discount?.toString() || '0'
+          });
+      }
+      
+      return newPurchaseOrder;
+    });
+  }
+  
+  async updatePurchaseOrder(id: number, purchaseOrderData: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder> {
+    return withTransaction(async (tx) => {
+      // Update purchase order
+      const [updatedPurchaseOrder] = await tx
+        .update(purchaseOrders)
+        .set({ ...purchaseOrderData, updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, id))
+        .returning();
+      
+      // Delete existing items
+      await tx
+        .delete(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, id));
+      
+      // Create new items
+      for (const item of items) {
+        await tx
+          .insert(purchaseOrderItems)
+          .values({
+            ...item,
+            purchaseOrderId: id,
+            quantity: item.quantity.toString(),
+            unitCost: item.unitCost.toString(),
+            subtotal: item.subtotal.toString(),
+            totalAmount: item.totalAmount.toString(),
+            taxRate: item.taxRate?.toString() || '0',
+            taxAmount: item.taxAmount?.toString() || '0',
+            discount: item.discount?.toString() || '0'
+          });
+      }
+      
+      return updatedPurchaseOrder;
+    });
+  }
+  
+  async updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder> {
+    const updateData: any = {
+      status: status as any,
+      updatedAt: new Date()
+    };
+    
+    if (deliveredDate) {
+      updateData.deliveredDate = deliveredDate;
+    }
+    
+    const [updatedPurchaseOrder] = await db
+      .update(purchaseOrders)
+      .set(updateData)
+      .where(eq(purchaseOrders.id, id))
+      .returning();
+    
+    return updatedPurchaseOrder;
+  }
+  
+  async deletePurchaseOrder(id: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Delete purchase order items (cascading)
+      await tx
+        .delete(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, id));
+      
+      // Delete the purchase order
+      await tx
+        .delete(purchaseOrders)
+        .where(eq(purchaseOrders.id, id));
+    });
+  }
+  
   // Transaction methods
   async getTransaction(id: number): Promise<Transaction | undefined> {
     const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
@@ -1772,6 +1924,24 @@ export class DatabaseStorage implements IStorage {
       });
     } catch (error) {
       console.error('Error in getNextQuotationNumber:', error);
+      throw error;
+    }
+  }
+
+  async getNextPurchaseOrderNumber(orderDate?: Date): Promise<string> {
+    try {
+      const currentDate = orderDate || new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+      
+      console.log('Generating purchase order number for yearMonth:', yearMonth);
+      
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextPurchaseOrderNumber:', error);
       throw error;
     }
   }
