@@ -15,11 +15,12 @@ interface StatsCardProps {
     label: string;
     color: "green" | "red" | "yellow" | "blue";
   };
+  noCurrency?: boolean;
 }
 
-export function StatsCard({ title, value, change, secondaryText, status }: StatsCardProps) {
+export function StatsCard({ title, value, change, secondaryText, status, noCurrency }: StatsCardProps) {
   const formatValue = (val: string | number) => {
-    if (typeof val === 'number') {
+    if (typeof val === 'number' && !noCurrency) {
       return formatCurrency(val);
     }
     return val;

@@ -133,10 +133,11 @@ export default function Dashboard() {
                 color: "yellow"
               }}
               change={{
-                value: formatCurrency(data.openInvoices.value),
+                value: data.openInvoices.value,
                 percentage: 0,
                 positive: true
               }}
+              noCurrency={true}
             />
             
             <StatsCard
@@ -152,6 +153,7 @@ export default function Dashboard() {
                 label: "4.3%",
                 color: "blue"
               }}
+              noCurrency={true}
             />
           </>
         )}
