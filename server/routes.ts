@@ -393,7 +393,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertClientSchema, req, res);
       if (!validatedData) return;
       
-      const newClient = await storage.createClient(validatedData);
+      // Add default storeId if not provided
+      const clientData = {
+        ...validatedData,
+        storeId: validatedData.storeId || 1
+      };
+      
+      const newClient = await storage.createClient(clientData);
       res.status(201).json(newClient);
     } catch (error) {
       console.error("Error creating client:", error);
