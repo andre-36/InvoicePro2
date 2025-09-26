@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { insertClientSchema } from "@shared/schema";
+import { insertClientSchema, type Client } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { useLocation } from "wouter";
 
 // Extend the schema for validation with proper email preprocessing
 const extendedClientSchema = insertClientSchema
-  .omit({ userId: true })
+  .omit({ storeId: true })
   .extend({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.preprocess(
@@ -47,7 +47,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
   const [, navigate] = useLocation();
 
   // If editing, fetch client data
-  const { data: clientData, isLoading } = useQuery({
+  const { data: clientData, isLoading } = useQuery<Client>({
     queryKey: ['/api/clients', clientId],
     enabled: !!clientId,
   });
