@@ -83,7 +83,9 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
       if (clientId) {
         return apiRequest('PUT', `/api/clients/${clientId}`, values);
       } else {
-        return apiRequest('POST', '/api/clients', values);
+        // Add storeId when creating new client
+        const clientData = { ...values, storeId: 1 };
+        return apiRequest('POST', '/api/clients', clientData);
       }
     },
     onSuccess: () => {
