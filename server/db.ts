@@ -12,8 +12,7 @@ export const db = drizzle(client, { schema });
 export async function withTransaction<T>(
   callback: (tx: typeof db) => Promise<T>
 ): Promise<T> {
-  return client.begin(async (sql) => {
-    const tx = drizzle(sql, { schema });
+  return db.transaction(async (tx) => {
     return await callback(tx);
   });
 }
