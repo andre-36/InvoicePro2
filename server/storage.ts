@@ -346,19 +346,28 @@ async function createWithSimpleSequentialNumber<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await withTransaction(async (tx) => {
+        console.log('Debug: Generating number with prefix:', prefix);
+        console.log('Debug: Column object:', column);
+        console.log('Debug: Column name:', column.name);
+        
         const uniqueNumber = await generateSimpleSequentialNumber(prefix, table, column, tx);
+        console.log('Debug: Generated unique number:', uniqueNumber);
+        
+        const insertData = {
+          ...data,
+          [column.name]: uniqueNumber
+        };
+        console.log('Debug: Insert data:', insertData);
         
         const [newRecord] = await tx
           .insert(table)
-          .values({
-            ...data,
-            [column.name]: uniqueNumber
-          })
+          .values(insertData)
           .returning();
           
         return newRecord;
       });
     } catch (error: any) {
+      console.log('Debug: Error in createWithSimpleSequentialNumber:', error);
       // Check if this is a unique constraint violation
       if (error?.code === '23505' && error?.detail?.includes(column.name)) {
         if (attempt === maxRetries) {
