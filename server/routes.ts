@@ -361,6 +361,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
+  app.get("/api/clients", requireAuth, async (req, res) => {
+    try {
+      // Default to store 1 for general client listing
+      const clients = await storage.getClients(1);
+      res.json(clients);
+    } catch (error) {
+      console.error("Error getting clients:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/stores/:storeId/clients", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
