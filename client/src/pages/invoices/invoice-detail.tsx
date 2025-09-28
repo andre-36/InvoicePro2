@@ -13,6 +13,7 @@ import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { generatePDF } from "@/lib/pdf-generator";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import type { Invoice, InvoiceItem, Client } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,15 +30,25 @@ interface InvoiceDetailProps {
   id: number;
 }
 
+interface InvoiceDetailResponse {
+  invoice: Invoice;
+  items: InvoiceItem[];
+  client?: Client;
+}
+
 export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const { data: invoice, isLoading, error } = useQuery({
+  const { data: invoiceData, isLoading, error } = useQuery<InvoiceDetailResponse>({
     queryKey: ['/api/invoices', id],
   });
+
+  const invoice = invoiceData?.invoice;
+  const items = invoiceData?.items || [];
+  const client = invoiceData?.client;
 
   // Delete invoice mutation
   const deleteMutation = useMutation({
@@ -93,8 +104,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           issueDate: formatDate(invoice.issueDate),
           dueDate: formatDate(invoice.dueDate)
         },
-        items: invoice.items,
-        client: invoice.client
+        items: items,
+        client: client
       });
       
       toast({
@@ -331,13 +342,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <div>
               <CardTitle className="text-xl mb-2">Client Information</CardTitle>
               <div className="space-y-1">
-                <p className="font-medium">{invoice.client.name}</p>
-                <p className="text-sm text-gray-600">{invoice.client.email}</p>
-                {invoice.client.phone && (
-                  <p className="text-sm text-gray-600">{invoice.client.phone}</p>
+                <p className="font-medium">{client?.name}</p>
+                <p className="text-sm text-gray-600">{client?.email}</p>
+                {client?.phone && (
+                  <p className="text-sm text-gray-600">{client?.phone}</p>
                 )}
-                {invoice.client.address && (
-                  <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.client.address}</p>
+                {client?.address && (
+                  <p className="text-sm text-gray-600 whitespace-pre-line">{client?.address}</p>
                 )}
               </div>
             </div>
@@ -384,7 +395,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {invoice.items.map((item) => (
+                {items.map((item) => (
                   <tr key={item.id}>
                     <td className="px-6 py-4 whitespace-normal text-sm text-gray-900">
                       {item.description}
@@ -393,13 +404,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       {parseFloat(item.quantity).toString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                      {formatCurrency(item.price)}
+                      {formatCurrency(item.unitPrice)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                       {parseFloat(item.taxRate) > 0 ? `${item.taxRate}%` : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                      {formatCurrency(item.total)}
+                      {formatCurrency(item.totalAmount)}
                     </td>
                   </tr>
                 ))}
@@ -416,7 +427,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700">Tax:</span>
-              <span className="text-gray-900">{formatCurrency(invoice.tax)}</span>
+              <span className="text-gray-900">{formatCurrency(invoice.taxAmount)}</span>
             </div>
             {parseFloat(invoice.discount) > 0 && (
               <div className="flex justify-between text-sm">
@@ -426,7 +437,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             )}
             <div className="flex justify-between pt-2 border-t border-gray-200">
               <span className="font-semibold text-gray-900">Total:</span>
-              <span className="font-bold text-gray-900">{formatCurrency(invoice.total)}</span>
+              <span className="font-bold text-gray-900">{formatCurrency(invoice.totalAmount)}</span>
             </div>
           </div>
           
