@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -66,16 +67,18 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
   });
 
   // Update form when client data is loaded
-  if (clientId && clientData && !form.formState.isDirty) {
-    form.reset({
-      ...clientData,
-      email: clientData.email ?? "",
-      phone: clientData.phone ?? "",
-      address: clientData.address ?? "",
-      taxNumber: clientData.taxNumber ?? "",
-      notes: clientData.notes ?? "",
-    });
-  }
+  useEffect(() => {
+    if (clientId && clientData && !form.formState.isDirty) {
+      form.reset({
+        ...clientData,
+        email: clientData.email ?? "",
+        phone: clientData.phone ?? "",
+        address: clientData.address ?? "",
+        taxNumber: clientData.taxNumber ?? "",
+        notes: clientData.notes ?? "",
+      });
+    }
+  }, [clientId, clientData, form]);
 
   // Create/update client mutation
   const mutation = useMutation({
