@@ -26,10 +26,23 @@ export function formatCurrency(amount: string | number): string {
 
 export function formatDate(dateString: string): string {
   try {
+    // Handle null or undefined
+    if (!dateString) {
+      return 'N/A';
+    }
+    
     const date = new Date(dateString);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date value:', dateString);
+      return dateString || 'Invalid Date';
+    }
+    
     return format(date, 'MMM dd, yyyy');
   } catch (error) {
-    return dateString;
+    console.warn('Error formatting date:', error, 'Input:', dateString);
+    return dateString || 'Invalid Date';
   }
 }
 
