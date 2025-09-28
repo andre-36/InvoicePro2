@@ -46,6 +46,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     queryKey: ['/api/invoices', id],
   });
 
+  // Debug logging
+  console.log('Invoice Detail Debug:', { id, invoiceData, isLoading, error });
+
   const invoice = invoiceData?.invoice;
   const items = invoiceData?.items || [];
   const client = invoiceData?.client;

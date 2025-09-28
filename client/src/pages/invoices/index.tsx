@@ -279,10 +279,8 @@ export default function InvoicesPage() {
                   {filteredInvoices.map((invoice) => (
                     <TableRow key={invoice.id} className="group">
                       <TableCell className="font-medium text-primary">
-                        <Link href={`/invoices/${invoice.id}`}>
-                          <a className="hover:underline">
-                            {invoice.invoiceNumber}
-                          </a>
+                        <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary">
+                          {invoice.invoiceNumber}
                         </Link>
                       </TableCell>
                       <TableCell>{invoice.clientName}</TableCell>
