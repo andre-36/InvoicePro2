@@ -49,7 +49,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
 
   // If editing, fetch client data
   const { data: clientData, isLoading } = useQuery<Client>({
-    queryKey: ['/api/clients', clientId],
+    queryKey: [`/api/clients/${clientId}`],
     enabled: !!clientId,
   });
 
