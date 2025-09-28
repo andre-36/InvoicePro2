@@ -43,10 +43,11 @@ import { generatePDF } from "@/lib/pdf-generator";
 type Invoice = {
   id: number;
   invoiceNumber: string;
-  clientName: string;
+  clientId?: number;
+  clientName?: string;
   issueDate: string;
   dueDate: string;
-  total: string;
+  totalAmount: string;
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 };
 
@@ -287,7 +288,7 @@ export default function InvoicesPage() {
                       <TableCell>{invoice.clientName}</TableCell>
                       <TableCell>{formatDate(invoice.issueDate)}</TableCell>
                       <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(invoice.total)}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(invoice.totalAmount)}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

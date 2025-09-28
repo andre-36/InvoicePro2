@@ -723,6 +723,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // General invoices endpoint
+  app.get("/api/invoices", requireAuth, async (req, res) => {
+    try {
+      // Default to store 1 for general invoice listing
+      const invoices = await storage.getInvoices(1);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error getting invoices:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Get next invoice number preview - MUST be before /:id route
   app.get("/api/invoices/next-number", requireAuth, async (req, res) => {
     try {
