@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
@@ -85,18 +93,13 @@ export default function ClientsPage() {
     setIsDialogOpen(true);
   };
   
+  const handleDoubleClick = (id: number) => {
+    handleEdit(id);
+  };
+  
   const closeDialog = () => {
     setIsDialogOpen(false);
     setEditClientId(null);
-  };
-  
-  // Generate client initials
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase())
-      .slice(0, 2)
-      .join('');
   };
   
   return (
@@ -128,21 +131,30 @@ export default function ClientsPage() {
           </div>
         </CardHeader>
         
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array(6).fill(0).map((_, i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <Skeleton className="h-12 w-12 rounded-full" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead className="w-[70px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array(5).fill(0).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : filteredClients.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-gray-100 p-3 mb-4">
@@ -164,94 +176,105 @@ export default function ClientsPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredClients.map((client) => (
-                <div key={client.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow group">
-                  <div className="flex justify-between">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-medium">
-                        {getInitials(client.name)}
-                      </div>
-                      <div>
-                        <h3 className="text-base font-medium text-gray-900">{client.name}</h3>
-                        <div className="mt-1 text-sm text-gray-500 space-y-1">
-                          <div className="flex items-center">
-                            <Mail className="h-3.5 w-3.5 mr-1.5" />
-                            <a href={`mailto:${client.email}`} className="hover:underline">
-                              {client.email}
-                            </a>
-                          </div>
-                          {client.phone && (
-                            <div className="flex items-center">
-                              <Phone className="h-3.5 w-3.5 mr-1.5" />
-                              <a href={`tel:${client.phone}`} className="hover:underline">
-                                {client.phone}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[160px]">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          <span>View Details</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(client.id)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>Edit</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Client</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete {client.name}? This action cannot be undone
-                                and will also remove all invoices associated with this client.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteMutation.mutate(client.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  
-                  {client.address && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="text-xs text-gray-500 whitespace-pre-line line-clamp-2">
-                        {client.address}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead className="w-[70px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredClients.map((client) => (
+                  <TableRow 
+                    key={client.id} 
+                    className="cursor-pointer hover:bg-gray-50"
+                    onDoubleClick={() => handleDoubleClick(client.id)}
+                    data-testid={`row-client-${client.id}`}
+                  >
+                    <TableCell className="font-medium">{client.name}</TableCell>
+                    <TableCell>
+                      {client.email ? (
+                        <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                          {client.email}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.phone ? (
+                        <a href={`tel:${client.phone}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                          {client.phone}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.address ? (
+                        <span className="text-sm text-gray-600 line-clamp-1" title={client.address}>
+                          {client.address}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[160px]">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            <span>View Details</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEdit(client.id)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {client.name}? This action cannot be undone
+                                  and will also remove all invoices associated with this client.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteMutation.mutate(client.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
