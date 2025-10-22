@@ -128,6 +128,7 @@ export interface IStorage {
   getDashboardStats(storeId: number): Promise<DashboardStats>;
   getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]>;
   getInvoiceStatusSummary(storeId: number): Promise<InvoiceStatusSummary>;
+  getProductSalesByCategory(storeId: number): Promise<CategorySalesData[]>;
   getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData>;
   getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]>;
   getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
@@ -168,6 +169,14 @@ export type InvoiceStatusSummary = {
   pending: number;
   overdue: number;
   total: number;
+};
+
+export type CategorySalesData = {
+  categoryId: number | null;
+  categoryName: string;
+  totalRevenue: number;
+  totalQuantity: number;
+  productCount: number;
 };
 
 export type RevenueData = {
@@ -1841,6 +1850,49 @@ export class DatabaseStorage implements IStorage {
       overdue: parseInt(row.overdue || '0'),
       total: parseInt(row.total || '0')
     };
+  }
+
+  async getProductSalesByCategory(storeId: number): Promise<CategorySalesData[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        c.id as category_id,
+        c.name as category_name,
+        COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
+        COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
+        COUNT(DISTINCT p.id) as product_count
+      FROM ${categories} c
+      INNER JOIN ${products} p ON c.id = p.category_id
+      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
+      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE i.store_id = ${storeId} AND i.status = 'paid'
+      GROUP BY c.id, c.name
+      HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
+      
+      UNION ALL
+      
+      SELECT 
+        NULL as category_id,
+        'Uncategorized' as category_name,
+        COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
+        COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
+        COUNT(DISTINCT p.id) as product_count
+      FROM ${products} p
+      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
+      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE p.category_id IS NULL AND i.store_id = ${storeId} AND i.status = 'paid'
+      GROUP BY p.category_id
+      HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
+      
+      ORDER BY total_revenue DESC
+    `);
+    
+    return result.map(row => ({
+      categoryId: row.category_id ? parseInt(row.category_id as string) : null,
+      categoryName: row.category_name as string,
+      totalRevenue: parseFloat(row.total_revenue as string || '0'),
+      totalQuantity: parseFloat(row.total_quantity as string || '0'),
+      productCount: parseInt(row.product_count as string || '0')
+    }));
   }
   
   async getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData> {

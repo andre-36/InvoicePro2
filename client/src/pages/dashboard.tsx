@@ -8,6 +8,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { InvoiceStatusChart } from "@/components/dashboard/invoice-status-chart";
+import { CategorySalesChart } from "@/components/dashboard/category-sales-chart";
 import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { TopClientsList } from "@/components/dashboard/top-clients-list";
 
@@ -163,6 +164,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <RevenueChart startDate={queryDates.start} endDate={queryDates.end} />
         <InvoiceStatusChart />
+      </div>
+
+      {/* Category Sales Chart */}
+      <div className="grid grid-cols-1 gap-5">
+        <CategorySalesChart />
       </div>
       
       {/* Recent Invoices & Clients */}

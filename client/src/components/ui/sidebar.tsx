@@ -15,6 +15,7 @@ import {
   FileEdit,
   Bell,
   Package,
+  FolderOpen,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -219,6 +220,22 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Products</span>
+              </Link>
+
+              <Link 
+                href="/categories"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/categories") 
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                <FolderOpen className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/categories") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>Categories</span>
               </Link>
               
               <Link 

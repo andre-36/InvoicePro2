@@ -1340,6 +1340,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/category-sales", requireAuth, async (req, res) => {
+    try {
+      const storeId = 1; // Default to store 1
+      const data = await storage.getProductSalesByCategory(storeId);
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting category sales:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Dashboard metrics routes
   app.get("/api/stores/:storeId/dashboard/stats", requireAuth, async (req, res) => {
     try {

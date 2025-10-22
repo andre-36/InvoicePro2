@@ -21,6 +21,7 @@ import ClientsPage from "@/pages/clients";
 import CreateClientPage from "@/pages/clients/create";
 import ProductsPage from "@/pages/products";
 import ProductDashboard from "@/pages/products/dashboard";
+import CategoriesPage from "@/pages/categories";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import { useMobile } from "./hooks/use-mobile";
@@ -150,6 +151,7 @@ function App() {
                 <Route path="/products/:id/dashboard">
                   {params => <ProductDashboard id={parseInt(params.id)} />}
                 </Route>
+                <Route path="/categories" component={CategoriesPage} />
                 <Route path="/reports" component={ReportsPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route component={NotFound} />
