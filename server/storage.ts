@@ -127,6 +127,7 @@ export interface IStorage {
   // Dashboard metrics
   getDashboardStats(storeId: number): Promise<DashboardStats>;
   getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]>;
+  getInvoiceStatusSummary(storeId: number): Promise<InvoiceStatusSummary>;
   getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData>;
   getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]>;
   getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
@@ -160,6 +161,13 @@ export type ClientWithSalesStats = {
   totalSpent: number;
   averageSpend: number;
   lastPurchaseDate: Date | null;
+};
+
+export type InvoiceStatusSummary = {
+  paid: number;
+  pending: number;
+  overdue: number;
+  total: number;
 };
 
 export type RevenueData = {
@@ -1813,6 +1821,26 @@ export class DatabaseStorage implements IStorage {
       averageSpend: parseFloat(row.average_spend || '0'),
       lastPurchaseDate: row.last_purchase_date
     }));
+  }
+
+  async getInvoiceStatusSummary(storeId: number): Promise<InvoiceStatusSummary> {
+    const result = await db.execute(sql`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'paid') as paid,
+        COUNT(*) FILTER (WHERE status IN ('sent', 'draft')) as pending,
+        COUNT(*) FILTER (WHERE status = 'overdue') as overdue,
+        COUNT(*) as total
+      FROM ${invoices}
+      WHERE store_id = ${storeId}
+    `);
+    
+    const row = result[0];
+    return {
+      paid: parseInt(row.paid || '0'),
+      pending: parseInt(row.pending || '0'),
+      overdue: parseInt(row.overdue || '0'),
+      total: parseInt(row.total || '0')
+    };
   }
   
   async getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData> {
