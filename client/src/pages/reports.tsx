@@ -12,7 +12,7 @@ const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'
 type DateRange = "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
 
 type RevenueData = {
-  labels: string[];
+  dates: string[];
   income: number[];
   expenses: number[];
 };
@@ -23,7 +23,7 @@ type Transaction = {
   amount: string;
   date: string;
   type: 'income' | 'expense';
-  category: string;
+  category: string | null;
 };
 
 export default function ReportsPage() {
@@ -32,12 +32,12 @@ export default function ReportsPage() {
   
   // Revenue chart data
   const { data: revenueData, isLoading: isLoadingRevenue } = useQuery<RevenueData>({
-    queryKey: ['/api/dashboard/revenue-overview', { months: 12 }],
+    queryKey: ['/api/stores/1/dashboard/revenue'],
   });
   
   // Transactions for expense/income breakdown
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/transactions'],
+    queryKey: ['/api/stores/1/transactions'],
   });
   
   // Process transaction data for charts
@@ -68,8 +68,8 @@ export default function ReportsPage() {
   const prepareRevenueChartData = () => {
     if (!revenueData) return [];
     
-    return revenueData.labels.map((month, index) => ({
-      name: month,
+    return revenueData.dates.map((date, index) => ({
+      name: date,
       income: revenueData.income[index],
       expenses: revenueData.expenses[index],
       profit: revenueData.income[index] - revenueData.expenses[index]
