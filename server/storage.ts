@@ -1,12 +1,13 @@
 import { eq, and, desc, gte, lt, sql, isNull, inArray } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
-  users, clients, products, productBatches, invoices, invoiceItems, 
+  users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, quotations, quotationItems, transactions, stores,
   settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems,
   
   type User, type InsertUser, type Store, type InsertStore,
-  type Client, type InsertClient, type Product, type InsertProduct,
+  type Client, type InsertClient, type Supplier, type InsertSupplier,
+  type Product, type InsertProduct,
   type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,

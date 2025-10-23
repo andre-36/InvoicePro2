@@ -13,6 +13,7 @@ import {
   insertUserSchema,
   insertStoreSchema,
   insertClientSchema,
+  insertSupplierSchema,
   insertCategorySchema,
   insertProductSchema,
   insertProductBatchSchema,
@@ -439,6 +440,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting client:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Supplier routes
+  app.get("/api/suppliers", requireAuth, async (req, res) => {
+    try {
+      // Default to store 1 for general supplier listing
+      const suppliers = await storage.getSuppliers(1);
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error getting suppliers:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/stores/:storeId/suppliers", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const suppliers = await storage.getSuppliers(storeId);
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error getting suppliers:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      const supplier = await storage.getSupplier(supplierId);
+      
+      if (!supplier) {
+        return res.status(404).json({ error: "Supplier not found" });
+      }
+      
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error getting supplier:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/suppliers", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertSupplierSchema, req, res);
+      if (!validatedData) return;
+      
+      // Add default storeId if not provided
+      const supplierData = {
+        ...validatedData,
+        storeId: validatedData.storeId || 1
+      };
+      
+      const newSupplier = await storage.createSupplier(supplierData);
+      res.status(201).json(newSupplier);
+    } catch (error) {
+      console.error("Error creating supplier:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/suppliers/:id", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertSupplierSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedSupplier = await storage.updateSupplier(supplierId, validatedData);
+      res.json(updatedSupplier);
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      await storage.deleteSupplier(supplierId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
