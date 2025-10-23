@@ -58,6 +58,29 @@ export const clients = pgTable("clients", {
   };
 });
 
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  supplierNumber: varchar("supplier_number", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 100 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  taxNumber: varchar("tax_number", { length: 50 }),
+  contactPerson: varchar("contact_person", { length: 100 }),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("suppliers_store_id_idx").on(table.storeId),
+    emailIdx: index("suppliers_email_idx").on(table.email),
+    supplierNumberIdx: uniqueIndex("suppliers_supplier_number_idx").on(table.supplierNumber)
+  };
+});
+
 // Categories table
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -263,6 +286,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
   purchaseOrderNumber: varchar("purchase_order_number", { length: 50 }).notNull().unique(),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   supplierName: varchar("supplier_name", { length: 100 }).notNull(),
   supplierEmail: varchar("supplier_email", { length: 100 }),
   supplierPhone: varchar("supplier_phone", { length: 50 }),
@@ -283,6 +307,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
 }, (table) => {
   return {
     storeIdIdx: index("purchase_orders_store_id_idx").on(table.storeId),
+    supplierIdIdx: index("purchase_orders_supplier_id_idx").on(table.supplierId),
     statusIdx: index("purchase_orders_status_idx").on(table.status),
     orderDateIdx: index("purchase_orders_order_date_idx").on(table.orderDate),
     supplierNameIdx: index("purchase_orders_supplier_name_idx").on(table.supplierName)
@@ -344,6 +369,7 @@ export const importExportLogs = pgTable("import_export_logs", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true, updatedAt: true });
@@ -367,6 +393,9 @@ export type InsertStore = z.infer<typeof insertStoreSchema>;
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
