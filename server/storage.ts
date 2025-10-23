@@ -44,6 +44,13 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   
+  // Supplier methods
+  getSupplier(id: number): Promise<Supplier | undefined>;
+  getSuppliers(storeId: number): Promise<Supplier[]>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: number): Promise<void>;
+  
   // Category methods
   getCategory(id: number): Promise<Category | undefined>;
   getCategories(): Promise<Category[]>;
@@ -487,6 +494,33 @@ export class DatabaseStorage implements IStorage {
   
   async deleteClient(id: number): Promise<void> {
     await db.delete(clients).where(eq(clients.id, id));
+  }
+  
+  // Supplier methods
+  async getSupplier(id: number): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier;
+  }
+  
+  async getSuppliers(storeId: number): Promise<Supplier[]> {
+    return db.select().from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(suppliers.name);
+  }
+  
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    return createWithSimpleSequentialNumber<Supplier>(suppliers, suppliers.supplierNumber, "S", supplier);
+  }
+  
+  async updateSupplier(id: number, supplierData: Partial<InsertSupplier>): Promise<Supplier> {
+    const [updatedSupplier] = await db
+      .update(suppliers)
+      .set({ ...supplierData, updatedAt: new Date() })
+      .where(eq(suppliers.id, id))
+      .returning();
+    return updatedSupplier;
+  }
+  
+  async deleteSupplier(id: number): Promise<void> {
+    await db.delete(suppliers).where(eq(suppliers.id, id));
   }
   
   // Category methods
