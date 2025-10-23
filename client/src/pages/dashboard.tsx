@@ -100,44 +100,17 @@ export default function Dashboard() {
             <StatsCard
               title="Total Income"
               value={data.totalIncome}
-              change={{
-                value: 2567,
-                percentage: 12.5,
-                positive: true
-              }}
-              status={{
-                label: "12.5%",
-                color: "green"
-              }}
             />
             
             <StatsCard
               title="Total Expenses"
               value={data.totalExpenses}
-              change={{
-                value: 945,
-                percentage: 8.2,
-                positive: false
-              }}
-              status={{
-                label: "8.2%",
-                color: "red"
-              }}
             />
             
             <StatsCard
               title="Open Invoices"
               value={data.openInvoices.count}
-              secondaryText="invoices"
-              status={{
-                label: "Pending",
-                color: "yellow"
-              }}
-              change={{
-                value: data.openInvoices.value,
-                percentage: 0,
-                positive: true
-              }}
+              secondaryText={`${formatCurrency(data.openInvoices.value)} total`}
               noCurrency={true}
             />
             
@@ -145,15 +118,6 @@ export default function Dashboard() {
               title="Total Clients"
               value={data.totalClients}
               secondaryText="clients"
-              change={{
-                value: 2,
-                percentage: 4.3,
-                positive: true
-              }}
-              status={{
-                label: "4.3%",
-                color: "blue"
-              }}
               noCurrency={true}
             />
           </>
