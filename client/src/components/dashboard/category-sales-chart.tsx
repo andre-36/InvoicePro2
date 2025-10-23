@@ -82,42 +82,19 @@ export function CategorySalesChart() {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      const percentage = ((data.value / totalRevenue) * 100).toFixed(1);
       return (
         <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-          <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{data.name}</p>
+          <p className="font-semibold text-gray-900 dark:text-gray-100">{data.name}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Sales: {formatCurrency(data.value)}
+            Revenue: {formatCurrency(data.value)}
           </p>
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {percentage}% of total sales
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {Math.round((data.value / totalRevenue) * 100)}% of total
           </p>
         </div>
       );
     }
     return null;
-  };
-
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    if (percent < 0.05) return null; // Don't show label for slices less than 5%
-
-    return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
-        dominantBaseline="central"
-        className="font-semibold text-sm"
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
   };
 
   return (
@@ -143,8 +120,6 @@ export function CategorySalesChart() {
                     paddingAngle={2}
                     dataKey="value"
                     stroke="none"
-                    label={renderCustomLabel}
-                    labelLine={false}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
