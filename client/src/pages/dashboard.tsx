@@ -14,7 +14,7 @@ import { TopClientsList } from "@/components/dashboard/top-clients-list";
 
 
 type DashboardStats = {
-  totalIncome: number;
+  totalRevenue: number;
   totalExpenses: number;
   openInvoices: {
     count: number;
@@ -99,7 +99,7 @@ export default function Dashboard() {
           <>
             <StatsCard
               title="Total Income"
-              value={data.totalIncome}
+              value={data.totalRevenue}
             />
             
             <StatsCard
