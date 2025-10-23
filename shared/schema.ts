@@ -453,5 +453,39 @@ export const loginSchema = z.object({
 
 export type LoginData = z.infer<typeof loginSchema>;
 
-// Add relation definitions
-// This would be used if we were using relations() from drizzle-orm
+// Define relations for easier querying
+import { relations } from "drizzle-orm";
+
+export const storesRelations = relations(stores, ({ many }) => ({
+  clients: many(clients),
+  products: many(productBatches),
+  invoices: many(invoices),
+  quotations: many(quotations),
+  purchaseOrders: many(purchaseOrders)
+}));
+
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  store: one(stores, { fields: [clients.storeId], references: [stores.id] }),
+  invoices: many(invoices),
+  quotations: many(quotations)
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
+  batches: many(productBatches),
+  invoiceItems: many(invoiceItems),
+  quotationItems: many(quotationItems)
+}));
+
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  store: one(stores, { fields: [invoices.storeId], references: [stores.id] }),
+  client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
+  items: many(invoiceItems),
+  transactions: many(transactions)
+}));
+
+export const invoiceItemsRelations = relations(invoiceItems, ({ one, many }) => ({
+  invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
+  product: one(products, { fields: [invoiceItems.productId], references: [products.id] }),
+  batches: many(invoiceItemBatches)
+}));
