@@ -13,8 +13,9 @@ type DateRange = "this_month" | "last_month" | "this_quarter" | "this_year" | "c
 
 type RevenueData = {
   dates: string[];
-  income: number[];
+  revenue: number[];
   expenses: number[];
+  profit: number[];
 };
 
 type Transaction = {
@@ -66,13 +67,13 @@ export default function ReportsPage() {
   
   // Prepare revenue chart data
   const prepareRevenueChartData = () => {
-    if (!revenueData) return [];
+    if (!revenueData || !revenueData.revenue || !revenueData.expenses) return [];
     
     return revenueData.dates.map((date, index) => ({
       name: date,
-      income: revenueData.income[index],
+      income: revenueData.revenue[index],
       expenses: revenueData.expenses[index],
-      profit: revenueData.income[index] - revenueData.expenses[index]
+      profit: revenueData.revenue[index] - revenueData.expenses[index]
     }));
   };
   
