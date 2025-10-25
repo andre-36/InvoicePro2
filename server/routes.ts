@@ -1512,6 +1512,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Financial Reports endpoints
+  app.get("/api/stores/:storeId/reports/financial", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const dateRange = req.query.dateRange as string || 'this_month';
+      const report = await storage.getFinancialReport(storeId, dateRange);
+      res.json(report);
+    } catch (error) {
+      console.error("Error getting financial report:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/stores/:storeId/reports/cashflow", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const dateRange = req.query.dateRange as string || 'this_month';
+      const report = await storage.getCashFlowReport(storeId, dateRange);
+      res.json(report);
+    } catch (error) {
+      console.error("Error getting cash flow report:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Database backup endpoint
   app.get("/api/backup/export", requireAuth, async (req, res) => {
     try {

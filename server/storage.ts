@@ -141,6 +141,8 @@ export interface IStorage {
   getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]>;
   getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
   getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]>;
+  getFinancialReport(storeId: number, dateRange: string): Promise<any>;
+  getCashFlowReport(storeId: number, dateRange: string): Promise<any>;
 }
 
 // Types for dashboard metrics
@@ -2079,6 +2081,229 @@ export class DatabaseStorage implements IStorage {
     };
   }
   
+  async getFinancialReport(storeId: number, dateRange: string): Promise<any> {
+    const { startDate, endDate } = this.getDateRangeFromString(dateRange);
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    // Get sales revenue from paid invoices
+    const salesRevenueResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as sales_revenue
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startStr}
+        AND issue_date <= ${endStr}
+    `);
+
+    // Get other income from transactions
+    const otherIncomeResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as other_income
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'income'
+        AND category != 'Sales'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Get total COGS from invoices
+    const cogsResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(iib.quantity::numeric * iib.capital_cost::numeric), 0) as total_cogs
+      FROM ${invoiceItemBatches} iib
+      JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE i.store_id = ${storeId}
+        AND i.status = 'paid'
+        AND i.issue_date >= ${startStr}
+        AND i.issue_date <= ${endStr}
+    `);
+
+    // Get inventory values
+    const inventoryResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CASE WHEN pb.purchase_date < ${startStr} THEN pb.remaining_quantity::numeric * pb.capital_cost::numeric ELSE 0 END), 0) as beginning_inventory,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as ending_inventory,
+        COALESCE(SUM(CASE WHEN pb.purchase_date >= ${startStr} AND pb.purchase_date <= ${endStr} THEN pb.initial_quantity::numeric * pb.capital_cost::numeric ELSE 0 END), 0) as purchases
+      FROM ${productBatches} pb
+      WHERE pb.store_id = ${storeId}
+    `);
+
+    // Get operating expenses
+    const operatingExpensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as operating_expenses
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    const salesRevenue = parseFloat(salesRevenueResult[0]?.sales_revenue || '0');
+    const otherIncome = parseFloat(otherIncomeResult[0]?.other_income || '0');
+    const totalRevenue = salesRevenue + otherIncome;
+
+    const beginningInventory = parseFloat(inventoryResult[0]?.beginning_inventory || '0');
+    const purchases = parseFloat(inventoryResult[0]?.purchases || '0');
+    const endingInventory = parseFloat(inventoryResult[0]?.ending_inventory || '0');
+    const totalCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+
+    const operatingExpenses = parseFloat(operatingExpensesResult[0]?.operating_expenses || '0');
+    const otherExpenses = 0; // Can be expanded later
+
+    const grossProfit = totalRevenue - totalCOGS;
+    const netProfit = grossProfit - operatingExpenses - otherExpenses;
+
+    const grossProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const netProfitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    return {
+      revenue: {
+        salesRevenue,
+        otherIncome,
+        totalRevenue
+      },
+      cogs: {
+        beginningInventory,
+        purchases,
+        endingInventory,
+        totalCOGS
+      },
+      expenses: {
+        operatingExpenses,
+        otherExpenses,
+        totalExpenses: operatingExpenses + otherExpenses
+      },
+      profit: {
+        grossProfit,
+        netProfit,
+        grossProfitMargin,
+        netProfitMargin
+      }
+    };
+  }
+
+  async getCashFlowReport(storeId: number, dateRange: string): Promise<any> {
+    const { startDate, endDate } = this.getDateRangeFromString(dateRange);
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    // Operating activities - cash from sales
+    const cashFromSalesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as cash_from_sales
+      FROM ${invoices}
+      WHERE store_id = ${storeId}
+        AND status = 'paid'
+        AND issue_date >= ${startStr}
+        AND issue_date <= ${endStr}
+    `);
+
+    // Cash paid to suppliers (from purchase orders)
+    const cashToSuppliersResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as cash_to_suppliers
+      FROM ${purchaseOrders}
+      WHERE store_id = ${storeId}
+        AND status IN ('received', 'partial')
+        AND order_date >= ${startStr}
+        AND order_date <= ${endStr}
+    `);
+
+    // Cash paid for expenses
+    const cashForExpensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as cash_for_expenses
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Equipment purchases (if tracked in transactions)
+    const equipmentResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as equipment_purchases
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND category = 'Equipment'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Owner investment (if tracked)
+    const ownerInvestmentResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as owner_investment
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'income'
+        AND category = 'Owner Investment'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    const cashFromSales = parseFloat(cashFromSalesResult[0]?.cash_from_sales || '0');
+    const cashPaidToSuppliers = parseFloat(cashToSuppliersResult[0]?.cash_to_suppliers || '0');
+    const cashPaidForExpenses = parseFloat(cashForExpensesResult[0]?.cash_for_expenses || '0');
+    const equipmentPurchases = parseFloat(equipmentResult[0]?.equipment_purchases || '0');
+    const ownerInvestment = parseFloat(ownerInvestmentResult[0]?.owner_investment || '0');
+
+    const netOperatingCashFlow = cashFromSales - cashPaidToSuppliers - cashPaidForExpenses;
+    const netInvestingCashFlow = -equipmentPurchases;
+    const netFinancingCashFlow = ownerInvestment;
+    const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
+
+    // Calculate beginning cash (simplified - would need a proper cash account)
+    const beginningCash = 0; // This should be tracked separately
+    const endingCash = beginningCash + netCashFlow;
+
+    return {
+      operating: {
+        cashFromSales,
+        cashPaidToSuppliers,
+        cashPaidForExpenses,
+        netOperatingCashFlow
+      },
+      investing: {
+        equipmentPurchases,
+        netInvestingCashFlow
+      },
+      financing: {
+        ownerInvestment,
+        netFinancingCashFlow
+      },
+      netCashFlow,
+      beginningCash,
+      endingCash
+    };
+  }
+
+  private getDateRangeFromString(dateRange: string): { startDate: Date; endDate: Date } {
+    const today = new Date();
+    const endDate = new Date(today);
+    let startDate = new Date(today);
+
+    switch (dateRange) {
+      case 'this_month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'last_month':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate.setDate(0); // Last day of previous month
+        break;
+      case 'this_quarter':
+        const quarter = Math.floor(today.getMonth() / 3);
+        startDate = new Date(today.getFullYear(), quarter * 3, 1);
+        break;
+      case 'this_year':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    return { startDate, endDate };
+  }
+
   async getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]> {
     // Generate SQL for optionally filtering by product ID
     const productFilter = productId 
