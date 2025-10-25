@@ -108,16 +108,14 @@ export default function Dashboard() {
             />
             
             <StatsCard
-              title="Open Invoices"
-              value={data.openInvoices.count}
-              secondaryText={`${formatCurrency(data.openInvoices.value)} total`}
-              noCurrency={true}
+              title="Total Profit"
+              value={data.totalRevenue - data.totalExpenses}
             />
             
             <StatsCard
-              title="Total Clients"
-              value={data.totalClients}
-              secondaryText="clients"
+              title="Open Invoices"
+              value={data.openInvoices.count}
+              secondaryText={`${formatCurrency(data.openInvoices.value)} total`}
               noCurrency={true}
             />
           </>
