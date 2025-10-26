@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Edit, FileDown, Trash2, FileEdit, Calendar, Building, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Edit, FileDown, Trash2, FileEdit, Calendar, Building, Mail, Phone, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -165,6 +165,10 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
 
   const { quotation, items, client } = quotationData;
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6" data-testid="quotation-detail-page">
       {/* Header */}
@@ -194,6 +198,15 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
         </div>
         
         <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={handlePrint}
+            data-testid="button-print-quotation"
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
+
           {quotation.status !== 'accepted' && !quotation.convertedToInvoiceId && (
             <Button
               onClick={() => convertMutation.mutate(quotation.id)}

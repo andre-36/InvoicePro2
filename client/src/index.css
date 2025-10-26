@@ -99,3 +99,136 @@
     @apply sticky top-0 z-10 bg-muted;
   }
 }
+
+/* Print styles for PRS Paper (13.8cm x 21.7cm) */
+@media print {
+  @page {
+    size: 13.8cm 21.7cm;
+    margin: 0.5cm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide navigation, buttons, and unnecessary elements */
+  header,
+  nav,
+  button,
+  .no-print,
+  [data-testid="button-back"],
+  [data-testid="button-print-quotation"],
+  [data-testid="button-convert-to-invoice"],
+  [data-testid="button-delete-quotation"] {
+    display: none !important;
+  }
+
+  /* Hide sidebar and adjust layout */
+  .lg\:grid-cols-3 {
+    display: block !important;
+  }
+
+  .lg\:col-span-2 {
+    width: 100% !important;
+  }
+
+  /* Hide quick actions sidebar */
+  .space-y-6 > div:last-child {
+    display: none !important;
+  }
+
+  /* Optimize typography for small paper */
+  * {
+    font-size: 9pt !important;
+    line-height: 1.2 !important;
+  }
+
+  h1 {
+    font-size: 14pt !important;
+    margin-bottom: 0.3cm !important;
+  }
+
+  h2, h3 {
+    font-size: 11pt !important;
+    margin-bottom: 0.2cm !important;
+  }
+
+  /* Card styles for print */
+  .border,
+  .shadow-lg,
+  .shadow-sm,
+  .rounded-lg,
+  .rounded-md {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Compact spacing */
+  .space-y-6 > * + *,
+  .space-y-4 > * + *,
+  .space-y-3 > * + *,
+  .space-y-2 > * + * {
+    margin-top: 0.2cm !important;
+  }
+
+  .p-5, .p-4, .p-3 {
+    padding: 0.2cm !important;
+  }
+
+  .mb-5, .mb-4, .mb-3 {
+    margin-bottom: 0.2cm !important;
+  }
+
+  /* Table styles */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 0.2cm 0 !important;
+  }
+
+  th, td {
+    padding: 0.1cm 0.15cm !important;
+    border: 1px solid #ddd !important;
+    text-align: left !important;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  .text-right {
+    text-align: right !important;
+  }
+
+  /* Quotation header */
+  [data-testid="text-quotation-number"] {
+    font-size: 16pt !important;
+    font-weight: bold !important;
+    margin-bottom: 0.2cm !important;
+  }
+
+  /* Client info */
+  [data-testid="text-client-name"] {
+    font-weight: bold !important;
+    margin-bottom: 0.1cm !important;
+  }
+
+  /* Total amount emphasis */
+  [data-testid="text-total-amount"] {
+    font-size: 12pt !important;
+    font-weight: bold !important;
+  }
+
+  /* Prevent page breaks inside important elements */
+  table, .border, .card {
+    page-break-inside: avoid !important;
+  }
+
+  /* Ensure content fits on page */
+  .space-y-6 {
+    max-width: 100% !important;
+  }
+}
