@@ -351,6 +351,26 @@ export const settings = pgTable("settings", {
   };
 });
 
+// Print Settings table
+export const printSettings = pgTable("print_settings", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull().unique(),
+  companyName: varchar("company_name", { length: 200 }).notNull().default("Your Company Name"),
+  companyTagline: varchar("company_tagline", { length: 200 }).default(""),
+  companyAddress: text("company_address").default(""),
+  companyPhone: varchar("company_phone", { length: 100 }).default(""),
+  companyEmail: varchar("company_email", { length: 100 }).default(""),
+  logoUrl: varchar("logo_url", { length: 500 }).default(""),
+  showTax: boolean("show_tax").default(true).notNull(),
+  showDiscount: boolean("show_discount").default(true).notNull(),
+  showPONumber: boolean("show_po_number").default(true).notNull(),
+  defaultNotes: text("default_notes").default("Items checked and verified upon delivery. Items cannot be returned."),
+  accentColor: varchar("accent_color", { length: 20 }).default("#000000"),
+  paperSize: paperSizeEnum("paper_size").default("prs").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
 // Import/Export Logs
 export const importExportLogs = pgTable("import_export_logs", {
   id: serial("id").primaryKey(),
@@ -382,6 +402,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({ i
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, purchaseOrderNumber: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
 
 // Define types for TypeScript
@@ -432,6 +453,9 @@ export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSche
 
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
+
+export type PrintSettings = typeof printSettings.$inferSelect;
+export type InsertPrintSettings = z.infer<typeof insertPrintSettingsSchema>;
 
 export type ImportExportLog = typeof importExportLogs.$inferSelect;
 export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
