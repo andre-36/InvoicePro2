@@ -170,9 +170,120 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
   };
 
   return (
-    <div className="space-y-6" data-testid="quotation-detail-page">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <>
+      {/* Print-only template */}
+      <div className="print-only hidden">
+        <div className="print-invoice-template">
+          {/* Header */}
+          <div className="print-header">
+            <div className="print-header-left">
+              <div className="print-logo">
+                <div className="print-logo-circle">LOGO</div>
+              </div>
+              <div className="print-bill-to">
+                <div className="print-bill-to-label">Bill To</div>
+                <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
+              </div>
+            </div>
+            
+            <div className="print-header-center">
+              <div className="print-company-name">YOUR COMPANY NAME</div>
+              <div className="print-company-tagline">DISTRIBUTOR ALUMINUM & ACCESSORIES</div>
+              <div className="print-company-address">
+                Your Company Address Line 1<br />
+                Phone: (XXX) XXXX-XXXX / Email: your@email.com
+              </div>
+            </div>
+            
+            <div className="print-header-right">
+              <div className="print-doc-type">Quotation</div>
+              <div className="print-doc-details">
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Quotation #</span>
+                  <span className="print-doc-value">{quotation.quotationNumber}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Date</span>
+                  <span className="print-doc-value">{formatDate(quotation.issueDate)}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Valid Until</span>
+                  <span className="print-doc-value">{formatDate(quotation.expiryDate)}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">PO #</span>
+                  <span className="print-doc-value"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Page indicator */}
+          <div className="print-page-number">1/1</div>
+
+          {/* Items Table */}
+          <table className="print-items-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>QTY</th>
+                <th>Rate</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td>ITEM{index + 1}</td>
+                  <td>{item.description}</td>
+                  <td className="print-text-right">{item.quantity}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Footer */}
+          <div className="print-footer">
+            <div className="print-footer-left">
+              <div className="print-notes-label">Notes:</div>
+              <div className="print-notes-text">
+                {quotation.notes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+              </div>
+            </div>
+            
+            <div className="print-footer-right">
+              <div className="print-total-row">
+                <span className="print-total-label">Subtotal</span>
+                <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
+              </div>
+              {parseFloat(quotation.taxAmount || '0') > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Tax</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
+                </div>
+              )}
+              {parseFloat(quotation.discount || '0') > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Discount</span>
+                  <span className="print-total-value">-{formatCurrency(parseFloat(quotation.discount))}</span>
+                </div>
+              )}
+              <div className="print-total-row print-total-final">
+                <span className="print-total-label">Total</span>
+                <span className="print-total-value">{formatCurrency(parseFloat(quotation.totalAmount))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen view */}
+      <div className="space-y-6 screen-only" data-testid="quotation-detail-page">
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link href="/quotations">
             <Button variant="ghost" size="sm" data-testid="button-back">
@@ -416,6 +527,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
