@@ -74,6 +74,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     queryKey: ['/api/quotations', id],
   });
 
+  // Fetch print settings
+  const { data: printSettings } = useQuery({
+    queryKey: ['/api/stores/1/print-settings'],
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       return apiRequest('DELETE', `/api/quotations/${id}`, undefined);
@@ -187,11 +192,20 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-header-center">
-              <div className="print-company-name">YOUR COMPANY NAME</div>
-              <div className="print-company-tagline">DISTRIBUTOR ALUMINUM & ACCESSORIES</div>
+              <div className="print-company-name">{printSettings?.companyName || "YOUR COMPANY NAME"}</div>
+              {printSettings?.companyTagline && (
+                <div className="print-company-tagline">{printSettings.companyTagline}</div>
+              )}
               <div className="print-company-address">
-                Your Company Address Line 1<br />
-                Phone: (XXX) XXXX-XXXX / Email: your@email.com
+                {printSettings?.companyAddress || "Your Company Address"}
+                {(printSettings?.companyPhone || printSettings?.companyEmail) && (
+                  <>
+                    <br />
+                    {printSettings.companyPhone && `Phone: ${printSettings.companyPhone}`}
+                    {printSettings.companyPhone && printSettings.companyEmail && ' / '}
+                    {printSettings.companyEmail && `Email: ${printSettings.companyEmail}`}
+                  </>
+                )}
               </div>
             </div>
             
@@ -210,10 +224,12 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                   <span className="print-doc-label">Valid Until</span>
                   <span className="print-doc-value">{formatDate(quotation.expiryDate)}</span>
                 </div>
-                <div className="print-doc-row">
-                  <span className="print-doc-label">PO #</span>
-                  <span className="print-doc-value"></span>
-                </div>
+                {printSettings?.showPONumber !== false && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">PO #</span>
+                    <span className="print-doc-value"></span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -250,7 +266,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             <div className="print-footer-left">
               <div className="print-notes-label">Notes:</div>
               <div className="print-notes-text">
-                {quotation.notes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {quotation.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             
@@ -259,13 +275,13 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                 <span className="print-total-label">Subtotal</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
               </div>
-              {parseFloat(quotation.taxAmount || '0') > 0 && (
+              {printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Tax</span>
                   <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
                 </div>
               )}
-              {parseFloat(quotation.discount || '0') > 0 && (
+              {printSettings?.showDiscount !== false && parseFloat(quotation.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
                   <span className="print-total-value">-{formatCurrency(parseFloat(quotation.discount))}</span>
