@@ -3,7 +3,7 @@ import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, quotations, quotationItems, transactions, stores,
-  settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems,
+  settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
   
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -13,7 +13,8 @@ import {
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
-  type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog
+  type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
+  type PrintSettings, type InsertPrintSettings
 } from "../shared/schema";
 
 import session from "express-session";
@@ -127,6 +128,11 @@ export interface IStorage {
   getSettings(storeId: number): Promise<Setting[]>;
   setSetting(setting: InsertSetting): Promise<Setting>;
   deleteSetting(id: number): Promise<void>;
+  
+  // Print Settings methods
+  getPrintSettings(storeId: number): Promise<PrintSettings | undefined>;
+  createPrintSettings(settings: InsertPrintSettings): Promise<PrintSettings>;
+  updatePrintSettings(storeId: number, settings: Partial<InsertPrintSettings>): Promise<PrintSettings>;
   
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
@@ -1692,6 +1698,32 @@ export class DatabaseStorage implements IStorage {
   
   async deleteSetting(id: number): Promise<void> {
     await db.delete(settings).where(eq(settings.id, id));
+  }
+  
+  // Print Settings methods
+  async getPrintSettings(storeId: number): Promise<PrintSettings | undefined> {
+    const [printSetting] = await db
+      .select()
+      .from(printSettings)
+      .where(eq(printSettings.storeId, storeId));
+    return printSetting;
+  }
+  
+  async createPrintSettings(settingsData: InsertPrintSettings): Promise<PrintSettings> {
+    const [newSettings] = await db
+      .insert(printSettings)
+      .values(settingsData)
+      .returning();
+    return newSettings;
+  }
+  
+  async updatePrintSettings(storeId: number, settingsData: Partial<InsertPrintSettings>): Promise<PrintSettings> {
+    const [updatedSettings] = await db
+      .update(printSettings)
+      .set({ ...settingsData, updatedAt: new Date() })
+      .where(eq(printSettings.storeId, storeId))
+      .returning();
+    return updatedSettings;
   }
   
   // Import/Export methods
