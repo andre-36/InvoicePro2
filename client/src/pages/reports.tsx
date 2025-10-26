@@ -76,11 +76,25 @@ export default function ReportsPage() {
   // Financial Report data
   const { data: financialReport, isLoading: isLoadingFinancial } = useQuery<FinancialReport>({
     queryKey: ['/api/stores/1/reports/financial', dateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/reports/financial?dateRange=${dateRange}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch financial report');
+      return response.json();
+    },
   });
   
   // Cash Flow Report data
   const { data: cashFlowReport, isLoading: isLoadingCashFlow } = useQuery<CashFlowReport>({
     queryKey: ['/api/stores/1/reports/cashflow', dateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/reports/cashflow?dateRange=${dateRange}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch cashflow report');
+      return response.json();
+    },
   });
   
   // Transactions for detailed breakdown
