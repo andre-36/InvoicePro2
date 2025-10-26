@@ -25,6 +25,7 @@ import {
   insertPurchaseOrderSchema,
   insertPurchaseOrderItemSchema,
   insertSettingSchema,
+  insertPrintSettingsSchema,
   loginSchema
 } from "../shared/schema";
 // Import InvoiceItem type from schema
@@ -1894,6 +1895,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing clients:", error);
       res.status(500).json({ error: "Failed to import clients" });
+    }
+  });
+
+  // Print Settings routes
+  app.get("/api/stores/:storeId/print-settings", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      let printSettings = await storage.getPrintSettings(storeId);
+      
+      // If no settings exist, create default settings
+      if (!printSettings) {
+        printSettings = await storage.createPrintSettings({
+          storeId,
+          companyName: "Your Company Name",
+          companyTagline: "",
+          companyAddress: "",
+          companyPhone: "",
+          companyEmail: "",
+          logoUrl: "",
+          showTax: true,
+          showDiscount: true,
+          showPONumber: true,
+          defaultNotes: "Items checked and verified upon delivery. Items cannot be returned.",
+          accentColor: "#000000",
+          paperSize: "prs"
+        });
+      }
+      
+      res.json(printSettings);
+    } catch (error) {
+      console.error("Error getting print settings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/stores/:storeId/print-settings", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const validatedData = validateRequestBody(insertPrintSettingsSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      // Check if settings exist, if not create them first
+      let printSettings = await storage.getPrintSettings(storeId);
+      
+      if (!printSettings) {
+        printSettings = await storage.createPrintSettings({
+          ...validatedData,
+          storeId
+        });
+      } else {
+        printSettings = await storage.updatePrintSettings(storeId, validatedData);
+      }
+      
+      res.json(printSettings);
+    } catch (error) {
+      console.error("Error updating print settings:", error);
+      res.status(500).json({ error: "Server error" });
     }
   });
 
