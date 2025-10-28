@@ -184,11 +184,24 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           <div className="print-header">
             <div className="print-header-left">
               <div className="print-logo">
-                <div className="print-logo-circle">LOGO</div>
+                {printSettings?.logoUrl ? (
+                  <img src={printSettings.logoUrl} alt="Company Logo" className="print-logo-image" />
+                ) : (
+                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                    {printSettings?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                  </div>
+                )}
               </div>
               <div className="print-bill-to">
-                <div className="print-bill-to-label">Bill To</div>
+                <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
                 <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
+                {client && (
+                  <div className="print-bill-to-details">
+                    {client.email && <div>{client.email}</div>}
+                    {client.phone && <div>{client.phone}</div>}
+                    {client.address && <div>{client.address}</div>}
+                  </div>
+                )}
               </div>
             </div>
             
@@ -211,10 +224,10 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-header-right">
-              <div className="print-doc-type">Quotation</div>
+              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>QUOTATION</div>
               <div className="print-doc-details">
                 <div className="print-doc-row">
-                  <span className="print-doc-label">Quotation #</span>
+                  <span className="print-doc-label">No.</span>
                   <span className="print-doc-value">{quotation.quotationNumber}</span>
                 </div>
                 <div className="print-doc-row">
@@ -227,8 +240,8 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                 </div>
                 {printSettings?.showPONumber !== false && (
                   <div className="print-doc-row">
-                    <span className="print-doc-label">PO #</span>
-                    <span className="print-doc-value"></span>
+                    <span className="print-doc-label">PO Number</span>
+                    <span className="print-doc-value">_____________</span>
                   </div>
                 )}
               </div>
@@ -265,7 +278,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           {/* Footer */}
           <div className="print-footer">
             <div className="print-footer-left">
-              <div className="print-notes-label">Notes:</div>
+              <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
                 {quotation.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
@@ -278,7 +291,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               </div>
               {printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 && (
                 <div className="print-total-row">
-                  <span className="print-total-label">Tax</span>
+                  <span className="print-total-label">Tax ({quotation.taxRate}%)</span>
                   <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
                 </div>
               )}
@@ -288,9 +301,25 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                   <span className="print-total-value">-{formatCurrency(parseFloat(quotation.discount))}</span>
                 </div>
               )}
-              <div className="print-total-row print-total-final">
-                <span className="print-total-label">Total</span>
+              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                <span className="print-total-label">TOTAL</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(quotation.totalAmount))}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Signature Area */}
+          <div className="print-signature-area">
+            <div className="print-signature-box">
+              <div className="print-signature-label">Prepared By</div>
+              <div className="print-signature-line">
+                {printSettings?.companyName || 'Company Representative'}
+              </div>
+            </div>
+            <div className="print-signature-box">
+              <div className="print-signature-label">Approved By</div>
+              <div className="print-signature-line">
+                {client?.name || 'Customer'}
               </div>
             </div>
           </div>
