@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { PrintSettings } from "@shared/schema";
 
 interface QuotationDetailPageProps {
   id: number;
@@ -75,7 +76,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
   });
 
   // Fetch print settings
-  const { data: printSettings } = useQuery({
+  const { data: printSettings } = useQuery<PrintSettings>({
     queryKey: ['/api/stores/1/print-settings'],
   });
 
@@ -102,7 +103,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
 
   const convertMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('POST', `/api/quotations/${id}/convert`, {});
+      return apiRequest('POST', `/api/quotations/${id}/convert`, {}) as Promise<unknown> as Promise<{ id: number }>;
     },
     onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
