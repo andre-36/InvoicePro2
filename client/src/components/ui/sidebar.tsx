@@ -336,7 +336,7 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                     "mr-3 h-5 w-5",
                     isActive("/general-settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
-                  <span>General Settings</span>
+                  <span>General</span>
                 </Link>
               </div>
             </div>
