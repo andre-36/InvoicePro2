@@ -83,7 +83,7 @@ export interface IStorage {
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
-  getInvoices(storeId: number): Promise<Invoice[]>;
+  getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
   getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
   getOpenInvoices(storeId: number): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
@@ -767,12 +767,36 @@ export class DatabaseStorage implements IStorage {
     return { invoice, items, client };
   }
   
-  async getInvoices(storeId: number): Promise<Invoice[]> {
-    return db
-      .select()
+  async getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]> {
+    const results = await db
+      .select({
+        id: invoices.id,
+        storeId: invoices.storeId,
+        invoiceNumber: invoices.invoiceNumber,
+        clientId: invoices.clientId,
+        issueDate: invoices.issueDate,
+        dueDate: invoices.dueDate,
+        status: invoices.status,
+        subtotal: invoices.subtotal,
+        taxRate: invoices.taxRate,
+        taxAmount: invoices.taxAmount,
+        discount: invoices.discount,
+        shipping: invoices.shipping,
+        totalAmount: invoices.totalAmount,
+        totalProfit: invoices.totalProfit,
+        termsAndConditions: invoices.termsAndConditions,
+        paperSize: invoices.paperSize,
+        notes: invoices.notes,
+        createdAt: invoices.createdAt,
+        updatedAt: invoices.updatedAt,
+        clientName: clients.name
+      })
       .from(invoices)
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
       .where(eq(invoices.storeId, storeId))
       .orderBy(desc(invoices.issueDate));
+    
+    return results;
   }
   
   async getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]> {

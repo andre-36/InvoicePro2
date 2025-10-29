@@ -148,7 +148,7 @@ export default function InvoicesPage() {
     ? invoices.filter(invoice => {
         const matchesSearch = 
           invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          invoice.clientName.toLowerCase().includes(searchQuery.toLowerCase());
+          (invoice.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
         
         const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
         
