@@ -128,7 +128,7 @@ export default function QuotationsPage() {
   const filteredQuotations = quotations?.filter((quotation) => {
     const matchesSearch = 
       quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quotation.clientName?.toLowerCase().includes(searchQuery.toLowerCase());
+      (quotation.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
     return matchesSearch && matchesStatus;
   }) || [];

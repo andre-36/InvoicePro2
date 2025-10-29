@@ -94,7 +94,7 @@ export interface IStorage {
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
   getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
-  getQuotations(storeId: number): Promise<Quotation[]>;
+  getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]>;
   createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation>;
   convertQuotationToInvoice(id: number): Promise<Invoice>;
@@ -1206,12 +1206,36 @@ export class DatabaseStorage implements IStorage {
     return { quotation, items, client };
   }
   
-  async getQuotations(storeId: number): Promise<Quotation[]> {
-    return db
-      .select()
+  async getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]> {
+    const results = await db
+      .select({
+        id: quotations.id,
+        storeId: quotations.storeId,
+        quotationNumber: quotations.quotationNumber,
+        clientId: quotations.clientId,
+        issueDate: quotations.issueDate,
+        expiryDate: quotations.expiryDate,
+        status: quotations.status,
+        subtotal: quotations.subtotal,
+        taxRate: quotations.taxRate,
+        taxAmount: quotations.taxAmount,
+        discount: quotations.discount,
+        shipping: quotations.shipping,
+        totalAmount: quotations.totalAmount,
+        termsAndConditions: quotations.termsAndConditions,
+        paperSize: quotations.paperSize,
+        notes: quotations.notes,
+        convertedToInvoiceId: quotations.convertedToInvoiceId,
+        createdAt: quotations.createdAt,
+        updatedAt: quotations.updatedAt,
+        clientName: clients.name
+      })
       .from(quotations)
+      .leftJoin(clients, eq(quotations.clientId, clients.id))
       .where(eq(quotations.storeId, storeId))
       .orderBy(desc(quotations.issueDate));
+    
+    return results;
   }
   
   async createQuotation(quotationData: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation> {
