@@ -107,9 +107,28 @@
     margin: 0.5cm 0.4cm;
   }
 
+  * {
+    overflow: visible !important;
+  }
+
+  html,
   body {
     background: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body > div,
+  #root,
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* Hide sidebar and navigation elements */
