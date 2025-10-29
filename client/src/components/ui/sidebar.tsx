@@ -324,19 +324,19 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 </Link>
                 
                 <Link 
-                  href="/print-settings"
+                  href="/general-settings"
                   className={cn(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/print-settings") 
+                    isActive("/general-settings") 
                       ? "text-primary-foreground bg-primary" 
                       : "text-foreground hover:text-foreground hover:bg-accent"
                   )}
                 >
-                  <FileText className={cn(
+                  <Settings className={cn(
                     "mr-3 h-5 w-5",
-                    isActive("/print-settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    isActive("/general-settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
-                  <span>Print Settings</span>
+                  <span>General Settings</span>
                 </Link>
               </div>
             </div>

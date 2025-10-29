@@ -27,6 +27,7 @@ import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import PrintSettingsPage from "@/pages/print-settings";
+import GeneralSettingsPage from "@/pages/general-settings";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -160,6 +161,7 @@ function App() {
                 <Route path="/reports" component={ReportsPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/print-settings" component={PrintSettingsPage} />
+                <Route path="/general-settings" component={GeneralSettingsPage} />
                 <Route component={NotFound} />
               </Switch>
             </main>
