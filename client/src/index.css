@@ -100,10 +100,10 @@
   }
 }
 
-/* Print styles for PRS Paper Landscape (21.7cm x 13.8cm) */
+/* Print styles for PRS Paper (13.8cm x 21.7cm) */
 @media print {
   @page {
-    size: 21.7cm 13.8cm landscape;
+    size: 13.8cm 21.7cm;
     margin: 0.5cm 0.4cm;
   }
 
@@ -121,25 +121,6 @@
     display: block !important;
   }
 
-  /* Hide all navigation and sidebar elements */
-  nav, 
-  aside, 
-  .sidebar,
-  [data-sidebar],
-  header,
-  .header,
-  button,
-  .screen-only,
-  [class*="sidebar"],
-  [class*="nav"] {
-    display: none !important;
-  }
-
-  /* Only show the print template */
-  .print-invoice-template {
-    display: block !important;
-  }
-
   /* Print template layout */
   .print-invoice-template {
     width: 100%;
@@ -152,9 +133,9 @@
   /* Header */
   .print-header {
     display: grid;
-    grid-template-columns: 3.5cm 1fr 4cm;
-    gap: 0.3cm;
-    margin-bottom: 0.4cm;
+    grid-template-columns: 3cm 1fr 3.5cm;
+    gap: 0.2cm;
+    margin-bottom: 0.3cm;
     position: relative;
   }
 
@@ -276,7 +257,7 @@
   .print-items-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0.4cm 0 0.3cm 0;
+    margin: 0.5cm 0;
     font-size: 9pt;
   }
 
@@ -318,9 +299,9 @@
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: 0.6cm;
-    margin-top: 0.4cm;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 0.5cm;
+    margin-top: 0.5cm;
     border-top: 2px solid #000;
     padding-top: 0.3cm;
   }
@@ -384,21 +365,21 @@
 
   /* Signature area */
   .print-signature-area {
-    margin-top: 0.6cm;
+    margin-top: 1cm;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2cm;
+    gap: 1cm;
     page-break-inside: avoid;
   }
 
   .print-signature-box {
     text-align: center;
-    padding-top: 0.3cm;
+    padding-top: 0.5cm;
   }
 
   .print-signature-line {
     border-top: 1px solid #000;
-    margin-top: 1cm;
+    margin-top: 1.5cm;
     padding-top: 0.2cm;
     font-size: 9pt;
   }

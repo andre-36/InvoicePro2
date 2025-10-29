@@ -276,17 +276,17 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
               <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
               <div className="mt-2 px-2 space-y-1">
                 <Link 
-                  href="/general-settings"
+                  href="/settings"
                   className={cn(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/general-settings") 
+                    isActive("/settings") 
                       ? "text-primary-foreground bg-primary" 
                       : "text-foreground hover:text-foreground hover:bg-accent"
                   )}
                 >
                   <Settings className={cn(
                     "mr-3 h-5 w-5",
-                    isActive("/general-settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    isActive("/settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>General</span>
                 </Link>
@@ -321,6 +321,22 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                     isActive("/settings/account") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>Account</span>
+                </Link>
+                
+                <Link 
+                  href="/print-settings"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/print-settings") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <FileText className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/print-settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Print Settings</span>
                 </Link>
               </div>
             </div>
