@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Save, FileText } from "lucide-react";
+import { Settings, Save, FileText, Upload, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { PrintSettings } from "@shared/schema";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UploadResult } from "@uppy/core";
 
 // Schema for form validation
 const printSettingsFormSchema = z.object({
@@ -219,12 +221,77 @@ export default function PrintSettingsPage() {
                 name="logoUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Logo URL</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="https://example.com/logo.png" data-testid="input-logo-url" />
-                    </FormControl>
+                    <FormLabel>Company Logo</FormLabel>
+                    <div className="space-y-4">
+                      {field.value && (
+                        <div className="flex items-center gap-4 p-4 border rounded-lg">
+                          <img 
+                            src={field.value} 
+                            alt="Company Logo" 
+                            className="h-20 w-20 object-contain border rounded"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Current Logo</p>
+                            <p className="text-xs text-muted-foreground break-all">{field.value}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => field.onChange("")}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Or enter logo URL manually" 
+                            data-testid="input-logo-url" 
+                          />
+                        </FormControl>
+                        <ObjectUploader
+                          maxNumberOfFiles={1}
+                          maxFileSize={5242880}
+                          onGetUploadParameters={async () => {
+                            const response = await apiRequest('POST', '/api/objects/upload', {});
+                            return {
+                              method: 'PUT' as const,
+                              url: response.uploadURL,
+                            };
+                          }}
+                          onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                            if (result.successful.length > 0) {
+                              const uploadURL = result.successful[0].uploadURL;
+                              try {
+                                const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                                field.onChange(response.logoPath);
+                                toast({
+                                  title: "Logo uploaded",
+                                  description: "Your company logo has been uploaded successfully.",
+                                });
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to save logo. Please try again.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Logo
+                        </ObjectUploader>
+                      </div>
+                    </div>
                     <FormDescription>
-                      URL of your company logo (leave empty to use text placeholder)
+                      Upload an image or enter a URL (max 5MB, images only)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

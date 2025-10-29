@@ -30,6 +30,7 @@ import {
 } from "../shared/schema";
 // Import InvoiceItem type from schema
 import { type InvoiceItem } from "../shared/schema";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // Simple password hashing function
 function hashPassword(password: string): string {
@@ -1895,6 +1896,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing clients:", error);
       res.status(500).json({ error: "Failed to import clients" });
+    }
+  });
+
+  // Object Storage routes - for logo upload
+  // Reference: blueprint:javascript_object_storage
+  app.post("/api/objects/upload", requireAuth, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.path,
+      );
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error accessing object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.put("/api/logo", requireAuth, async (req, res) => {
+    if (!req.body.logoURL) {
+      return res.status(400).json({ error: "logoURL is required" });
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.logoURL,
+        {
+          owner: userId.toString(),
+          visibility: "public",
+        },
+      );
+
+      res.status(200).json({
+        logoPath: objectPath,
+      });
+    } catch (error) {
+      console.error("Error setting logo:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
