@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,16 +62,18 @@ export default function PrintSettingsPage() {
     },
   });
 
-  if (printSettings && !form.formState.isDirty) {
-    form.reset({
-      paperSize: printSettings.paperSize || "prs",
-      showTax: printSettings.showTax ?? true,
-      showDiscount: printSettings.showDiscount ?? true,
-      showPONumber: printSettings.showPONumber ?? true,
-      defaultNotes: printSettings.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
-      accentColor: printSettings.accentColor || "#000000",
-    });
-  }
+  useEffect(() => {
+    if (printSettings && !form.formState.isDirty) {
+      form.reset({
+        paperSize: printSettings.paperSize || "prs",
+        showTax: printSettings.showTax ?? true,
+        showDiscount: printSettings.showDiscount ?? true,
+        showPONumber: printSettings.showPONumber ?? true,
+        defaultNotes: printSettings.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
+        accentColor: printSettings.accentColor || "#000000",
+      });
+    }
+  }, [printSettings, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: PrintSettingsFormValues) => {
