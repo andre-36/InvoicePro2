@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Trash2, FileDown, Send, CreditCard, Clock, X, AlertTriangle } from "lucide-react";
+import { Edit, Trash2, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -214,14 +214,22 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            Invoice {invoice.invoiceNumber}
-            <span className="ml-3">{getStatusBadge(invoice.status)}</span>
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {format(new Date(invoice.issueDate), 'MMMM d, yyyy')}
-          </p>
+        <div className="flex items-center space-x-4">
+          <Link href="/invoices">
+            <Button variant="ghost" size="sm" data-testid="button-back">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+              Invoice {invoice.invoiceNumber}
+              <span className="ml-3">{getStatusBadge(invoice.status)}</span>
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {format(new Date(invoice.issueDate), 'MMMM d, yyyy')}
+            </p>
+          </div>
         </div>
         
         <div className="flex flex-wrap gap-2">
