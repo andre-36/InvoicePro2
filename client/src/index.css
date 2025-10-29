@@ -112,29 +112,24 @@
     color: black !important;
   }
 
-  /* Hide all non-print elements */
-  body > div:not(.print-only),
-  nav, 
-  aside, 
-  .sidebar,
-  [data-sidebar],
-  header,
-  .header,
-  button:not(.print-only button),
-  .screen-only,
-  [class*="sidebar"],
-  [class*="nav"],
-  main > div:not(.print-only) {
+  /* Hide screen-only content */
+  .screen-only {
     display: none !important;
   }
 
-  /* Show only print template */
+  /* Show print-only content */
   .print-only {
     display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
   }
 
   .print-invoice-template {
     display: block !important;
+    visibility: visible !important;
   }
 
   /* Print template layout */

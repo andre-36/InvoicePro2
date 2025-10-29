@@ -178,7 +178,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
   return (
     <>
       {/* Print-only template */}
-      <div className="print-only hidden">
+      <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
           {/* Header */}
           <div className="print-header">
