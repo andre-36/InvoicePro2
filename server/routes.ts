@@ -251,6 +251,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Current user routes (without ID in URL)
+  app.get("/api/user", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const user = await storage.getUser(currentUser.id);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Exclude password
+      const { password, ...userData } = user;
+      res.json(userData);
+    } catch (error) {
+      console.error("Error getting current user:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/user", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const validatedData = validateRequestBody(
+        insertUserSchema.partial().omit({ password: true }), 
+        req, 
+        res
+      );
+      if (!validatedData) return;
+      
+      const updatedUser = await storage.updateUser(currentUser.id, validatedData);
+      
+      // Exclude password
+      const { password, ...userData } = updatedUser;
+      res.json(userData);
+    } catch (error) {
+      console.error("Error updating current user:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/user/company", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const companyData = req.body;
+      
+      const updatedUser = await storage.updateUser(currentUser.id, companyData);
+      
+      // Exclude password
+      const { password, ...userData } = updatedUser;
+      res.json(userData);
+    } catch (error) {
+      console.error("Error updating company details:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/user/payment", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      // Payment methods are stored in user table (can be expanded to separate table if needed)
+      const paymentData = req.body;
+      
+      const updatedUser = await storage.updateUser(currentUser.id, paymentData);
+      
+      // Exclude password
+      const { password, ...userData } = updatedUser;
+      res.json(userData);
+    } catch (error) {
+      console.error("Error updating payment settings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/user/password", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current and new password are required" });
+      }
+      
+      // Verify current password
+      const user = await storage.getUser(currentUser.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const hashedCurrentPassword = hashPassword(currentPassword);
+      if (user.password !== hashedCurrentPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      
+      // Update password
+      const hashedNewPassword = hashPassword(newPassword);
+      await storage.updateUser(currentUser.id, { password: hashedNewPassword });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating password:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.put("/api/users/:id/password", requireAuth, async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
