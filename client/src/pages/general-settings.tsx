@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,11 +58,11 @@ export default function GeneralSettingsPage() {
   });
 
   // Update logo preview when settings load
-  useState(() => {
+  useEffect(() => {
     if (settings?.logoUrl) {
       setLogoPreview(settings.logoUrl);
     }
-  });
+  }, [settings?.logoUrl]);
 
   // Update mutation
   const updateMutation = useMutation({
