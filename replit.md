@@ -8,6 +8,16 @@ AluminumManager is a comprehensive web application designed for aluminum profile
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### October 29, 2025 - Company Information Consolidation
+- Consolidated company information from Print Settings into General Settings (Company tab)
+- Company information now stored in users table: companyName, companyTagline, companyAddress, companyPhone, companyEmail, taxNumber, logoUrl
+- Print Settings now contains only print-specific preferences: paperSize, showTax, showDiscount, showPONumber, defaultNotes, accentColor
+- Added logo upload functionality using Replit's Object Storage with presigned URLs
+- Updated General Settings Company tab to include all company fields with image uploader
+- Simplified Print Settings page to focus on print preferences only
+
 ## System Architecture
 
 ### Frontend Architecture

@@ -1957,7 +1957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Print Settings routes
+  // Print Settings routes - print preferences only
   app.get("/api/stores/:storeId/print-settings", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
@@ -1967,12 +1967,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!printSettings) {
         printSettings = await storage.createPrintSettings({
           storeId,
-          companyName: "Your Company Name",
-          companyTagline: "",
-          companyAddress: "",
-          companyPhone: "",
-          companyEmail: "",
-          logoUrl: "",
           showTax: true,
           showDiscount: true,
           showPONumber: true,

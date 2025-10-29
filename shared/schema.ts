@@ -17,10 +17,15 @@ export const users = pgTable("users", {
   fullName: varchar("full_name", { length: 100 }).notNull(),
   email: varchar("email", { length: 100 }).notNull(),
   role: varchar("role", { length: 50 }).default("user").notNull(),
-  companyName: varchar("company_name", { length: 100 }),
+  companyName: varchar("company_name", { length: 200 }),
+  companyTagline: varchar("company_tagline", { length: 200 }),
+  companyAddress: text("company_address"),
+  companyPhone: varchar("company_phone", { length: 100 }),
+  companyEmail: varchar("company_email", { length: 100 }),
+  taxNumber: varchar("tax_number", { length: 50 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
-  logoUrl: varchar("logo_url", { length: 255 }),
+  logoUrl: varchar("logo_url", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
@@ -351,16 +356,10 @@ export const settings = pgTable("settings", {
   };
 });
 
-// Print Settings table
+// Print Settings table - only print-specific preferences
 export const printSettings = pgTable("print_settings", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull().unique(),
-  companyName: varchar("company_name", { length: 200 }).notNull().default("Your Company Name"),
-  companyTagline: varchar("company_tagline", { length: 200 }).default(""),
-  companyAddress: text("company_address").default(""),
-  companyPhone: varchar("company_phone", { length: 100 }).default(""),
-  companyEmail: varchar("company_email", { length: 100 }).default(""),
-  logoUrl: varchar("logo_url", { length: 500 }).default(""),
   showTax: boolean("show_tax").default(true).notNull(),
   showDiscount: boolean("show_discount").default(true).notNull(),
   showPONumber: boolean("show_po_number").default(true).notNull(),

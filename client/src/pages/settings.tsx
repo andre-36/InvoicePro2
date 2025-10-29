@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, Image as ImageIcon } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UploadResult } from "@uppy/core";
 
 // Profile settings schema
 const profileSchema = z.object({
@@ -29,9 +31,12 @@ const profileSchema = z.object({
 // Company settings schema
 const companySchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
-  address: z.string().min(2, "Address is required"),
-  phone: z.string().optional(),
+  companyTagline: z.string().optional(),
+  companyAddress: z.string().optional(),
+  companyPhone: z.string().optional(),
+  companyEmail: z.string().email("Please enter a valid email").optional().or(z.literal("")),
   taxNumber: z.string().optional(),
+  logoUrl: z.string().optional(),
 });
 
 // Payment settings schema
@@ -88,9 +93,12 @@ export default function SettingsPage() {
     resolver: zodResolver(companySchema),
     defaultValues: {
       companyName: "",
-      address: "",
-      phone: "",
+      companyTagline: "",
+      companyAddress: "",
+      companyPhone: "",
+      companyEmail: "",
       taxNumber: "",
+      logoUrl: "",
     }
   });
   
@@ -214,9 +222,12 @@ export default function SettingsPage() {
     
     companyForm.reset({
       companyName: userData.companyName || "",
-      address: userData.address || "",
-      phone: userData.phone || "",
-      taxNumber: userData.taxNumber || "", // This may not exist in the userData
+      companyTagline: userData.companyTagline || "",
+      companyAddress: userData.companyAddress || "",
+      companyPhone: userData.companyPhone || "",
+      companyEmail: userData.companyEmail || "",
+      taxNumber: userData.taxNumber || "",
+      logoUrl: userData.logoUrl || "",
     });
   }
   
@@ -504,20 +515,163 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
-              <CardDescription>Update your company details which will appear on your invoices</CardDescription>
+              <CardDescription>Update your company details which will appear on your invoices and quotations</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...companyForm}>
                 <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="space-y-6">
+                  <FormField
+                    control={companyForm.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your Company Name" {...field} data-testid="input-company-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={companyForm.control}
+                    name="companyTagline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tagline / Subtitle</FormLabel>
+                        <FormControl>
+                          <Input placeholder="DISTRIBUTOR ALUMINUM & ACCESSORIES" {...field} data-testid="input-company-tagline" />
+                        </FormControl>
+                        <FormDescription>
+                          A short description of your business
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={companyForm.control}
+                    name="logoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Logo</FormLabel>
+                        <div className="space-y-4">
+                          {field.value && (
+                            <div className="flex items-center gap-4 p-4 border rounded-lg">
+                              <img 
+                                src={field.value} 
+                                alt="Company Logo" 
+                                className="h-20 w-20 object-contain border rounded"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">Current Logo</p>
+                                <p className="text-xs text-muted-foreground break-all">{field.value}</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => field.onChange("")}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Or enter logo URL manually" 
+                                data-testid="input-logo-url" 
+                              />
+                            </FormControl>
+                            <ObjectUploader
+                              maxNumberOfFiles={1}
+                              maxFileSize={5242880}
+                              onGetUploadParameters={async () => {
+                                const response = await apiRequest('POST', '/api/objects/upload', {});
+                                return {
+                                  method: 'PUT' as const,
+                                  url: response.uploadURL,
+                                };
+                              }}
+                              onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                                if (result.successful.length > 0) {
+                                  const uploadURL = result.successful[0].uploadURL;
+                                  try {
+                                    const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                                    field.onChange(response.logoPath);
+                                    toast({
+                                      title: "Logo uploaded",
+                                      description: "Your company logo has been uploaded successfully.",
+                                    });
+                                  } catch (error) {
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to save logo. Please try again.",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload Logo
+                            </ObjectUploader>
+                          </div>
+                        </div>
+                        <FormDescription>
+                          Upload an image or enter a URL (max 5MB, images only)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Separator />
+                  
+                  <FormField
+                    control={companyForm.control}
+                    name="companyAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Street address, city, postal code" rows={3} {...field} data-testid="input-company-address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={companyForm.control}
-                      name="companyName"
+                      name="companyPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Company Name</FormLabel>
+                          <FormLabel>Phone</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter company name" {...field} />
+                            <Input placeholder="(XXX) XXXX-XXXX" {...field} data-testid="input-company-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
+                      name="companyEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="company@email.com" {...field} data-testid="input-company-email" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -531,45 +685,13 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Tax Number / VAT ID</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter tax number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={companyForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company Phone</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter company phone" {...field} />
+                            <Input placeholder="Enter tax number" {...field} data-testid="input-tax-number" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  
-                  <FormField
-                    control={companyForm.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Address</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter company address" 
-                            rows={3}
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   
                   <div className="flex justify-end">
                     <Button 

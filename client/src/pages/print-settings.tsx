@@ -3,13 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Save, FileText, Upload, Image as ImageIcon } from "lucide-react";
+import { Settings, Save, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
@@ -30,23 +28,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { PrintSettings } from "@shared/schema";
-import { ObjectUploader } from "@/components/ObjectUploader";
-import type { UploadResult } from "@uppy/core";
 
-// Schema for form validation
+// Schema for print preferences only
 const printSettingsFormSchema = z.object({
-  companyName: z.string().min(1, "Company name is required"),
-  companyTagline: z.string().default(""),
-  companyAddress: z.string().default(""),
-  companyPhone: z.string().default(""),
-  companyEmail: z.string().email("Invalid email").or(z.literal("")),
-  logoUrl: z.string().default(""),
-  showTax: z.boolean().default(true),
-  showDiscount: z.boolean().default(true),
-  showPONumber: z.boolean().default(true),
-  defaultNotes: z.string().default(""),
-  accentColor: z.string().default("#000000"),
-  paperSize: z.enum(["a4", "prs"]).default("prs"),
+  paperSize: z.enum(["prs", "a4"]),
+  showTax: z.boolean(),
+  showDiscount: z.boolean(),
+  showPONumber: z.boolean(),
+  defaultNotes: z.string(),
+  accentColor: z.string(),
 });
 
 type PrintSettingsFormValues = z.infer<typeof printSettingsFormSchema>;
@@ -54,48 +44,50 @@ type PrintSettingsFormValues = z.infer<typeof printSettingsFormSchema>;
 export default function PrintSettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const storeId = 1; // Default store ID
+  const [storeId] = useState(1);
 
-  // Fetch print settings
   const { data: printSettings, isLoading } = useQuery<PrintSettings>({
-    queryKey: [`/api/stores/${storeId}/print-settings`],
+    queryKey: ["/api/stores", storeId, "print-settings"],
   });
 
-  // Form setup
   const form = useForm<PrintSettingsFormValues>({
     resolver: zodResolver(printSettingsFormSchema),
-    values: printSettings ? {
-      companyName: printSettings.companyName,
-      companyTagline: printSettings.companyTagline ?? "",
-      companyAddress: printSettings.companyAddress ?? "",
-      companyPhone: printSettings.companyPhone ?? "",
-      companyEmail: printSettings.companyEmail ?? "",
-      logoUrl: printSettings.logoUrl ?? "",
-      showTax: printSettings.showTax,
-      showDiscount: printSettings.showDiscount,
-      showPONumber: printSettings.showPONumber,
-      defaultNotes: printSettings.defaultNotes ?? "",
-      accentColor: printSettings.accentColor ?? "#000000",
-      paperSize: printSettings.paperSize,
-    } : undefined,
+    defaultValues: {
+      paperSize: "prs",
+      showTax: true,
+      showDiscount: true,
+      showPONumber: true,
+      defaultNotes: "Items checked and verified upon delivery. Items cannot be returned.",
+      accentColor: "#000000",
+    },
   });
 
-  // Update mutation
+  if (printSettings && !form.formState.isDirty) {
+    form.reset({
+      paperSize: printSettings.paperSize || "prs",
+      showTax: printSettings.showTax ?? true,
+      showDiscount: printSettings.showDiscount ?? true,
+      showPONumber: printSettings.showPONumber ?? true,
+      defaultNotes: printSettings.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
+      accentColor: printSettings.accentColor || "#000000",
+    });
+  }
+
   const updateMutation = useMutation({
     mutationFn: async (data: PrintSettingsFormValues) => {
-      return apiRequest('PUT', `/api/stores/${storeId}/print-settings`, data);
+      return apiRequest("PUT", `/api/stores/${storeId}/print-settings`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${storeId}/print-settings`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stores", storeId, "print-settings"] });
       toast({
         title: "Settings saved",
-        description: "Print settings have been updated successfully.",
+        description: "Your print settings have been updated successfully.",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message || "Failed to save print settings. Please try again.",
+        description: "Failed to save print settings. Please try again.",
         variant: "destructive",
       });
     },
@@ -107,10 +99,13 @@ export default function PrintSettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="print-settings-page">
         <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-12 w-12 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </div>
         </div>
         <Skeleton className="h-96 w-full" />
       </div>
@@ -126,186 +121,21 @@ export default function PrintSettingsPage() {
         </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Print Settings</h1>
-          <p className="text-muted-foreground">Configure how your quotations and invoices are printed</p>
+          <p className="text-muted-foreground">Configure print preferences for quotations and invoices</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            To update company information and logo, visit <a href="/settings" className="text-primary hover:underline">General Settings → Company</a>
+          </p>
         </div>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Company Information */}
+          {/* Print Preferences */}
           <Card>
             <CardHeader>
-              <CardTitle>Company Information</CardTitle>
+              <CardTitle>Print Preferences</CardTitle>
               <CardDescription>
-                This information will appear on all printed quotations and invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Your Company Name" data-testid="input-company-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="companyTagline"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tagline / Subtitle</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="DISTRIBUTOR ALUMINUM & ACCESSORIES" data-testid="input-company-tagline" />
-                    </FormControl>
-                    <FormDescription>
-                      A short description of your business
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="companyAddress"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Street address, city, postal code" rows={3} data-testid="input-company-address" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="companyPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="(XXX) XXXX-XXXX" data-testid="input-company-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="companyEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="email" placeholder="your@email.com" data-testid="input-company-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="logoUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Logo</FormLabel>
-                    <div className="space-y-4">
-                      {field.value && (
-                        <div className="flex items-center gap-4 p-4 border rounded-lg">
-                          <img 
-                            src={field.value} 
-                            alt="Company Logo" 
-                            className="h-20 w-20 object-contain border rounded"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Current Logo</p>
-                            <p className="text-xs text-muted-foreground break-all">{field.value}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => field.onChange("")}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            placeholder="Or enter logo URL manually" 
-                            data-testid="input-logo-url" 
-                          />
-                        </FormControl>
-                        <ObjectUploader
-                          maxNumberOfFiles={1}
-                          maxFileSize={5242880}
-                          onGetUploadParameters={async () => {
-                            const response = await apiRequest('POST', '/api/objects/upload', {});
-                            return {
-                              method: 'PUT' as const,
-                              url: response.uploadURL,
-                            };
-                          }}
-                          onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-                            if (result.successful.length > 0) {
-                              const uploadURL = result.successful[0].uploadURL;
-                              try {
-                                const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
-                                field.onChange(response.logoPath);
-                                toast({
-                                  title: "Logo uploaded",
-                                  description: "Your company logo has been uploaded successfully.",
-                                });
-                              } catch (error) {
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to save logo. Please try again.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }
-                          }}
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload Logo
-                        </ObjectUploader>
-                      </div>
-                    </div>
-                    <FormDescription>
-                      Upload an image or enter a URL (max 5MB, images only)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Print Appearance */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Print Appearance</CardTitle>
-              <CardDescription>
-                Customize the look and feel of your printed documents
+                Customize paper size and formatting options
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -338,15 +168,26 @@ export default function PrintSettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Accent Color</FormLabel>
-                      <FormControl>
-                        <div className="flex gap-2">
-                          <Input {...field} type="color" className="w-20" data-testid="input-accent-color" />
-                          <Input {...field} placeholder="#000000" className="flex-1" />
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Color used for borders and accents
-                      </FormDescription>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <input
+                            type="color"
+                            {...field}
+                            className="h-10 w-20 rounded border border-input"
+                            data-testid="input-accent-color"
+                          />
+                        </FormControl>
+                        <FormControl>
+                          <input
+                            type="text"
+                            {...field}
+                            className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            placeholder="#000000"
+                            data-testid="input-accent-color-text"
+                          />
+                        </FormControl>
+                      </div>
+                      <FormDescription>Color used for headers and accents</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -360,7 +201,7 @@ export default function PrintSettingsPage() {
             <CardHeader>
               <CardTitle>Display Options</CardTitle>
               <CardDescription>
-                Choose which fields to show on printed documents
+                Choose which information to show on printed documents
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -368,11 +209,11 @@ export default function PrintSettingsPage() {
                 control={form.control}
                 name="showTax"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Show Tax</FormLabel>
                       <FormDescription>
-                        Display tax amounts on printed documents
+                        Display tax information on documents
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -390,11 +231,11 @@ export default function PrintSettingsPage() {
                 control={form.control}
                 name="showDiscount"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Show Discount</FormLabel>
                       <FormDescription>
-                        Display discount amounts on printed documents
+                        Display discount fields on documents
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -412,18 +253,18 @@ export default function PrintSettingsPage() {
                 control={form.control}
                 name="showPONumber"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Show PO Number</FormLabel>
                       <FormDescription>
-                        Display purchase order number field on quotations
+                        Display purchase order number field
                       </FormDescription>
                     </div>
                     <FormControl>
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        data-testid="switch-show-po"
+                        data-testid="switch-show-po-number"
                       />
                     </FormControl>
                   </FormItem>
@@ -432,12 +273,12 @@ export default function PrintSettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Default Content */}
+          {/* Default Notes */}
           <Card>
             <CardHeader>
-              <CardTitle>Default Content</CardTitle>
+              <CardTitle>Default Notes</CardTitle>
               <CardDescription>
-                Set default text that appears on all documents
+                Standard terms and conditions to appear on documents
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -446,17 +287,17 @@ export default function PrintSettingsPage() {
                 name="defaultNotes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Default Notes</FormLabel>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         {...field}
-                        placeholder="Items checked and verified upon delivery. Items cannot be returned."
                         rows={4}
-                        data-testid="input-default-notes"
+                        placeholder="Items checked and verified upon delivery. Items cannot be returned."
+                        data-testid="textarea-default-notes"
                       />
                     </FormControl>
                     <FormDescription>
-                      These notes will appear at the bottom of all printed documents
+                      These notes will appear at the bottom of invoices and quotations
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -466,14 +307,15 @@ export default function PrintSettingsPage() {
           </Card>
 
           {/* Save Button */}
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end">
             <Button
               type="submit"
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || !form.formState.isDirty}
+              className="gap-2"
               data-testid="button-save-settings"
             >
-              <Save className="mr-2 h-4 w-4" />
-              {updateMutation.isPending ? "Saving..." : "Save Settings"}
+              <Save className="h-4 w-4" />
+              <span>{updateMutation.isPending ? "Saving..." : "Save Settings"}</span>
             </Button>
           </div>
         </form>
