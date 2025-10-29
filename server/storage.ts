@@ -1291,7 +1291,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Quotation with ID ${id} not found`);
       }
       
-      const quotationItems = await tx
+      const items = await tx
         .select()
         .from(quotationItems)
         .where(eq(quotationItems.quotationId, id));
@@ -1325,7 +1325,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       
       // Copy all items from quotation to invoice
-      for (const item of quotationItems) {
+      for (const item of items) {
         await tx
           .insert(invoiceItems)
           .values({

@@ -26,7 +26,10 @@ import {
   insertPurchaseOrderItemSchema,
   insertSettingSchema,
   insertPrintSettingsSchema,
-  loginSchema
+  loginSchema,
+  updateUserProfileSchema,
+  updateUserCompanySchema,
+  updateUserPaymentSchema
 } from "../shared/schema";
 // Import InvoiceItem type from schema
 import { type InvoiceItem } from "../shared/schema";
@@ -233,8 +236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Permission denied" });
       }
       
+      // Use safe update schema to prevent privilege escalation
       const validatedData = validateRequestBody(
-        insertUserSchema.partial().omit({ password: true }), 
+        updateUserProfileSchema, 
         req, 
         res
       );
@@ -274,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const currentUser = req.user as any;
       const validatedData = validateRequestBody(
-        insertUserSchema.partial().omit({ password: true }), 
+        updateUserProfileSchema, 
         req, 
         res
       );
@@ -294,9 +298,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/user/company", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
-      const companyData = req.body;
+      const validatedData = validateRequestBody(
+        updateUserCompanySchema,
+        req,
+        res
+      );
+      if (!validatedData) return;
       
-      const updatedUser = await storage.updateUser(currentUser.id, companyData);
+      const updatedUser = await storage.updateUser(currentUser.id, validatedData);
       
       // Exclude password
       const { password, ...userData } = updatedUser;
@@ -310,10 +319,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/user/payment", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
-      // Payment methods are stored in user table (can be expanded to separate table if needed)
-      const paymentData = req.body;
+      const validatedData = validateRequestBody(
+        updateUserPaymentSchema,
+        req,
+        res
+      );
+      if (!validatedData) return;
       
-      const updatedUser = await storage.updateUser(currentUser.id, paymentData);
+      const updatedUser = await storage.updateUser(currentUser.id, validatedData);
       
       // Exclude password
       const { password, ...userData } = updatedUser;

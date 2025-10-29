@@ -386,6 +386,29 @@ export const importExportLogs = pgTable("import_export_logs", {
 
 // Define the insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Define safe update schemas for user endpoints
+export const updateUserProfileSchema = z.object({
+  fullName: z.string().min(1).max(100).optional(),
+  email: z.string().email().max(100).optional(),
+  phone: z.string().max(50).optional(),
+  address: z.string().optional(),
+});
+
+export const updateUserCompanySchema = z.object({
+  companyName: z.string().max(200).optional(),
+  companyTagline: z.string().max(200).optional(),
+  companyAddress: z.string().optional(),
+  companyPhone: z.string().max(100).optional(),
+  companyEmail: z.string().email().max(100).optional(),
+  taxNumber: z.string().max(50).optional(),
+  logoUrl: z.string().max(500).optional(),
+});
+
+export const updateUserPaymentSchema = z.object({
+  // Payment-related fields can be added here as needed
+  // For now, this is a placeholder schema
+});
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
