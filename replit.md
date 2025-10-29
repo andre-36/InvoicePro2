@@ -10,6 +10,20 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 29, 2025 - Security Improvements and Bug Fixes
+- **Security**: Fixed critical privilege escalation vulnerability in user update endpoints
+  - Added three safe update schemas: updateUserProfileSchema, updateUserCompanySchema, updateUserPaymentSchema
+  - All user update endpoints now use field whitelisting to prevent role/password modification
+  - Password changes only allowed through dedicated endpoint with current password verification
+- **API**: Added current user endpoints for easier client-side integration
+  - GET /api/user - Get current user's complete profile
+  - PUT /api/user - Update profile (fullName, email, phone, address only)
+  - PUT /api/user/company - Update company details (whitelisted fields)
+  - PUT /api/user/payment - Update payment settings (placeholder)
+  - PUT /api/user/password - Change password with verification
+- **Bug Fix**: Fixed quotation to invoice conversion error (variable name conflict)
+- **UI Fix**: Removed nested anchor tag warning in dashboard InvoiceStatusChart component
+
 ### October 29, 2025 - Company Information Consolidation
 - Consolidated company information from Print Settings into General Settings (Company tab)
 - Company information now stored in users table: companyName, companyTagline, companyAddress, companyPhone, companyEmail, taxNumber, logoUrl

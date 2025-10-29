@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const hasInitialized = useRef(false);
   
   // Fetch user data
   const { data: userData, isLoading } = useQuery({
@@ -209,27 +210,31 @@ export default function SettingsPage() {
     }
   });
   
-  // Set form values when user data is loaded
-  if (userData && !profileForm.formState.isDirty) {
-    profileForm.reset({
-      fullName: userData.fullName || "",
-      email: userData.email || "",
-      username: userData.username || "",
-      companyName: userData.companyName || "",
-      address: userData.address || "",
-      phone: userData.phone || "",
-    });
-    
-    companyForm.reset({
-      companyName: userData.companyName || "",
-      companyTagline: userData.companyTagline || "",
-      companyAddress: userData.companyAddress || "",
-      companyPhone: userData.companyPhone || "",
-      companyEmail: userData.companyEmail || "",
-      taxNumber: userData.taxNumber || "",
-      logoUrl: userData.logoUrl || "",
-    });
-  }
+  // Set form values when user data is loaded (only once)
+  useEffect(() => {
+    if (userData && !hasInitialized.current) {
+      profileForm.reset({
+        fullName: userData.fullName || "",
+        email: userData.email || "",
+        username: userData.username || "",
+        companyName: userData.companyName || "",
+        address: userData.address || "",
+        phone: userData.phone || "",
+      });
+      
+      companyForm.reset({
+        companyName: userData.companyName || "",
+        companyTagline: userData.companyTagline || "",
+        companyAddress: userData.companyAddress || "",
+        companyPhone: userData.companyPhone || "",
+        companyEmail: userData.companyEmail || "",
+        taxNumber: userData.taxNumber || "",
+        logoUrl: userData.logoUrl || "",
+      });
+      
+      hasInitialized.current = true;
+    }
+  }, [userData, profileForm, companyForm]);
   
   // Form submission handlers
   const onProfileSubmit = (data: ProfileFormValues) => {
