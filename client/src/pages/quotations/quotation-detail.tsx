@@ -80,6 +80,19 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     queryKey: ['/api/stores/1/print-settings'],
   });
 
+  // Fetch current user for company information
+  const { data: currentUser } = useQuery<{
+    companyName?: string;
+    companyTagline?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    companyEmail?: string;
+    taxNumber?: string;
+    logoUrl?: string;
+  }>({
+    queryKey: ['/api/user'],
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       return apiRequest('DELETE', `/api/quotations/${id}`, undefined);
@@ -184,11 +197,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           <div className="print-header">
             <div className="print-header-left">
               <div className="print-logo">
-                {printSettings?.logoUrl ? (
-                  <img src={printSettings.logoUrl} alt="Company Logo" className="print-logo-image" />
+                {currentUser?.logoUrl ? (
+                  <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
                   <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
-                    {printSettings?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                    {currentUser?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
                   </div>
                 )}
               </div>
@@ -206,18 +219,18 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-header-center">
-              <div className="print-company-name">{printSettings?.companyName || "YOUR COMPANY NAME"}</div>
-              {printSettings?.companyTagline && (
-                <div className="print-company-tagline">{printSettings.companyTagline}</div>
+              <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
+              {currentUser?.companyTagline && (
+                <div className="print-company-tagline">{currentUser.companyTagline}</div>
               )}
               <div className="print-company-address">
-                {printSettings?.companyAddress || "Your Company Address"}
-                {(printSettings?.companyPhone || printSettings?.companyEmail) && (
+                {currentUser?.companyAddress || "Your Company Address"}
+                {(currentUser?.companyPhone || currentUser?.companyEmail) && (
                   <>
                     <br />
-                    {printSettings.companyPhone && `Phone: ${printSettings.companyPhone}`}
-                    {printSettings.companyPhone && printSettings.companyEmail && ' / '}
-                    {printSettings.companyEmail && `Email: ${printSettings.companyEmail}`}
+                    {currentUser.companyPhone && `Phone: ${currentUser.companyPhone}`}
+                    {currentUser.companyPhone && currentUser.companyEmail && ' / '}
+                    {currentUser.companyEmail && `Email: ${currentUser.companyEmail}`}
                   </>
                 )}
               </div>
@@ -313,7 +326,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             <div className="print-signature-box">
               <div className="print-signature-label">Prepared By</div>
               <div className="print-signature-line">
-                {printSettings?.companyName || 'Company Representative'}
+                {currentUser?.companyName || 'Company Representative'}
               </div>
             </div>
             <div className="print-signature-box">
