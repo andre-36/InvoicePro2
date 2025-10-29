@@ -112,6 +112,16 @@
     color: black !important;
   }
 
+  /* Hide sidebar and navigation elements */
+  nav,
+  header,
+  .fixed.inset-y-0,
+  .sidebar,
+  button,
+  .bg-gray-900 {
+    display: none !important;
+  }
+
   /* Hide screen-only content */
   .screen-only {
     display: none !important;
