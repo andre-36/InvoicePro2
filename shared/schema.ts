@@ -400,7 +400,7 @@ export const updateUserCompanySchema = z.object({
   companyTagline: z.string().max(200).optional(),
   companyAddress: z.string().optional(),
   companyPhone: z.string().max(100).optional(),
-  companyEmail: z.string().email().max(100).optional(),
+  companyEmail: z.string().email().max(100).optional().or(z.literal("")),
   taxNumber: z.string().max(50).optional(),
   logoUrl: z.string().max(500).optional(),
 });
