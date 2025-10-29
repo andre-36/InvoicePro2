@@ -100,10 +100,10 @@
   }
 }
 
-/* Print styles for PRS Paper (13.8cm x 21.7cm) */
+/* Print styles for PRS Paper Landscape (24cm x 14cm) */
 @media print {
   @page {
-    size: 13.8cm 21.7cm;
+    size: 24cm 14cm landscape;
     margin: 0.5cm 0.4cm;
   }
 
@@ -112,12 +112,28 @@
     color: black !important;
   }
 
-  /* Hide screen view, show print template */
-  .screen-only {
+  /* Hide all non-print elements */
+  body > div:not(.print-only),
+  nav, 
+  aside, 
+  .sidebar,
+  [data-sidebar],
+  header,
+  .header,
+  button:not(.print-only button),
+  .screen-only,
+  [class*="sidebar"],
+  [class*="nav"],
+  main > div:not(.print-only) {
     display: none !important;
   }
 
+  /* Show only print template */
   .print-only {
+    display: block !important;
+  }
+
+  .print-invoice-template {
     display: block !important;
   }
 
@@ -133,9 +149,9 @@
   /* Header */
   .print-header {
     display: grid;
-    grid-template-columns: 3cm 1fr 3.5cm;
-    gap: 0.2cm;
-    margin-bottom: 0.3cm;
+    grid-template-columns: 4cm 1fr 5cm;
+    gap: 0.4cm;
+    margin-bottom: 0.4cm;
     position: relative;
   }
 
@@ -299,9 +315,9 @@
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 0.5cm;
-    margin-top: 0.5cm;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 0.8cm;
+    margin-top: 0.4cm;
     border-top: 2px solid #000;
     padding-top: 0.3cm;
   }
