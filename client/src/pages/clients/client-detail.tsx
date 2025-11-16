@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ClientForm } from "@/components/clients/client-form";
 import { format } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 type Client = {
   id: number;
@@ -23,9 +26,16 @@ type ClientStats = {
   lastPurchaseDate: string | null;
 };
 
+type MonthlyPurchase = {
+  month: string;
+  totalAmount: number;
+  invoiceCount: number;
+};
+
 export default function ClientDetailPage() {
   const { id } = useParams();
   const clientId = parseInt(id!);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: client, isLoading: clientLoading } = useQuery<Client>({
     queryKey: [`/api/clients/${clientId}`],
@@ -33,6 +43,10 @@ export default function ClientDetailPage() {
 
   const { data: stats, isLoading: statsLoading } = useQuery<ClientStats>({
     queryKey: [`/api/clients/${clientId}/stats`],
+  });
+
+  const { data: monthlyPurchases, isLoading: purchasesLoading } = useQuery<MonthlyPurchase[]>({
+    queryKey: [`/api/clients/${clientId}/monthly-purchases`],
   });
 
   if (clientLoading || statsLoading) {
@@ -82,10 +96,14 @@ export default function ClientDetailPage() {
               {client.name}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Client #{client.clientNumber}
+              Client #{client.clientNumber || client.id}
             </p>
           </div>
         </div>
+        <Button onClick={() => setIsEditDialogOpen(true)} data-testid="button-edit-client">
+          <Edit className="mr-2 h-4 w-4" />
+          Edit Client
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -226,6 +244,83 @@ export default function ClientDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Monthly Purchases Chart */}
+      <Card className="border-gray-200 dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+            <TrendingUp className="h-5 w-5" />
+            Monthly Purchases
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {purchasesLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : !monthlyPurchases || monthlyPurchases.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <TrendingUp className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No purchase data</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                This client hasn't made any purchases yet.
+              </p>
+            </div>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyPurchases}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs fill-gray-600 dark:fill-gray-400"
+                  />
+                  <YAxis 
+                    className="text-xs fill-gray-600 dark:fill-gray-400"
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: '#111827', fontWeight: 600 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="totalAmount" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2}
+                    dot={{ fill: '#3b82f6', r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Total Amount"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="invoiceCount" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    dot={{ fill: '#10b981', r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Invoice Count"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+          </DialogHeader>
+          <ClientForm 
+            clientId={clientId} 
+            onSuccess={() => setIsEditDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
