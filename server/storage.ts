@@ -514,15 +514,17 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getClientStats(clientId: number): Promise<ClientStats> {
-    const [result] = await db
+    const results = await db
       .select({
         totalPurchases: count(invoices.id),
-        unpaidInvoicesCount: sql<number>`COUNT(CASE WHEN ${invoices.status} != 'paid' THEN 1 END)`,
-        lastPurchaseDate: sql<string>`MAX(${invoices.issueDate})`,
+        unpaidInvoicesCount: sql<number>`COUNT(CASE WHEN ${invoices.status} != 'paid' THEN 1 END)::int`,
+        lastPurchaseDate: sql<string>`MAX(${invoices.issueDate})::text`,
       })
       .from(invoices)
       .where(eq(invoices.clientId, clientId));
 
+    const result = results[0];
+    
     return {
       totalPurchases: Number(result?.totalPurchases || 0),
       unpaidInvoicesCount: Number(result?.unpaidInvoicesCount || 0),
