@@ -190,14 +190,14 @@ export default function ClientsPage() {
                 {filteredClients.map((client) => (
                   <TableRow 
                     key={client.id} 
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                     onDoubleClick={() => handleDoubleClick(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>
                       {client.email ? (
-                        <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <a href={`mailto:${client.email}`} className="text-blue-600 dark:text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>
                           {client.email}
                         </a>
                       ) : (
@@ -206,7 +206,7 @@ export default function ClientsPage() {
                     </TableCell>
                     <TableCell>
                       {client.phone ? (
-                        <a href={`tel:${client.phone}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <a href={`tel:${client.phone}`} className="text-blue-600 dark:text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>
                           {client.phone}
                         </a>
                       ) : (

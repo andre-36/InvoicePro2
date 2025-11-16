@@ -445,31 +445,31 @@ export default function ProductsPage() {
                       data-testid={`row-product-${product.id}`}
                     >
                       <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="font-mono text-sm text-gray-600">
+                      <TableCell className="font-mono text-sm text-gray-600 dark:text-gray-400">
                         {product.sku || "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span className={`text-sm font-medium ${
-                              product.stockStatus === 'out_of_stock' ? 'text-red-600' :
-                              product.stockStatus === 'low_stock' ? 'text-amber-600' :
-                              'text-green-600'
+                              product.stockStatus === 'out_of_stock' ? 'text-red-600 dark:text-red-400' :
+                              product.stockStatus === 'low_stock' ? 'text-amber-600 dark:text-amber-400' :
+                              'text-green-600 dark:text-green-400'
                             }`}>
                               {product.currentStock || 0}
                             </span>
                             {product.isLowStock && (
-                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 rounded-full">
                                 Low
                               </span>
                             )}
                             {product.stockStatus === 'out_of_stock' && (
-                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full">
+                              <span className="text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">
                                 Out
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             Min: {product.minStock || 0}
                           </span>
                         </div>
