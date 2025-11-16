@@ -530,6 +530,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id/monthly-purchases", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const monthlyPurchases = await storage.getClientMonthlyPurchases(clientId);
+      res.json(monthlyPurchases);
+    } catch (error) {
+      console.error("Error getting client monthly purchases:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertClientSchema, req, res);

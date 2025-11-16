@@ -46,6 +46,7 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
   getClientStats(clientId: number): Promise<ClientStats>;
+  getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]>;
   
   // Supplier methods
   getSupplier(id: number): Promise<Supplier | undefined>;
@@ -250,6 +251,12 @@ export type ClientStats = {
   totalPurchases: number;
   unpaidInvoicesCount: number;
   lastPurchaseDate: string | null;
+};
+
+export type ClientMonthlyPurchase = {
+  month: string;
+  totalAmount: number;
+  invoiceCount: number;
 };
 
 export type ProductSalesHistory = {
@@ -530,6 +537,25 @@ export class DatabaseStorage implements IStorage {
       unpaidInvoicesCount: Number(result?.unpaidInvoicesCount || 0),
       lastPurchaseDate: result?.lastPurchaseDate || null,
     };
+  }
+
+  async getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]> {
+    const results = await db
+      .select({
+        month: sql<string>`TO_CHAR(${invoices.issueDate}, 'Mon YYYY')`,
+        totalAmount: sql<number>`SUM(${invoices.totalAmount})::numeric`,
+        invoiceCount: count(invoices.id),
+      })
+      .from(invoices)
+      .where(eq(invoices.clientId, clientId))
+      .groupBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM'), TO_CHAR(${invoices.issueDate}, 'Mon YYYY')`)
+      .orderBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM')`);
+
+    return results.map(r => ({
+      month: r.month,
+      totalAmount: Number(r.totalAmount || 0),
+      invoiceCount: Number(r.invoiceCount || 0),
+    }));
   }
   
   // Supplier methods
