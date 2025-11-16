@@ -52,8 +52,6 @@ export default function ClientsPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editClientId, setEditClientId] = useState<number | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
@@ -88,18 +86,8 @@ export default function ClientsPage() {
       )
     : [];
   
-  const handleEdit = (id: number) => {
-    setEditClientId(id);
-    setIsDialogOpen(true);
-  };
-  
-  const handleDoubleClick = (id: number) => {
-    handleEdit(id);
-  };
-  
-  const closeDialog = () => {
-    setIsDialogOpen(false);
-    setEditClientId(null);
+  const handleViewDetails = (id: number) => {
+    navigate(`/clients/${id}`);
   };
   
   return (
@@ -191,7 +179,7 @@ export default function ClientsPage() {
                   <TableRow 
                     key={client.id} 
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onDoubleClick={() => handleDoubleClick(client.id)}
+                    onDoubleClick={() => handleViewDetails(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
                     <TableCell className="font-medium">{client.name}</TableCell>
@@ -232,9 +220,9 @@ export default function ClientsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-[160px]">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEdit(client.id)}>
+                          <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
                             <Edit className="mr-2 h-4 w-4" />
-                            <span>Edit</span>
+                            <span>View Details</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <AlertDialog>
@@ -273,16 +261,6 @@ export default function ClientsPage() {
           )}
         </CardContent>
       </Card>
-      
-      {/* Edit dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <ClientForm 
-            clientId={editClientId || undefined} 
-            onSuccess={closeDialog}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
