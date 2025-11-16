@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lt, sql, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lt, sql, isNull, inArray, count } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
@@ -45,6 +45,7 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
+  getClientStats(clientId: number): Promise<ClientStats>;
   
   // Supplier methods
   getSupplier(id: number): Promise<Supplier | undefined>;
@@ -242,6 +243,13 @@ export type ProductStats = {
   averageSellingPrice: string;
   averageCost: string;
   profitMargin: string;
+};
+
+// Client dashboard types
+export type ClientStats = {
+  totalPurchases: number;
+  unpaidInvoicesCount: number;
+  lastPurchaseDate: string | null;
 };
 
 export type ProductSalesHistory = {
@@ -503,6 +511,23 @@ export class DatabaseStorage implements IStorage {
   
   async deleteClient(id: number): Promise<void> {
     await db.delete(clients).where(eq(clients.id, id));
+  }
+  
+  async getClientStats(clientId: number): Promise<ClientStats> {
+    const [result] = await db
+      .select({
+        totalPurchases: count(invoices.id),
+        unpaidInvoicesCount: sql<number>`COUNT(CASE WHEN ${invoices.status} != 'paid' THEN 1 END)`,
+        lastPurchaseDate: sql<string>`MAX(${invoices.issueDate})`,
+      })
+      .from(invoices)
+      .where(eq(invoices.clientId, clientId));
+
+    return {
+      totalPurchases: Number(result?.totalPurchases || 0),
+      unpaidInvoicesCount: Number(result?.unpaidInvoicesCount || 0),
+      lastPurchaseDate: result?.lastPurchaseDate || null,
+    };
   }
   
   // Supplier methods

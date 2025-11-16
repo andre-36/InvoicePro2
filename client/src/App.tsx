@@ -19,6 +19,7 @@ import CreatePurchaseOrderPage from "@/pages/purchase-orders/create";
 import PurchaseOrderDetailPage from "@/pages/purchase-orders/purchase-order-detail";
 import ClientsPage from "@/pages/clients";
 import CreateClientPage from "@/pages/clients/create";
+import ClientDetailPage from "@/pages/clients/client-detail";
 import ProductsPage from "@/pages/products";
 import ProductDashboard from "@/pages/products/dashboard";
 import CategoriesPage from "@/pages/categories";
@@ -150,6 +151,7 @@ function App() {
                 </Route>
                 <Route path="/clients" component={ClientsPage} />
                 <Route path="/clients/create" component={CreateClientPage} />
+                <Route path="/clients/:id" component={ClientDetailPage} />
                 <Route path="/products" component={ProductsPage} />
                 <Route path="/products/:id/dashboard">
                   {params => <ProductDashboard id={parseInt(params.id)} />}

@@ -519,6 +519,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id/stats", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const stats = await storage.getClientStats(clientId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting client stats:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertClientSchema, req, res);
