@@ -542,20 +542,31 @@ export class DatabaseStorage implements IStorage {
   async getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]> {
     const results = await db
       .select({
-        month: sql<string>`TO_CHAR(${invoices.issueDate}, 'Mon YYYY')`,
-        totalAmount: sql<number>`SUM(${invoices.totalAmount})::numeric`,
-        invoiceCount: count(invoices.id),
+        month: sql<string>`TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')`,
+        sortKey: sql<string>`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`,
+        totalAmount: sql<string>`COALESCE(
+          SUM(
+            CASE 
+              WHEN NULLIF(REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g'), '') IS NOT NULL THEN
+                REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g')::numeric
+              ELSE 0
+            END
+          ), 0
+        )`,
+        invoiceCount: sql<number>`COUNT(${invoices.id})::int`,
       })
       .from(invoices)
       .where(eq(invoices.clientId, clientId))
-      .groupBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM'), TO_CHAR(${invoices.issueDate}, 'Mon YYYY')`)
-      .orderBy(sql`TO_CHAR(${invoices.issueDate}, 'YYYY-MM')`);
+      .groupBy(sql`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`, sql`TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')`)
+      .orderBy(sql`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`);
 
-    return results.map(r => ({
-      month: r.month,
-      totalAmount: Number(r.totalAmount || 0),
-      invoiceCount: Number(r.invoiceCount || 0),
-    }));
+    return results
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(r => ({
+        month: r.month,
+        totalAmount: parseFloat(r.totalAmount) || 0,
+        invoiceCount: Number(r.invoiceCount || 0),
+      }));
   }
   
   // Supplier methods
