@@ -540,27 +540,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]> {
-    const results = await db
-      .select({
-        month: sql<string>`TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')`,
-        sortKey: sql<string>`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`,
-        totalAmount: sql<string>`COALESCE(
+    const results = await db.execute(sql`
+      WITH cleaned_invoices AS (
+        SELECT 
+          ${invoices.issueDate}::date as issue_date,
+          NULLIF(REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g'), '') as clean_amount
+        FROM ${invoices}
+        WHERE ${invoices.clientId} = ${clientId}
+      )
+      SELECT 
+        TO_CHAR(issue_date, 'Mon YYYY') as month,
+        TO_CHAR(issue_date, 'YYYY-MM') as "sortKey",
+        COALESCE(
           SUM(
             CASE 
-              WHEN NULLIF(REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g'), '') IS NOT NULL THEN
-                REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g')::numeric
+              WHEN clean_amount IS NOT NULL THEN clean_amount::numeric
               ELSE 0
             END
           ), 0
-        )`,
-        invoiceCount: sql<number>`COUNT(${invoices.id})::int`,
-      })
-      .from(invoices)
-      .where(eq(invoices.clientId, clientId))
-      .groupBy(sql`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`, sql`TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')`)
-      .orderBy(sql`TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')`);
+        )::text as "totalAmount",
+        COUNT(*)::int as "invoiceCount"
+      FROM cleaned_invoices
+      GROUP BY TO_CHAR(issue_date, 'YYYY-MM'), TO_CHAR(issue_date, 'Mon YYYY')
+      ORDER BY TO_CHAR(issue_date, 'YYYY-MM')
+    `);
 
-    return results
+    const rows = results.rows as Array<{
+      month: string;
+      sortKey: string;
+      totalAmount: string;
+      invoiceCount: number;
+    }>;
+
+    return rows
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .map(r => ({
         month: r.month,
