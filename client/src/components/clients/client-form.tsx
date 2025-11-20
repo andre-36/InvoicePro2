@@ -137,12 +137,19 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
             <CardTitle>{clientId ? "Edit Client" : "Add New Client"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Display client number for existing clients */}
-            {clientId && clientData?.clientNumber && (
+            {/* Display client number for existing clients or format example for new clients */}
+            {clientId && clientData?.clientNumber ? (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
                 <div className="text-sm font-medium text-gray-700">Client Number</div>
                 <div className="text-lg font-mono text-gray-900" data-testid="text-client-number">
                   {clientData.clientNumber}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-sm font-medium text-blue-700">Client Number</div>
+                <div className="text-sm text-blue-600 mt-1">
+                  Will be automatically generated (e.g., C-00001)
                 </div>
               </div>
             )}
