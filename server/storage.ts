@@ -495,26 +495,13 @@ export class DatabaseStorage implements IStorage {
 
   // Client methods
   async getClient(id: number): Promise<Client | undefined> {
-    const result = await db
-      .select({
-        id: clients.id,
-        storeId: clients.storeId,
-        name: clients.name,
-        email: clients.email,
-        phone: clients.phone,
-        address: clients.address,
-        taxNumber: clients.taxNumber,
-        clientNumber: clients.clientNumber,
-        city: clients.city,
-        state: clients.state,
-        postalCode: clients.postalCode,
-        country: clients.country,
-      })
+    const [client] = await db
+      .select()
       .from(clients)
       .where(eq(clients.id, id))
       .limit(1);
 
-    return result[0];
+    return client;
   }
 
   async getClients(storeId: number): Promise<Client[]> {
