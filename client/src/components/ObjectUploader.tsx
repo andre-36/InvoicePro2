@@ -35,7 +35,7 @@ export function ObjectUploader({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
-        allowedFileTypes: ['image/*'],
+        allowedFileTypes: ['image/*', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
       },
       autoProceed: false,
     })
@@ -43,7 +43,20 @@ export function ObjectUploader({
         shouldUseMultipart: false,
         getUploadParameters: onGetUploadParameters,
       })
+      .on("upload", (data) => {
+        console.log("Starting upload:", data);
+      })
+      .on("upload-success", (file, response) => {
+        console.log("File uploaded successfully:", file?.name, response);
+      })
+      .on("upload-error", (file, error) => {
+        console.error("Upload error for file:", file?.name, error);
+      })
+      .on("restriction-failed", (file, error) => {
+        console.error("Restriction failed:", file?.name, error);
+      })
       .on("complete", (result) => {
+        console.log("Upload complete:", result);
         onComplete?.(result);
       })
   );

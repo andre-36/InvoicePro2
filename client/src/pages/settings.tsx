@@ -832,12 +832,30 @@ export default function SettingsPage() {
                                 };
                               }}
                               onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                                console.log("Upload complete, result:", result);
+                                
+                                // Check for failed uploads first
+                                if (result.failed && result.failed.length > 0) {
+                                  const failedFile = result.failed[0];
+                                  console.error("Upload failed:", failedFile);
+                                  toast({
+                                    title: "Upload gagal",
+                                    description: `Gagal upload file: ${failedFile.error || 'Error tidak diketahui'}`,
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
                                 if (result.successful.length > 0) {
                                   const uploadedFile = result.successful[0];
                                   const uploadURL = uploadedFile.uploadURL;
 
+                                  console.log("File berhasil diupload ke:", uploadURL);
+
                                   try {
                                     const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+
+                                    console.log("Logo API response:", response);
 
                                     // Update the form field with the normalized path
                                     field.onChange(response.logoPath);
@@ -850,17 +868,24 @@ export default function SettingsPage() {
                                     });
 
                                     toast({
-                                      title: "Logo uploaded",
-                                      description: "Your company logo has been uploaded successfully. Click 'Save Company Details' to apply changes.",
+                                      title: "Logo berhasil diupload",
+                                      description: "Logo perusahaan Anda berhasil diupload. Klik 'Save Company Details' untuk menyimpan perubahan.",
                                     });
                                   } catch (error: any) {
-                                    console.error("Logo upload error:", error);
+                                    console.error("Logo API error:", error);
                                     toast({
                                       title: "Error",
-                                      description: error.message || "Failed to save logo. Please try again.",
+                                      description: error.message || "Gagal menyimpan logo. Silakan coba lagi.",
                                       variant: "destructive",
                                     });
                                   }
+                                } else {
+                                  console.warn("No successful uploads");
+                                  toast({
+                                    title: "Tidak ada file yang diupload",
+                                    description: "Silakan pilih file untuk diupload.",
+                                    variant: "destructive",
+                                  });
                                 }
                               }}
                             >
