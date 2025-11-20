@@ -481,6 +481,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
+  // Get next client number preview - MUST be before /:id route
+  app.get("/api/clients/next-number", requireAuth, async (req, res) => {
+    try {
+      const nextNumber = await storage.getNextClientNumber();
+      res.json({ clientNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next client number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/clients", requireAuth, async (req, res) => {
     try {
       // Default to store 1 for general client listing

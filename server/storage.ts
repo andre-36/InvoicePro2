@@ -116,6 +116,7 @@ export interface IStorage {
   getNextInvoiceNumber(issueDate?: Date): Promise<string>;
   getNextQuotationNumber(): Promise<string>;
   getNextPurchaseOrderNumber(orderDate?: Date): Promise<string>;
+  getNextClientNumber(): Promise<string>;
 
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -2526,6 +2527,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Preview number generation methods
+  async getNextClientNumber(): Promise<string> {
+    try {
+      return withTransaction(async (tx) => {
+        return await generateSimpleSequentialNumber("C", clients, clients.clientNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextClientNumber:', error);
+      throw error;
+    }
+  }
+
   async getNextInvoiceNumber(issueDate: Date = new Date()): Promise<string> {
     try {
       const year = issueDate.getFullYear().toString().slice(-2);

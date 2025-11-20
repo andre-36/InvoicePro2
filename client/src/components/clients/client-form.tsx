@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,12 +46,26 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const [nextClientNumber, setNextClientNumber] = useState<string>("");
 
   // If editing, fetch client data
   const { data: clientData, isLoading } = useQuery<Client>({
     queryKey: [`/api/clients/${clientId}`],
     enabled: !!clientId,
   });
+
+  // Fetch next client number preview for new clients
+  useEffect(() => {
+    if (!clientId) {
+      apiRequest('GET', '/api/clients/next-number')
+        .then((data: any) => {
+          setNextClientNumber(data.clientNumber);
+        })
+        .catch((error) => {
+          console.error("Error fetching next client number:", error);
+        });
+    }
+  }, [clientId]);
 
   // Form setup
   const form = useForm<ClientFormValues>({
@@ -149,7 +163,11 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
               <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-sm font-medium text-blue-700">Client Number</div>
                 <div className="text-sm text-blue-600 mt-1">
-                  Will be automatically generated (e.g., C-00001)
+                  {nextClientNumber ? (
+                    <>Will be automatically generated: <span className="font-mono font-semibold">{nextClientNumber}</span></>
+                  ) : (
+                    "Will be automatically generated (e.g., C-00001)"
+                  )}
                 </div>
               </div>
             )}
