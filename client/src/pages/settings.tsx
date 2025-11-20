@@ -723,27 +723,13 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium mb-2">Payment Types</h3>
+                <h3 className="text-lg font-medium mb-2">Payment Configuration</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Manage the payment methods available to your clients (e.g., Cash, Bank Transfer, Credit Card)
+                  Manage payment types (e.g., Cash, Bank Transfer, Credit Card) and payment terms (e.g., Net 30, COD)
                 </p>
                 <Button asChild variant="outline">
-                  <a href="/settings/payment-types">
-                    Manage Payment Types
-                  </a>
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-medium mb-2">Payment Terms</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Define payment terms for invoices (e.g., Net 30, Net 60, Due on Receipt)
-                </p>
-                <Button asChild variant="outline">
-                  <a href="/settings/payment-terms">
-                    Manage Payment Terms
+                  <a href="/payment-methods">
+                    Manage Payment Methods
                   </a>
                 </Button>
               </div>
