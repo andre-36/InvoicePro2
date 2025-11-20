@@ -833,18 +833,31 @@ export default function SettingsPage() {
                               }}
                               onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
                                 if (result.successful.length > 0) {
-                                  const uploadURL = result.successful[0].uploadURL;
+                                  const uploadedFile = result.successful[0];
+                                  const uploadURL = uploadedFile.uploadURL;
+
                                   try {
                                     const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+
+                                    // Update the form field with the normalized path
                                     field.onChange(response.logoPath);
+
+                                    // Mark form as dirty so save button is enabled
+                                    companyForm.setValue('logoUrl', response.logoPath, { 
+                                      shouldDirty: true,
+                                      shouldTouch: true,
+                                      shouldValidate: true
+                                    });
+
                                     toast({
                                       title: "Logo uploaded",
-                                      description: "Your company logo has been uploaded successfully.",
+                                      description: "Your company logo has been uploaded successfully. Click 'Save Company Details' to apply changes.",
                                     });
-                                  } catch (error) {
+                                  } catch (error: any) {
+                                    console.error("Logo upload error:", error);
                                     toast({
                                       title: "Error",
-                                      description: "Failed to save logo. Please try again.",
+                                      description: error.message || "Failed to save logo. Please try again.",
                                       variant: "destructive",
                                     });
                                   }
