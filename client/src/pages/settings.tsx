@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import type { UploadResult } from "@uppy/core";
+import Link from "next/link";
 
 // Profile settings schema
 const profileSchema = z.object({
@@ -70,12 +71,12 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
-  
+
   // Fetch user data
   const { data: userData, isLoading } = useQuery({
     queryKey: ['/api/user'],
   });
-  
+
   // Profile form setup
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -88,7 +89,7 @@ export default function SettingsPage() {
       phone: "",
     }
   });
-  
+
   // Company form setup
   const companyForm = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -102,7 +103,7 @@ export default function SettingsPage() {
       logoUrl: "",
     }
   });
-  
+
   // Payment form setup
   const paymentForm = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -115,7 +116,7 @@ export default function SettingsPage() {
       paypalEmail: "",
     }
   });
-  
+
   // Security form setup
   const securityForm = useForm<SecurityFormValues>({
     resolver: zodResolver(securitySchema),
@@ -125,7 +126,7 @@ export default function SettingsPage() {
       confirmPassword: "",
     }
   });
-  
+
   // Update user profile mutation
   const profileMutation = useMutation({
     mutationFn: async (data: Partial<ProfileFormValues>) => {
@@ -146,7 +147,7 @@ export default function SettingsPage() {
       });
     }
   });
-  
+
   // Update company details mutation
   const companyMutation = useMutation({
     mutationFn: async (data: CompanyFormValues) => {
@@ -167,7 +168,7 @@ export default function SettingsPage() {
       });
     }
   });
-  
+
   // Update payment settings mutation
   const paymentMutation = useMutation({
     mutationFn: async (data: PaymentFormValues) => {
@@ -188,7 +189,7 @@ export default function SettingsPage() {
       });
     }
   });
-  
+
   // Update password mutation
   const passwordMutation = useMutation({
     mutationFn: async (data: SecurityFormValues) => {
@@ -209,7 +210,7 @@ export default function SettingsPage() {
       });
     }
   });
-  
+
   // Set form values when user data is loaded (only once)
   useEffect(() => {
     if (userData && !hasInitialized.current) {
@@ -221,7 +222,7 @@ export default function SettingsPage() {
         address: userData.address || "",
         phone: userData.phone || "",
       });
-      
+
       companyForm.reset({
         companyName: userData.companyName || "",
         companyTagline: userData.companyTagline || "",
@@ -231,24 +232,24 @@ export default function SettingsPage() {
         taxNumber: userData.taxNumber || "",
         logoUrl: userData.logoUrl || "",
       });
-      
+
       hasInitialized.current = true;
     }
   }, [userData, profileForm, companyForm]);
-  
+
   // Form submission handlers
   const onProfileSubmit = (data: ProfileFormValues) => {
     profileMutation.mutate(data);
   };
-  
+
   const onCompanySubmit = (data: CompanyFormValues) => {
     companyMutation.mutate(data);
   };
-  
+
   const onPaymentSubmit = (data: PaymentFormValues) => {
     paymentMutation.mutate(data);
   };
-  
+
   const onSecuritySubmit = (data: SecurityFormValues) => {
     passwordMutation.mutate(data);
   };
@@ -260,11 +261,11 @@ export default function SettingsPage() {
         method: 'GET',
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to export backup');
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -274,7 +275,7 @@ export default function SettingsPage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
+
       return true;
     },
     onSuccess: () => {
@@ -297,7 +298,7 @@ export default function SettingsPage() {
     mutationFn: async (file: File) => {
       const text = await file.text();
       const backupData = JSON.parse(text);
-      
+
       return apiRequest('POST', '/api/backup/import', {
         data: backupData.data,
         storeId: 1
@@ -337,7 +338,7 @@ export default function SettingsPage() {
       importMutation.mutate(importFile);
     }
   };
-  
+
   // Get user initials for avatar
   const getUserInitials = (name: string = "") => {
     return name
@@ -346,7 +347,7 @@ export default function SettingsPage() {
       .slice(0, 2)
       .join("");
   };
-  
+
   // Show loading spinner if user data is loading
   if (isLoading) {
     return (
@@ -355,14 +356,14 @@ export default function SettingsPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your account settings and preferences</p>
       </div>
-      
+
       <Tabs 
         defaultValue="profile" 
         value={activeTab}
@@ -393,7 +394,7 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
         </div>
-        
+
         <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
@@ -408,7 +409,7 @@ export default function SettingsPage() {
                     {getUserInitials(userData?.fullName)}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <div>
                   <Button variant="outline" className="gap-2">
                     <Upload className="h-4 w-4" />
@@ -419,9 +420,9 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
-              
+
               <Separator />
-              
+
               <Form {...profileForm}>
                 <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -438,7 +439,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={profileForm.control}
                       name="email"
@@ -452,7 +453,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={profileForm.control}
                       name="username"
@@ -466,7 +467,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={profileForm.control}
                       name="phone"
@@ -481,7 +482,7 @@ export default function SettingsPage() {
                       )}
                     />
                   </div>
-                  
+
                   <FormField
                     control={profileForm.control}
                     name="address"
@@ -499,7 +500,7 @@ export default function SettingsPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="flex justify-end">
                     <Button 
                       type="submit" 
@@ -515,7 +516,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="company" className="space-y-6">
           <Card>
             <CardHeader>
@@ -639,7 +640,7 @@ export default function SettingsPage() {
                   />
 
                   <Separator />
-                  
+
                   <FormField
                     control={companyForm.control}
                     name="companyAddress"
@@ -682,7 +683,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={companyForm.control}
                       name="taxNumber"
@@ -697,7 +698,7 @@ export default function SettingsPage() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="flex justify-end">
                     <Button 
                       type="submit" 
@@ -713,7 +714,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="payment" className="space-y-6">
           <Card>
             <CardHeader>
@@ -749,7 +750,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
@@ -760,7 +761,7 @@ export default function SettingsPage() {
               <Form {...securityForm}>
                 <form onSubmit={securityForm.handleSubmit(onSecuritySubmit)} className="space-y-6">
                   <h3 className="text-lg font-medium mb-4">Change Password</h3>
-                  
+
                   <FormField
                     control={securityForm.control}
                     name="currentPassword"
@@ -774,7 +775,7 @@ export default function SettingsPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={securityForm.control}
@@ -789,7 +790,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={securityForm.control}
                       name="confirmPassword"
@@ -804,7 +805,7 @@ export default function SettingsPage() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="flex justify-end">
                     <Button 
                       type="submit" 
@@ -820,7 +821,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="backup" className="space-y-6">
           <Card>
             <CardHeader>
@@ -904,7 +905,7 @@ export default function SettingsPage() {
                   <li>• Backup files contain sensitive business data</li>
                 </ul>
               </div>
-              
+
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <h4 className="font-medium text-amber-900 mb-2">Import Warning</h4>
                 <p className="text-sm text-amber-800">

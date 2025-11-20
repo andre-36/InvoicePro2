@@ -28,8 +28,9 @@ import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import PrintSettingsPage from "@/pages/print-settings";
-import PaymentTypes from "@/pages/payment-types";
-import PaymentTerms from "@/pages/payment-terms";
+import PaymentMethodsPage from "@/pages/payment-methods";
+import PaymentTypesPage from "@/pages/payment-types";
+import PaymentTermsPage from "@/pages/payment-terms";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -164,8 +165,9 @@ function App() {
                 <Route path="/reports" component={ReportsPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/print-settings" component={PrintSettingsPage} />
-                <Route path="/settings/payment-types" component={PaymentTypes} />
-                <Route path="/settings/payment-terms" component={PaymentTerms} />
+                <Route path="/payment-methods" component={PaymentMethodsPage} />
+                <Route path="/payment-types" component={PaymentTypesPage} />
+                <Route path="/payment-terms" component={PaymentTermsPage} />
                 <Route component={NotFound} />
               </Switch>
             </main>
