@@ -2057,10 +2057,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      console.log("Generated upload URL:", uploadURL);
+      
+      if (!uploadURL) {
+        throw new Error("Failed to generate upload URL");
+      }
+      
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error getting upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
+      res.status(500).json({ 
+        error: "Failed to get upload URL",
+        details: error.message 
+      });
     }
   });
 
