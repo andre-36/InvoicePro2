@@ -307,7 +307,7 @@ async function generateNextNumber(prefix: string, yearMonth: string, table: any,
   return `${prefix}-${yearMonth}-${nextNumber.toString().padStart(4, '0')}`;
 }
 
-// Helper function for simple sequential numbering (like C-000001)
+// Helper function for simple sequential numbering (like C-00001)
 async function generateSimpleSequentialNumber(prefix: string, table: any, column: any, tx: any): Promise<string> {
   // Find the highest number with this prefix
   const prefixPattern = `${prefix}-%`;
@@ -330,7 +330,7 @@ async function generateSimpleSequentialNumber(prefix: string, table: any, column
     }
   }
 
-  return `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+  return `${prefix}-${nextNumber.toString().padStart(5, '0')}`;
 }
 
 // Helper function to safely create records with unique number generation and retry logic
