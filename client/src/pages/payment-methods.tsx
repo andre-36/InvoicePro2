@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, ArrowLeft } from "lucide-react";
+import { FolderPlus, FolderEdit, FolderMinus, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,11 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const paymentTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -42,6 +39,8 @@ export default function PaymentMethodsPage() {
   const [isTermDialogOpen, setIsTermDialogOpen] = useState(false);
   const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
   const [editingTermId, setEditingTermId] = useState<number | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -66,11 +65,15 @@ export default function PaymentMethodsPage() {
     }
   });
 
-  // Payment Types queries
   const { data: paymentTypes, isLoading: typesLoading } = useQuery({
     queryKey: ['/api/stores/1/payment-types'],
   });
 
+  const { data: paymentTerms, isLoading: termsLoading } = useQuery({
+    queryKey: ['/api/stores/1/payment-terms'],
+  });
+
+  // Payment Type Mutations
   const createTypeMutation = useMutation({
     mutationFn: async (data: PaymentTypeFormData) => {
       return apiRequest('POST', '/api/payment-types', data);
@@ -109,17 +112,14 @@ export default function PaymentMethodsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
       toast({ title: "Success", description: "Payment type deleted successfully" });
+      setSelectedTypeId(null);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete payment type", variant: "destructive" });
     }
   });
 
-  // Payment Terms queries
-  const { data: paymentTerms, isLoading: termsLoading } = useQuery({
-    queryKey: ['/api/stores/1/payment-terms'],
-  });
-
+  // Payment Term Mutations
   const createTermMutation = useMutation({
     mutationFn: async (data: PaymentTermFormData) => {
       return apiRequest('POST', '/api/payment-terms', data);
@@ -158,48 +158,43 @@ export default function PaymentMethodsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
       toast({ title: "Success", description: "Payment term deleted successfully" });
+      setSelectedTermId(null);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete payment term", variant: "destructive" });
     }
   });
 
-  const handleEditType = (paymentType: any) => {
-    setEditingTypeId(paymentType.id);
-    typeForm.reset({
-      name: paymentType.name,
-      description: paymentType.description || "",
-      isActive: paymentType.isActive,
-      storeId: paymentType.storeId
-    });
+  // Handlers for Payment Types
+  const handleAddType = () => {
+    setEditingTypeId(null);
+    typeForm.reset();
     setIsTypeDialogOpen(true);
   };
 
-  const handleDeleteType = (id: number) => {
+  const handleEditType = () => {
+    if (!selectedTypeId || !paymentTypes) return;
+    const type = paymentTypes.find((t: any) => t.id === selectedTypeId);
+    if (type) {
+      setEditingTypeId(type.id);
+      typeForm.reset({
+        name: type.name,
+        description: type.description || "",
+        isActive: type.isActive,
+        storeId: type.storeId
+      });
+      setIsTypeDialogOpen(true);
+    }
+  };
+
+  const handleDeleteType = () => {
+    if (!selectedTypeId) return;
     if (confirm("Are you sure you want to delete this payment type?")) {
-      deleteTypeMutation.mutate(id);
+      deleteTypeMutation.mutate(selectedTypeId);
     }
   };
 
-  const handleEditTerm = (paymentTerm: any) => {
-    setEditingTermId(paymentTerm.id);
-    termForm.reset({
-      name: paymentTerm.name,
-      days: paymentTerm.days,
-      description: paymentTerm.description || "",
-      isActive: paymentTerm.isActive,
-      storeId: paymentTerm.storeId
-    });
-    setIsTermDialogOpen(true);
-  };
-
-  const handleDeleteTerm = (id: number) => {
-    if (confirm("Are you sure you want to delete this payment term?")) {
-      deleteTermMutation.mutate(id);
-    }
-  };
-
-  const onTypeSubmit = (data: PaymentTypeFormData) => {
+  const onSubmitType = (data: PaymentTypeFormData) => {
     if (editingTypeId) {
       updateTypeMutation.mutate({ id: editingTypeId, data });
     } else {
@@ -207,7 +202,37 @@ export default function PaymentMethodsPage() {
     }
   };
 
-  const onTermSubmit = (data: PaymentTermFormData) => {
+  // Handlers for Payment Terms
+  const handleAddTerm = () => {
+    setEditingTermId(null);
+    termForm.reset();
+    setIsTermDialogOpen(true);
+  };
+
+  const handleEditTerm = () => {
+    if (!selectedTermId || !paymentTerms) return;
+    const term = paymentTerms.find((t: any) => t.id === selectedTermId);
+    if (term) {
+      setEditingTermId(term.id);
+      termForm.reset({
+        name: term.name,
+        days: term.days,
+        description: term.description || "",
+        isActive: term.isActive,
+        storeId: term.storeId
+      });
+      setIsTermDialogOpen(true);
+    }
+  };
+
+  const handleDeleteTerm = () => {
+    if (!selectedTermId) return;
+    if (confirm("Are you sure you want to delete this payment term?")) {
+      deleteTermMutation.mutate(selectedTermId);
+    }
+  };
+
+  const onSubmitTerm = (data: PaymentTermFormData) => {
     if (editingTermId) {
       updateTermMutation.mutate({ id: editingTermId, data });
     } else {
@@ -222,303 +247,304 @@ export default function PaymentMethodsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild data-testid="button-back">
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Payment Methods</h1>
-          <p className="text-sm text-muted-foreground">Manage payment types and terms for your business</p>
+          <p className="text-sm text-muted-foreground">Manage payment types and terms</p>
         </div>
       </div>
 
-      <Tabs defaultValue="types" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="types">Payment Types</TabsTrigger>
-          <TabsTrigger value="terms">Payment Terms</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="types" className="space-y-4">
-          <div className="flex justify-end">
-            <Dialog open={isTypeDialogOpen} onOpenChange={(open) => {
-              setIsTypeDialogOpen(open);
-              if (!open) {
-                setEditingTypeId(null);
-                typeForm.reset();
-              }
-            }}>
-              <Button onClick={() => setIsTypeDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Payment Type
-              </Button>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingTypeId ? "Edit Payment Type" : "Add Payment Type"}</DialogTitle>
-                </DialogHeader>
-                <Form {...typeForm}>
-                  <form onSubmit={typeForm.handleSubmit(onTypeSubmit)} className="space-y-4">
-                    <FormField
-                      control={typeForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="e.g., Cash, Credit Card" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={typeForm.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} placeholder="Add description..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={typeForm.control}
-                      name="isActive"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                          <div>
-                            <FormLabel>Active</FormLabel>
-                            <p className="text-sm text-muted-foreground">Enable this payment type</p>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => {
-                        setIsTypeDialogOpen(false);
-                        setEditingTypeId(null);
-                        typeForm.reset();
-                      }}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        {editingTypeId ? "Update" : "Create"}
-                      </Button>
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Payment Types Section */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Payment Types</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border rounded-md min-h-[300px] max-h-[400px] overflow-y-auto bg-background">
+              {paymentTypes && paymentTypes.length > 0 ? (
+                <div className="divide-y">
+                  {paymentTypes.map((type: any) => (
+                    <div
+                      key={type.id}
+                      onClick={() => setSelectedTypeId(type.id)}
+                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                        selectedTypeId === type.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted'
+                      }`}
+                      data-testid={`payment-type-${type.id}`}
+                    >
+                      {type.name}
                     </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+                  No payment types found
+                </div>
+              )}
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Types List</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentTypes && paymentTypes.length > 0 ? (
-                    paymentTypes.map((type: any) => (
-                      <TableRow key={type.id}>
-                        <TableCell className="font-medium">{type.name}</TableCell>
-                        <TableCell>{type.description || "-"}</TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            type.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {type.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditType(type)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteType(type.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        No payment types found. Add one to get started.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="terms" className="space-y-4">
-          <div className="flex justify-end">
-            <Dialog open={isTermDialogOpen} onOpenChange={(open) => {
-              setIsTermDialogOpen(open);
-              if (!open) {
-                setEditingTermId(null);
-                termForm.reset();
-              }
-            }}>
-              <Button onClick={() => setIsTermDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Payment Term
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddType}
+                className="gap-2"
+                data-testid="button-add-type"
+              >
+                <FolderPlus className="h-4 w-4 text-green-600" />
+                Add
               </Button>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingTermId ? "Edit Payment Term" : "Add Payment Term"}</DialogTitle>
-                </DialogHeader>
-                <Form {...termForm}>
-                  <form onSubmit={termForm.handleSubmit(onTermSubmit)} className="space-y-4">
-                    <FormField
-                      control={termForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="e.g., Net 30, COD" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={termForm.control}
-                      name="days"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Days</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                              placeholder="Number of days"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={termForm.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} placeholder="Add description..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={termForm.control}
-                      name="isActive"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                          <div>
-                            <FormLabel>Active</FormLabel>
-                            <p className="text-sm text-muted-foreground">Enable this payment term</p>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => {
-                        setIsTermDialogOpen(false);
-                        setEditingTermId(null);
-                        termForm.reset();
-                      }}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">
-                        {editingTermId ? "Update" : "Create"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditType}
+                disabled={!selectedTypeId}
+                className="gap-2"
+                data-testid="button-edit-type"
+              >
+                <FolderEdit className="h-4 w-4 text-yellow-600" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteType}
+                disabled={!selectedTypeId}
+                className="gap-2"
+                data-testid="button-delete-type"
+              >
+                <FolderMinus className="h-4 w-4 text-red-600" />
+                Delete
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Terms List</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentTerms && paymentTerms.length > 0 ? (
-                    paymentTerms.map((term: any) => (
-                      <TableRow key={term.id}>
-                        <TableCell className="font-medium">{term.name}</TableCell>
-                        <TableCell>{term.days} days</TableCell>
-                        <TableCell>{term.description || "-"}</TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            term.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {term.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditTerm(term)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTerm(term.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        No payment terms found. Add one to get started.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Payment Terms Section */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Payment Terms</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border rounded-md min-h-[300px] max-h-[400px] overflow-y-auto bg-background">
+              {paymentTerms && paymentTerms.length > 0 ? (
+                <div className="divide-y">
+                  {paymentTerms.map((term: any) => (
+                    <div
+                      key={term.id}
+                      onClick={() => setSelectedTermId(term.id)}
+                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                        selectedTermId === term.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted'
+                      }`}
+                      data-testid={`payment-term-${term.id}`}
+                    >
+                      {term.name}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+                  No payment terms found
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddTerm}
+                className="gap-2"
+                data-testid="button-add-term"
+              >
+                <FolderPlus className="h-4 w-4 text-green-600" />
+                Add
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditTerm}
+                disabled={!selectedTermId}
+                className="gap-2"
+                data-testid="button-edit-term"
+              >
+                <FolderEdit className="h-4 w-4 text-yellow-600" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteTerm}
+                disabled={!selectedTermId}
+                className="gap-2"
+                data-testid="button-delete-term"
+              >
+                <FolderMinus className="h-4 w-4 text-red-600" />
+                Delete
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Payment Type Dialog */}
+      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTypeId ? "Edit Payment Type" : "Add Payment Type"}</DialogTitle>
+          </DialogHeader>
+          <Form {...typeForm}>
+            <form onSubmit={typeForm.handleSubmit(onSubmitType)} className="space-y-4">
+              <FormField
+                control={typeForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Cash, Cheque, Credit Card" {...field} data-testid="input-type-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional description" {...field} data-testid="input-type-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">Enable this payment type</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-type-active" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsTypeDialogOpen(false)} data-testid="button-cancel-type">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createTypeMutation.isPending || updateTypeMutation.isPending} data-testid="button-save-type">
+                  {editingTypeId ? "Update" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Term Dialog */}
+      <Dialog open={isTermDialogOpen} onOpenChange={setIsTermDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTermId ? "Edit Payment Term" : "Add Payment Term"}</DialogTitle>
+          </DialogHeader>
+          <Form {...termForm}>
+            <form onSubmit={termForm.handleSubmit(onSubmitTerm)} className="space-y-4">
+              <FormField
+                control={termForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 1st Month, Before Delivery, COD" {...field} data-testid="input-term-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Days *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="e.g., 30, 60, 0 for immediate" 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        data-testid="input-term-days"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional description" {...field} data-testid="input-term-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">Enable this payment term</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-term-active" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsTermDialogOpen(false)} data-testid="button-cancel-term">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createTermMutation.isPending || updateTermMutation.isPending} data-testid="button-save-term">
+                  {editingTermId ? "Update" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
