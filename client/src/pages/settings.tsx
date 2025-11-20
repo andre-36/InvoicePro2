@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, Image as ImageIcon } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,8 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import type { UploadResult } from "@uppy/core";
-import Link from "next/link";
 
 // Profile settings schema
 const profileSchema = z.object({
@@ -60,14 +61,39 @@ const securitySchema = z.object({
   path: ["confirmPassword"],
 });
 
+// Payment type schema
+const paymentTypeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+  storeId: z.number().default(1)
+});
+
+// Payment term schema
+const paymentTermSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  days: z.number().min(0, "Days must be 0 or greater"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+  storeId: z.number().default(1)
+});
+
 type ProfileFormValues = z.infer<typeof profileSchema>;
 type CompanyFormValues = z.infer<typeof companySchema>;
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 type SecurityFormValues = z.infer<typeof securitySchema>;
+type PaymentTypeFormData = z.infer<typeof paymentTypeSchema>;
+type PaymentTermFormData = z.infer<typeof paymentTermSchema>;
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
+  const [isTermDialogOpen, setIsTermDialogOpen] = useState(false);
+  const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
+  const [editingTermId, setEditingTermId] = useState<number | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
@@ -75,6 +101,15 @@ export default function SettingsPage() {
   // Fetch user data
   const { data: userData, isLoading } = useQuery({
     queryKey: ['/api/user'],
+  });
+
+  // Fetch payment types and terms
+  const { data: paymentTypes } = useQuery({
+    queryKey: ['/api/stores/1/payment-types'],
+  });
+
+  const { data: paymentTerms } = useQuery({
+    queryKey: ['/api/stores/1/payment-terms'],
   });
 
   // Profile form setup
@@ -124,6 +159,29 @@ export default function SettingsPage() {
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
+    }
+  });
+
+  // Payment type form setup
+  const typeForm = useForm<PaymentTypeFormData>({
+    resolver: zodResolver(paymentTypeSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      isActive: true,
+      storeId: 1
+    }
+  });
+
+  // Payment term form setup
+  const termForm = useForm<PaymentTermFormData>({
+    resolver: zodResolver(paymentTermSchema),
+    defaultValues: {
+      name: "",
+      days: 0,
+      description: "",
+      isActive: true,
+      storeId: 1
     }
   });
 
@@ -211,6 +269,98 @@ export default function SettingsPage() {
     }
   });
 
+  // Payment Type Mutations
+  const createTypeMutation = useMutation({
+    mutationFn: async (data: PaymentTypeFormData) => {
+      return apiRequest('POST', '/api/payment-types', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      toast({ title: "Success", description: "Payment type created successfully" });
+      setIsTypeDialogOpen(false);
+      typeForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create payment type", variant: "destructive" });
+    }
+  });
+
+  const updateTypeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<PaymentTypeFormData> }) => {
+      return apiRequest('PUT', `/api/payment-types/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      toast({ title: "Success", description: "Payment type updated successfully" });
+      setIsTypeDialogOpen(false);
+      setEditingTypeId(null);
+      typeForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update payment type", variant: "destructive" });
+    }
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/payment-types/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      toast({ title: "Success", description: "Payment type deleted successfully" });
+      setSelectedTypeId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete payment type", variant: "destructive" });
+    }
+  });
+
+  // Payment Term Mutations
+  const createTermMutation = useMutation({
+    mutationFn: async (data: PaymentTermFormData) => {
+      return apiRequest('POST', '/api/payment-terms', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      toast({ title: "Success", description: "Payment term created successfully" });
+      setIsTermDialogOpen(false);
+      termForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create payment term", variant: "destructive" });
+    }
+  });
+
+  const updateTermMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<PaymentTermFormData> }) => {
+      return apiRequest('PUT', `/api/payment-terms/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      toast({ title: "Success", description: "Payment term updated successfully" });
+      setIsTermDialogOpen(false);
+      setEditingTermId(null);
+      termForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update payment term", variant: "destructive" });
+    }
+  });
+
+  const deleteTermMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/payment-terms/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      toast({ title: "Success", description: "Payment term deleted successfully" });
+      setSelectedTermId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete payment term", variant: "destructive" });
+    }
+  });
+
   // Set form values when user data is loaded (only once)
   useEffect(() => {
     if (userData && !hasInitialized.current) {
@@ -252,6 +402,81 @@ export default function SettingsPage() {
 
   const onSecuritySubmit = (data: SecurityFormValues) => {
     passwordMutation.mutate(data);
+  };
+
+  // Handlers for Payment Types
+  const handleAddType = () => {
+    setEditingTypeId(null);
+    typeForm.reset();
+    setIsTypeDialogOpen(true);
+  };
+
+  const handleEditType = () => {
+    if (!selectedTypeId || !paymentTypes) return;
+    const type = paymentTypes.find((t: any) => t.id === selectedTypeId);
+    if (type) {
+      setEditingTypeId(type.id);
+      typeForm.reset({
+        name: type.name,
+        description: type.description || "",
+        isActive: type.isActive,
+        storeId: type.storeId
+      });
+      setIsTypeDialogOpen(true);
+    }
+  };
+
+  const handleDeleteType = () => {
+    if (!selectedTypeId) return;
+    if (confirm("Are you sure you want to delete this payment type?")) {
+      deleteTypeMutation.mutate(selectedTypeId);
+    }
+  };
+
+  const onSubmitType = (data: PaymentTypeFormData) => {
+    if (editingTypeId) {
+      updateTypeMutation.mutate({ id: editingTypeId, data });
+    } else {
+      createTypeMutation.mutate(data);
+    }
+  };
+
+  // Handlers for Payment Terms
+  const handleAddTerm = () => {
+    setEditingTermId(null);
+    termForm.reset();
+    setIsTermDialogOpen(true);
+  };
+
+  const handleEditTerm = () => {
+    if (!selectedTermId || !paymentTerms) return;
+    const term = paymentTerms.find((t: any) => t.id === selectedTermId);
+    if (term) {
+      setEditingTermId(term.id);
+      termForm.reset({
+        name: term.name,
+        days: term.days,
+        description: term.description || "",
+        isActive: term.isActive,
+        storeId: term.storeId
+      });
+      setIsTermDialogOpen(true);
+    }
+  };
+
+  const handleDeleteTerm = () => {
+    if (!selectedTermId) return;
+    if (confirm("Are you sure you want to delete this payment term?")) {
+      deleteTermMutation.mutate(selectedTermId);
+    }
+  };
+
+  const onSubmitTerm = (data: PaymentTermFormData) => {
+    if (editingTermId) {
+      updateTermMutation.mutate({ id: editingTermId, data });
+    } else {
+      createTermMutation.mutate(data);
+    }
   };
 
   // Export backup mutation
@@ -716,25 +941,137 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="payment" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Methods</CardTitle>
-              <CardDescription>Configure payment types and terms for your business</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Payment Configuration</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Manage payment types (e.g., Cash, Bank Transfer, Credit Card) and payment terms (e.g., Net 30, COD)
-                </p>
-                <Button asChild variant="outline">
-                  <a href="/payment-methods">
-                    Manage Payment Methods
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Payment Types Section */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Payment Types</CardTitle>
+                <CardDescription>Manage payment methods (e.g., Cash, Bank Transfer, Credit Card)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border rounded-md min-h-[300px] max-h-[400px] overflow-y-auto bg-background">
+                  {paymentTypes && paymentTypes.length > 0 ? (
+                    <div className="divide-y">
+                      {paymentTypes.map((type: any) => (
+                        <div
+                          key={type.id}
+                          onClick={() => setSelectedTypeId(type.id)}
+                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                            selectedTypeId === type.id
+                              ? 'bg-primary text-primary-foreground'
+                              : 'hover:bg-muted'
+                          }`}
+                        >
+                          {type.name}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+                      No payment types found
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddType}
+                    className="gap-2"
+                  >
+                    <FolderPlus className="h-4 w-4 text-green-600" />
+                    Add
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditType}
+                    disabled={!selectedTypeId}
+                    className="gap-2"
+                  >
+                    <FolderEdit className="h-4 w-4 text-yellow-600" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteType}
+                    disabled={!selectedTypeId}
+                    className="gap-2"
+                  >
+                    <FolderMinus className="h-4 w-4 text-red-600" />
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment Terms Section */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Payment Terms</CardTitle>
+                <CardDescription>Define payment terms for invoices (e.g., Net 30, COD)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border rounded-md min-h-[300px] max-h-[400px] overflow-y-auto bg-background">
+                  {paymentTerms && paymentTerms.length > 0 ? (
+                    <div className="divide-y">
+                      {paymentTerms.map((term: any) => (
+                        <div
+                          key={term.id}
+                          onClick={() => setSelectedTermId(term.id)}
+                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                            selectedTermId === term.id
+                              ? 'bg-primary text-primary-foreground'
+                              : 'hover:bg-muted'
+                          }`}
+                        >
+                          {term.name}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">
+                      No payment terms found
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddTerm}
+                    className="gap-2"
+                  >
+                    <FolderPlus className="h-4 w-4 text-green-600" />
+                    Add
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditTerm}
+                    disabled={!selectedTermId}
+                    className="gap-2"
+                  >
+                    <FolderEdit className="h-4 w-4 text-yellow-600" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteTerm}
+                    disabled={!selectedTermId}
+                    className="gap-2"
+                  >
+                    <FolderMinus className="h-4 w-4 text-red-600" />
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="security" className="space-y-6">
@@ -902,6 +1239,155 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Payment Type Dialog */}
+      <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTypeId ? "Edit Payment Type" : "Add Payment Type"}</DialogTitle>
+          </DialogHeader>
+          <Form {...typeForm}>
+            <form onSubmit={typeForm.handleSubmit(onSubmitType)} className="space-y-4">
+              <FormField
+                control={typeForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Cash, Cheque, Credit Card" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional description" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">Enable this payment type</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsTypeDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createTypeMutation.isPending || updateTypeMutation.isPending}>
+                  {editingTypeId ? "Update" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Term Dialog */}
+      <Dialog open={isTermDialogOpen} onOpenChange={setIsTermDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTermId ? "Edit Payment Term" : "Add Payment Term"}</DialogTitle>
+          </DialogHeader>
+          <Form {...termForm}>
+            <form onSubmit={termForm.handleSubmit(onSubmitTerm)} className="space-y-4">
+              <FormField
+                control={termForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 1st Month, Before Delivery, COD" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Days *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="e.g., 30, 60, 0 for immediate" 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional description" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={termForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">Enable this payment term</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsTermDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createTermMutation.isPending || updateTermMutation.isPending}>
+                  {editingTermId ? "Update" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
