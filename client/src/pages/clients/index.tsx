@@ -38,6 +38,7 @@ import {
 
 type Client = {
   id: number;
+  clientNumber: string;
   name: string;
   email: string;
   phone: string;
@@ -80,7 +81,8 @@ export default function ClientsPage() {
   const filteredClients = clients
     ? clients.filter(client =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.email.toLowerCase().includes(searchQuery.toLowerCase())
+        client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.clientNumber.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
   
@@ -122,6 +124,7 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[100px]">Client #</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
@@ -132,6 +135,7 @@ export default function ClientsPage() {
               <TableBody>
                 {Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-28" /></TableCell>
@@ -165,6 +169,7 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[100px]">Client #</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
@@ -180,6 +185,7 @@ export default function ClientsPage() {
                     onDoubleClick={() => handleViewDetails(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
+                    <TableCell className="text-gray-500 dark:text-gray-400 font-mono text-sm" data-testid={`text-client-number-${client.id}`}>{client.clientNumber}</TableCell>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>
                       {client.email ? (
