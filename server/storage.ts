@@ -1898,13 +1898,13 @@ export class DatabaseStorage implements IStorage {
       WHERE store_id = ${storeId} AND type = 'expense'
     `);
     
-    // Calculate open invoices
+    // Calculate open invoices (excluding paid and cancelled)
     const openInvoicesResult = await db.execute(sql`
       SELECT 
         COUNT(*) as count,
         COALESCE(SUM(total_amount::numeric), 0) as value
       FROM ${invoices}
-      WHERE store_id = ${storeId} AND status IN ('sent', 'overdue')
+      WHERE store_id = ${storeId} AND status IN ('draft', 'sent', 'overdue')
     `);
     
     // Count clients
