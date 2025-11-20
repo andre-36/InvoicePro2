@@ -824,8 +824,13 @@ export default function SettingsPage() {
                             <ObjectUploader
                               maxNumberOfFiles={1}
                               maxFileSize={5242880}
-                              onGetUploadParameters={async () => {
+                              onGetUploadParameters={async (file) => {
+                                console.log("Getting upload parameters for file:", file?.name);
                                 const response = await apiRequest('POST', '/api/objects/upload', {});
+                                console.log("Upload parameters response:", response);
+                                if (!response.uploadURL) {
+                                  throw new Error("No upload URL received from server");
+                                }
                                 return {
                                   method: 'PUT' as const,
                                   url: response.uploadURL,
