@@ -718,104 +718,34 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Payment Methods</CardTitle>
-              <CardDescription>Configure how your clients can pay you</CardDescription>
+              <CardDescription>Configure payment types and terms for your business</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Form {...paymentForm}>
-                <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-6">
-                  <h3 className="text-lg font-medium mb-4">Bank Account</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={paymentForm.control}
-                      name="accountName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Account Holder Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter account name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={paymentForm.control}
-                      name="accountNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Account Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter account number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={paymentForm.control}
-                      name="bank"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bank Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter bank name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={paymentForm.control}
-                      name="routingNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Routing Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter routing number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <Separator className="my-6" />
-                  
-                  <h3 className="text-lg font-medium mb-4">Online Payment Methods</h3>
-                  
-                  <FormField
-                    control={paymentForm.control}
-                    name="paypalEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>PayPal Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter PayPal email address" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Your clients will be able to pay you via PayPal using this email address.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="flex justify-end">
-                    <Button 
-                      type="submit" 
-                      disabled={paymentMutation.isPending || !paymentForm.formState.isDirty}
-                      className="gap-2"
-                    >
-                      <Save className="h-4 w-4" />
-                      <span>Save Payment Methods</span>
-                    </Button>
-                  </div>
-                </form>
-              </Form>
+            <CardContent className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-2">Payment Types</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Manage the payment methods available to your clients (e.g., Cash, Bank Transfer, Credit Card)
+                </p>
+                <Button asChild variant="outline">
+                  <a href="/settings/payment-types">
+                    Manage Payment Types
+                  </a>
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-medium mb-2">Payment Terms</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Define payment terms for invoices (e.g., Net 30, Net 60, Due on Receipt)
+                </p>
+                <Button asChild variant="outline">
+                  <a href="/settings/payment-terms">
+                    Manage Payment Terms
+                  </a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

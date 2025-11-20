@@ -370,6 +370,37 @@ export const printSettings = pgTable("print_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
+// Payment Types table
+export const paymentTypes = pgTable("payment_types", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("payment_types_store_id_idx").on(table.storeId)
+  };
+});
+
+// Payment Terms table
+export const paymentTerms = pgTable("payment_terms", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  days: integer("days").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("payment_terms_store_id_idx").on(table.storeId)
+  };
+});
+
 // Import/Export Logs
 export const importExportLogs = pgTable("import_export_logs", {
   id: serial("id").primaryKey(),
@@ -426,6 +457,8 @@ export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderIte
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
+export const insertPaymentTypeSchema = createInsertSchema(paymentTypes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPaymentTermSchema = createInsertSchema(paymentTerms).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Define types for TypeScript
 export type User = typeof users.$inferSelect;
@@ -478,6 +511,12 @@ export type InsertSetting = z.infer<typeof insertSettingSchema>;
 
 export type PrintSettings = typeof printSettings.$inferSelect;
 export type InsertPrintSettings = z.infer<typeof insertPrintSettingsSchema>;
+
+export type PaymentType = typeof paymentTypes.$inferSelect;
+export type InsertPaymentType = z.infer<typeof insertPaymentTypeSchema>;
+
+export type PaymentTerm = typeof paymentTerms.$inferSelect;
+export type InsertPaymentTerm = z.infer<typeof insertPaymentTermSchema>;
 
 export type ImportExportLog = typeof importExportLogs.$inferSelect;
 export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;

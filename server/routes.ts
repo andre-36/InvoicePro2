@@ -26,6 +26,8 @@ import {
   insertPurchaseOrderItemSchema,
   insertSettingSchema,
   insertPrintSettingsSchema,
+  insertPaymentTypeSchema,
+  insertPaymentTermSchema,
   loginSchema,
   updateUserProfileSchema,
   updateUserCompanySchema,
@@ -2154,6 +2156,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(printSettings);
     } catch (error) {
       console.error("Error updating print settings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Payment Types routes
+  app.get("/api/stores/:storeId/payment-types", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const paymentTypes = await storage.getPaymentTypes(storeId);
+      res.json(paymentTypes);
+    } catch (error) {
+      console.error("Error getting payment types:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/payment-types/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const paymentType = await storage.getPaymentType(id);
+      
+      if (!paymentType) {
+        return res.status(404).json({ error: "Payment type not found" });
+      }
+      
+      res.json(paymentType);
+    } catch (error) {
+      console.error("Error getting payment type:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/payment-types", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertPaymentTypeSchema, req, res);
+      if (!validatedData) return;
+      
+      const newPaymentType = await storage.createPaymentType(validatedData);
+      res.status(201).json(newPaymentType);
+    } catch (error) {
+      console.error("Error creating payment type:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/payment-types/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertPaymentTypeSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedPaymentType = await storage.updatePaymentType(id, validatedData);
+      res.json(updatedPaymentType);
+    } catch (error) {
+      console.error("Error updating payment type:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/payment-types/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePaymentType(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting payment type:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Payment Terms routes
+  app.get("/api/stores/:storeId/payment-terms", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const paymentTerms = await storage.getPaymentTerms(storeId);
+      res.json(paymentTerms);
+    } catch (error) {
+      console.error("Error getting payment terms:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/payment-terms/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const paymentTerm = await storage.getPaymentTerm(id);
+      
+      if (!paymentTerm) {
+        return res.status(404).json({ error: "Payment term not found" });
+      }
+      
+      res.json(paymentTerm);
+    } catch (error) {
+      console.error("Error getting payment term:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/payment-terms", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertPaymentTermSchema, req, res);
+      if (!validatedData) return;
+      
+      const newPaymentTerm = await storage.createPaymentTerm(validatedData);
+      res.status(201).json(newPaymentTerm);
+    } catch (error) {
+      console.error("Error creating payment term:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/payment-terms/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertPaymentTermSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedPaymentTerm = await storage.updatePaymentTerm(id, validatedData);
+      res.json(updatedPaymentTerm);
+    } catch (error) {
+      console.error("Error updating payment term:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/payment-terms/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePaymentTerm(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting payment term:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

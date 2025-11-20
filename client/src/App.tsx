@@ -28,6 +28,8 @@ import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import PrintSettingsPage from "@/pages/print-settings";
+import PaymentTypes from "@/pages/payment-types";
+import PaymentTerms from "@/pages/payment-terms";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -51,11 +53,11 @@ function App() {
         const res = await fetch('/api/auth/user', {
           credentials: 'include'
         });
-        
+
         if (res.ok) {
           const userData = await res.json();
           setUser(userData);
-          
+
           // If we're at the root path, redirect to dashboard
           if (location === '/') {
             setLocation('/dashboard');
@@ -67,11 +69,11 @@ function App() {
               username: 'admin',
               password: 'password'
             });
-            
+
             if (loginRes.ok) {
               const userData = await loginRes.json();
               setUser(userData);
-              
+
               // If we're at the root path, redirect to dashboard
               if (location === '/') {
                 setLocation('/dashboard');
@@ -87,7 +89,7 @@ function App() {
         setLoading(false);
       }
     }
-    
+
     checkAuth();
   }, [location, setLocation]);
 
@@ -127,10 +129,10 @@ function App() {
             onToggle={toggleSidebar}
             mobileView={isMobile}
           />
-          
+
           <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
             <Header toggleSidebar={toggleSidebar} />
-            
+
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900">
               <Switch>
                 <Route path="/dashboard" component={Dashboard} />
@@ -162,6 +164,8 @@ function App() {
                 <Route path="/reports" component={ReportsPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/print-settings" component={PrintSettingsPage} />
+                <Route path="/settings/payment-types" component={PaymentTypes} />
+                <Route path="/settings/payment-terms" component={PaymentTerms} />
                 <Route component={NotFound} />
               </Switch>
             </main>

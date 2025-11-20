@@ -4,6 +4,7 @@ import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, quotations, quotationItems, transactions, stores,
   settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
+  paymentTypes, paymentTerms,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -14,7 +15,8 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
-  type PrintSettings, type InsertPrintSettings
+  type PrintSettings, type InsertPrintSettings,
+  type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm
 } from "../shared/schema";
 
 import session from "express-session";
@@ -136,6 +138,20 @@ export interface IStorage {
   getPrintSettings(storeId: number): Promise<PrintSettings | undefined>;
   createPrintSettings(settings: InsertPrintSettings): Promise<PrintSettings>;
   updatePrintSettings(storeId: number, settings: Partial<InsertPrintSettings>): Promise<PrintSettings>;
+
+  // Payment Types methods
+  getPaymentTypes(storeId: number): Promise<PaymentType[]>;
+  getPaymentType(id: number): Promise<PaymentType | undefined>;
+  createPaymentType(paymentType: InsertPaymentType): Promise<PaymentType>;
+  updatePaymentType(id: number, paymentType: Partial<InsertPaymentType>): Promise<PaymentType>;
+  deletePaymentType(id: number): Promise<void>;
+
+  // Payment Terms methods
+  getPaymentTerms(storeId: number): Promise<PaymentTerm[]>;
+  getPaymentTerm(id: number): Promise<PaymentTerm | undefined>;
+  createPaymentTerm(paymentTerm: InsertPaymentTerm): Promise<PaymentTerm>;
+  updatePaymentTerm(id: number, paymentTerm: Partial<InsertPaymentTerm>): Promise<PaymentTerm>;
+  deletePaymentTerm(id: number): Promise<void>;
 
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
@@ -1854,6 +1870,82 @@ export class DatabaseStorage implements IStorage {
       .where(eq(printSettings.storeId, storeId))
       .returning();
     return updatedSettings;
+  }
+
+  // Payment Types methods
+  async getPaymentTypes(storeId: number): Promise<PaymentType[]> {
+    return db
+      .select()
+      .from(paymentTypes)
+      .where(eq(paymentTypes.storeId, storeId))
+      .orderBy(paymentTypes.name);
+  }
+
+  async getPaymentType(id: number): Promise<PaymentType | undefined> {
+    const [paymentType] = await db
+      .select()
+      .from(paymentTypes)
+      .where(eq(paymentTypes.id, id));
+    return paymentType;
+  }
+
+  async createPaymentType(paymentTypeData: InsertPaymentType): Promise<PaymentType> {
+    const [newPaymentType] = await db
+      .insert(paymentTypes)
+      .values(paymentTypeData)
+      .returning();
+    return newPaymentType;
+  }
+
+  async updatePaymentType(id: number, paymentTypeData: Partial<InsertPaymentType>): Promise<PaymentType> {
+    const [updatedPaymentType] = await db
+      .update(paymentTypes)
+      .set({ ...paymentTypeData, updatedAt: new Date() })
+      .where(eq(paymentTypes.id, id))
+      .returning();
+    return updatedPaymentType;
+  }
+
+  async deletePaymentType(id: number): Promise<void> {
+    await db.delete(paymentTypes).where(eq(paymentTypes.id, id));
+  }
+
+  // Payment Terms methods
+  async getPaymentTerms(storeId: number): Promise<PaymentTerm[]> {
+    return db
+      .select()
+      .from(paymentTerms)
+      .where(eq(paymentTerms.storeId, storeId))
+      .orderBy(paymentTerms.days);
+  }
+
+  async getPaymentTerm(id: number): Promise<PaymentTerm | undefined> {
+    const [paymentTerm] = await db
+      .select()
+      .from(paymentTerms)
+      .where(eq(paymentTerms.id, id));
+    return paymentTerm;
+  }
+
+  async createPaymentTerm(paymentTermData: InsertPaymentTerm): Promise<PaymentTerm> {
+    const [newPaymentTerm] = await db
+      .insert(paymentTerms)
+      .values(paymentTermData)
+      .returning();
+    return newPaymentTerm;
+  }
+
+  async updatePaymentTerm(id: number, paymentTermData: Partial<InsertPaymentTerm>): Promise<PaymentTerm> {
+    const [updatedPaymentTerm] = await db
+      .update(paymentTerms)
+      .set({ ...paymentTermData, updatedAt: new Date() })
+      .where(eq(paymentTerms.id, id))
+      .returning();
+    return updatedPaymentTerm;
+  }
+
+  async deletePaymentTerm(id: number): Promise<void> {
+    await db.delete(paymentTerms).where(eq(paymentTerms.id, id));
   }
 
   // Import/Export methods
