@@ -2064,12 +2064,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Failed to generate upload URL");
       }
       
-      res.json({ uploadURL });
-    } catch (error) {
+      // Ensure response is sent properly
+      return res.status(200).json({ uploadURL });
+    } catch (error: any) {
       console.error("Error getting upload URL:", error);
-      res.status(500).json({ 
+      return res.status(500).json({ 
         error: "Failed to get upload URL",
-        details: error.message 
+        details: error?.message || "Unknown error"
       });
     }
   });
