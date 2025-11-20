@@ -4,7 +4,7 @@ import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, quotations, quotationItems, transactions, stores,
   settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
-  
+
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
   type Product, type InsertProduct,
@@ -24,21 +24,21 @@ import connectPg from "connect-pg-simple";
 export interface IStorage {
   // Session store for Express
   sessionStore: session.Store;
-  
+
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User>;
   deleteUser(id: number): Promise<void>;
-  
+
   // Store methods
   getStore(id: number): Promise<Store | undefined>;
   getStores(): Promise<Store[]>;
   createStore(store: InsertStore): Promise<Store>;
   updateStore(id: number, store: Partial<InsertStore>): Promise<Store>;
   deleteStore(id: number): Promise<void>;
-  
+
   // Client methods
   getClient(id: number): Promise<Client | undefined>;
   getClients(storeId: number): Promise<Client[]>;
@@ -47,21 +47,21 @@ export interface IStorage {
   deleteClient(id: number): Promise<void>;
   getClientStats(clientId: number): Promise<ClientStats>;
   getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]>;
-  
+
   // Supplier methods
   getSupplier(id: number): Promise<Supplier | undefined>;
   getSuppliers(storeId: number): Promise<Supplier[]>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier>;
   deleteSupplier(id: number): Promise<void>;
-  
+
   // Category methods
   getCategory(id: number): Promise<Category | undefined>;
   getCategories(): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
-  
+
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
   getProducts(storeId?: number): Promise<Product[]>;
@@ -69,19 +69,19 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
-  
+
   // Product dashboard methods
   getProductStats(productId: number): Promise<ProductStats>;
   getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]>;
   getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]>;
-  
+
   // Product batch methods
   getProductBatch(id: number): Promise<ProductBatch | undefined>;
   getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]>;
   createProductBatch(batch: InsertProductBatch): Promise<ProductBatch>;
   updateProductBatch(id: number, batch: Partial<InsertProductBatch>): Promise<ProductBatch>;
   deleteProductBatch(id: number): Promise<void>;
-  
+
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
@@ -92,7 +92,7 @@ export interface IStorage {
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
-  
+
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
   getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
@@ -101,7 +101,7 @@ export interface IStorage {
   updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation>;
   convertQuotationToInvoice(id: number): Promise<Invoice>;
   deleteQuotation(id: number): Promise<void>;
-  
+
   // Purchase Order methods
   getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
   getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined>;
@@ -111,12 +111,12 @@ export interface IStorage {
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
   receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: number): Promise<void>;
-  
+
   // Preview number generation methods
   getNextInvoiceNumber(issueDate?: Date): Promise<string>;
   getNextQuotationNumber(): Promise<string>;
   getNextPurchaseOrderNumber(orderDate?: Date): Promise<string>;
-  
+
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
   getTransactions(storeId: number): Promise<Transaction[]>;
@@ -124,22 +124,22 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction>;
   deleteTransaction(id: number): Promise<void>;
-  
+
   // Settings methods
   getSetting(storeId: number, key: string): Promise<Setting | undefined>;
   getSettings(storeId: number): Promise<Setting[]>;
   setSetting(setting: InsertSetting): Promise<Setting>;
   deleteSetting(id: number): Promise<void>;
-  
+
   // Print Settings methods
   getPrintSettings(storeId: number): Promise<PrintSettings | undefined>;
   createPrintSettings(settings: InsertPrintSettings): Promise<PrintSettings>;
   updatePrintSettings(storeId: number, settings: Partial<InsertPrintSettings>): Promise<PrintSettings>;
-  
+
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
   getImportExportLogs(userId: number): Promise<ImportExportLog[]>;
-  
+
   // Dashboard metrics
   getDashboardStats(storeId: number): Promise<DashboardStats>;
   getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]>;
@@ -352,9 +352,9 @@ async function createWithUniqueNumber<T>(
         const year = date.getFullYear().toString().slice(-2); // Get last 2 digits of year
         const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
         const yearMonth = year + month;
-        
+
         const uniqueNumber = await generateNextNumber(prefix, yearMonth, table, column, tx);
-        
+
         const [newRecord] = await tx
           .insert(table)
           .values({
@@ -362,7 +362,7 @@ async function createWithUniqueNumber<T>(
             [column.name]: uniqueNumber
           })
           .returning();
-          
+
         return newRecord;
       });
     } catch (error: any) {
@@ -379,7 +379,7 @@ async function createWithUniqueNumber<T>(
       throw error;
     }
   }
-  
+
   throw new Error(`Failed to create record with unique ${prefix} number`);
 }
 
@@ -395,7 +395,7 @@ async function createWithSimpleSequentialNumber<T>(
     try {
       return await withTransaction(async (tx) => {
         const uniqueNumber = await generateSimpleSequentialNumber(prefix, table, column, tx);
-        
+
         const [newRecord] = await tx
           .insert(table)
           .values({
@@ -403,7 +403,7 @@ async function createWithSimpleSequentialNumber<T>(
             clientNumber: uniqueNumber
           })
           .returning();
-          
+
         return newRecord;
       });
     } catch (error: any) {
@@ -420,14 +420,14 @@ async function createWithSimpleSequentialNumber<T>(
       throw error;
     }
   }
-  
+
   throw new Error(`Failed to create record with unique ${prefix} number`);
 }
 
 export class DatabaseStorage implements IStorage {
   // Session store for PostgreSQL
   sessionStore: session.Store;
-  
+
   constructor() {
     const PostgresStore = connectPg(session);
     this.sessionStore = new PostgresStore({
@@ -435,7 +435,7 @@ export class DatabaseStorage implements IStorage {
       createTableIfMissing: true
     });
   }
-  
+
   // User methods
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -451,7 +451,7 @@ export class DatabaseStorage implements IStorage {
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
   }
-  
+
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
     const [updatedUser] = await db
       .update(users)
@@ -460,26 +460,26 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedUser;
   }
-  
+
   async deleteUser(id: number): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
   }
-  
+
   // Store methods
   async getStore(id: number): Promise<Store | undefined> {
     const [store] = await db.select().from(stores).where(eq(stores.id, id));
     return store;
   }
-  
+
   async getStores(): Promise<Store[]> {
     return db.select().from(stores).orderBy(stores.name);
   }
-  
+
   async createStore(store: InsertStore): Promise<Store> {
     const [newStore] = await db.insert(stores).values(store).returning();
     return newStore;
   }
-  
+
   async updateStore(id: number, storeData: Partial<InsertStore>): Promise<Store> {
     const [updatedStore] = await db
       .update(stores)
@@ -488,25 +488,43 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedStore;
   }
-  
+
   async deleteStore(id: number): Promise<void> {
     await db.delete(stores).where(eq(stores.id, id));
   }
-  
+
   // Client methods
   async getClient(id: number): Promise<Client | undefined> {
-    const [client] = await db.select().from(clients).where(eq(clients.id, id));
-    return client;
+    const result = await db
+      .select({
+        id: clients.id,
+        storeId: clients.storeId,
+        name: clients.name,
+        email: clients.email,
+        phone: clients.phone,
+        address: clients.address,
+        taxNumber: clients.taxNumber,
+        clientNumber: clients.clientNumber,
+        city: clients.city,
+        state: clients.state,
+        postalCode: clients.postalCode,
+        country: clients.country,
+      })
+      .from(clients)
+      .where(eq(clients.id, id))
+      .limit(1);
+
+    return result[0];
   }
-  
+
   async getClients(storeId: number): Promise<Client[]> {
     return db.select().from(clients).where(eq(clients.storeId, storeId)).orderBy(clients.name);
   }
-  
+
   async createClient(client: InsertClient): Promise<Client> {
     return createWithSimpleSequentialNumber<Client>(clients, clients.clientNumber, "C", client);
   }
-  
+
   async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
     const [updatedClient] = await db
       .update(clients)
@@ -515,11 +533,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedClient;
   }
-  
+
   async deleteClient(id: number): Promise<void> {
     await db.delete(clients).where(eq(clients.id, id));
   }
-  
+
   async getClientStats(clientId: number): Promise<ClientStats> {
     const results = await db
       .select({
@@ -531,7 +549,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invoices.clientId, clientId));
 
     const result = results[0];
-    
+
     return {
       totalPurchases: Number(result?.totalPurchases || 0),
       unpaidInvoicesCount: Number(result?.unpaidInvoicesCount || 0),
@@ -580,21 +598,21 @@ export class DatabaseStorage implements IStorage {
         invoiceCount: Number(r.invoiceCount || 0),
       }));
   }
-  
+
   // Supplier methods
   async getSupplier(id: number): Promise<Supplier | undefined> {
     const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
     return supplier;
   }
-  
+
   async getSuppliers(storeId: number): Promise<Supplier[]> {
     return db.select().from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(suppliers.name);
   }
-  
+
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
     return createWithSimpleSequentialNumber<Supplier>(suppliers, suppliers.supplierNumber, "S", supplier);
   }
-  
+
   async updateSupplier(id: number, supplierData: Partial<InsertSupplier>): Promise<Supplier> {
     const [updatedSupplier] = await db
       .update(suppliers)
@@ -603,26 +621,26 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedSupplier;
   }
-  
+
   async deleteSupplier(id: number): Promise<void> {
     await db.delete(suppliers).where(eq(suppliers.id, id));
   }
-  
+
   // Category methods
   async getCategory(id: number): Promise<Category | undefined> {
     const [category] = await db.select().from(categories).where(eq(categories.id, id));
     return category;
   }
-  
+
   async getCategories(): Promise<Category[]> {
     return db.select().from(categories).orderBy(categories.name);
   }
-  
+
   async createCategory(category: InsertCategory): Promise<Category> {
     const [newCategory] = await db.insert(categories).values(category).returning();
     return newCategory;
   }
-  
+
   async updateCategory(id: number, categoryData: Partial<InsertCategory>): Promise<Category> {
     const [updatedCategory] = await db
       .update(categories)
@@ -631,20 +649,20 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedCategory;
   }
-  
+
   async deleteCategory(id: number): Promise<void> {
     await db.delete(categories).where(eq(categories.id, id));
   }
-  
+
   // Product methods
   async getProduct(id: number): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.id, id));
     return product;
   }
-  
+
   async getProducts(storeId?: number): Promise<Product[]> {
     const query = db.select().from(products).where(eq(products.isActive, true));
-    
+
     // If storeId is provided, we filter only products that have batches in the specified store
     if (storeId) {
       const productsInStore = await db.execute(sql`
@@ -656,10 +674,10 @@ export class DatabaseStorage implements IStorage {
       `);
       return productsInStore;
     }
-    
+
     return query.orderBy(products.name);
   }
-  
+
   async getProductsWithLowStock(storeId: number): Promise<Product[]> {
     const lowStockProducts = await db.execute(sql`
       SELECT p.*, 
@@ -673,12 +691,12 @@ export class DatabaseStorage implements IStorage {
     `);
     return lowStockProducts;
   }
-  
+
   async createProduct(productData: InsertProduct): Promise<Product> {
     const [newProduct] = await db.insert(products).values(productData).returning();
     return newProduct;
   }
-  
+
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
     const [updatedProduct] = await db
       .update(products)
@@ -687,7 +705,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedProduct;
   }
-  
+
   async deleteProduct(id: number): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
   }
@@ -778,13 +796,13 @@ export class DatabaseStorage implements IStorage {
     // TODO: Implement when purchase orders feature is added
     return [];
   }
-  
+
   // Product batch methods
   async getProductBatch(id: number): Promise<ProductBatch | undefined> {
     const [batch] = await db.select().from(productBatches).where(eq(productBatches.id, id));
     return batch;
   }
-  
+
   async getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]> {
     return db
       .select()
@@ -797,12 +815,12 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(productBatches.purchaseDate);
   }
-  
+
   async createProductBatch(batchData: InsertProductBatch): Promise<ProductBatch> {
     const [newBatch] = await db.insert(productBatches).values(batchData).returning();
     return newBatch;
   }
-  
+
   async updateProductBatch(id: number, batchData: Partial<InsertProductBatch>): Promise<ProductBatch> {
     const [updatedBatch] = await db
       .update(productBatches)
@@ -811,38 +829,38 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedBatch;
   }
-  
+
   async deleteProductBatch(id: number): Promise<void> {
     await db.delete(productBatches).where(eq(productBatches.id, id));
   }
-  
+
   // Invoice methods
   async getInvoice(id: number): Promise<Invoice | undefined> {
     const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
     return invoice;
   }
-  
+
   async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: InvoiceItem[]; client?: Client } | undefined> {
     const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
-    
+
     if (!invoice) {
       return undefined;
     }
-    
+
     const items = await db
       .select()
       .from(invoiceItems)
       .where(eq(invoiceItems.invoiceId, id))
       .orderBy(invoiceItems.id);
-    
+
     let client;
     if (invoice.clientId) {
       [client] = await db.select().from(clients).where(eq(clients.id, invoice.clientId));
     }
-    
+
     return { invoice, items, client };
   }
-  
+
   async getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]> {
     const results = await db
       .select({
@@ -871,10 +889,10 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(invoices.clientId, clients.id))
       .where(eq(invoices.storeId, storeId))
       .orderBy(desc(invoices.issueDate));
-    
+
     return results;
   }
-  
+
   async getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]> {
     return db
       .select()
@@ -883,7 +901,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(invoices.issueDate))
       .limit(limit);
   }
-  
+
   async getOpenInvoices(storeId: number): Promise<Invoice[]> {
     return db
       .select()
@@ -896,11 +914,11 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(invoices.issueDate));
   }
-  
+
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
     // Use the safe number generation for the base invoice, then process items
     const maxRetries = 5;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await withTransaction(async (tx) => {
@@ -909,9 +927,9 @@ export class DatabaseStorage implements IStorage {
           const year = issueDate.getFullYear().toString().slice(-2); // Get last 2 digits of year
           const month = (issueDate.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
           const yearMonth = year + month;
-          
+
           const invoiceNumber = await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
-          
+
           // Create the invoice with auto-generated number
           const [newInvoice] = await tx
             .insert(invoices)
@@ -920,15 +938,15 @@ export class DatabaseStorage implements IStorage {
               invoiceNumber
             })
             .returning();
-      
+
       // Calculate total profit for the invoice
       let totalProfit = 0;
-      
+
       // Process each item to allocate batches and calculate profits
       for (const item of items) {
         const productId = item.productId;
         const quantityNeeded = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-        
+
         // Create the invoice item
         const [newItem] = await tx
           .insert(invoiceItems)
@@ -938,7 +956,7 @@ export class DatabaseStorage implements IStorage {
             quantity: quantityNeeded.toString()
           })
           .returning();
-        
+
         // If this is a real invoice (not draft), allocate from batches and calculate profit
         if (invoiceData.status !== 'draft') {
           // Get available batches for this product, ordered by purchase date (FIFO)
@@ -953,22 +971,22 @@ export class DatabaseStorage implements IStorage {
               )
             )
             .orderBy(productBatches.purchaseDate);
-          
+
           let remainingQuantity = quantityNeeded;
           let itemProfit = 0;
-          
+
           // Allocate from each batch until we've fulfilled the quantity
           for (const batch of availableBatches) {
             if (remainingQuantity <= 0) break;
-            
+
             // Calculate how much we can take from this batch
             const quantityFromBatch = Math.min(
               remainingQuantity,
               parseFloat(batch.remainingQuantity.toString())
             );
-            
+
             if (quantityFromBatch <= 0) continue;
-            
+
             // Update the batch's remaining quantity
             await tx
               .update(productBatches)
@@ -977,7 +995,7 @@ export class DatabaseStorage implements IStorage {
                 updatedAt: new Date()
               })
               .where(eq(productBatches.id, batch.id));
-            
+
             // Record which batch was used for this item
             const batchCost = parseFloat(batch.capitalCost.toString());
             await tx
@@ -988,33 +1006,33 @@ export class DatabaseStorage implements IStorage {
                 quantity: quantityFromBatch.toString(),
                 capitalCost: batch.capitalCost
               });
-            
+
             // Calculate profit for this portion of the item
             const sellingPrice = parseFloat(item.unitPrice.toString());
             const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
             itemProfit += batchProfit;
-            
+
             // Reduce the remaining quantity needed
             remainingQuantity -= quantityFromBatch;
           }
-          
+
           // Update the item with its profit
           await tx
             .update(invoiceItems)
             .set({ profit: itemProfit.toString() })
             .where(eq(invoiceItems.id, newItem.id));
-          
+
           totalProfit += itemProfit;
         }
       }
-      
+
       // Update the invoice with the total profit
       if (invoiceData.status !== 'draft') {
         await tx
           .update(invoices)
           .set({ totalProfit: totalProfit.toString() })
           .where(eq(invoices.id, newInvoice.id));
-        
+
         // Create a transaction record for this invoice
         await tx
           .insert(transactions)
@@ -1028,13 +1046,13 @@ export class DatabaseStorage implements IStorage {
             referenceNumber: invoiceData.invoiceNumber,
           });
       }
-      
+
       // Return the invoice with the updated total profit
       const [updatedInvoice] = await tx
         .select()
         .from(invoices)
         .where(eq(invoices.id, newInvoice.id));
-      
+
       return updatedInvoice;
         });
       } catch (error: any) {
@@ -1051,7 +1069,7 @@ export class DatabaseStorage implements IStorage {
         throw error;
       }
     }
-    
+
     throw new Error(`Failed to create invoice with unique number`);
   }
 
@@ -1063,17 +1081,17 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedInvoice;
   }
-  
+
   async updateInvoiceStatus(id: number, status: string): Promise<Invoice> {
     const [invoice] = await db
       .select()
       .from(invoices)
       .where(eq(invoices.id, id));
-    
+
     if (!invoice) {
       throw new Error(`Invoice with ID ${id} not found`);
     }
-    
+
     // If changing from draft to another status, we need to allocate batches and calculate profits
     if (invoice.status === 'draft' && status !== 'draft') {
       return withTransaction(async (tx) => {
@@ -1082,13 +1100,13 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(invoiceItems)
           .where(eq(invoiceItems.invoiceId, id));
-        
+
         let totalProfit = 0;
-        
+
         // Process each item to allocate batches and calculate profits
         for (const item of items) {
           const quantityNeeded = parseFloat(item.quantity.toString());
-          
+
           // Get available batches for this product, ordered by purchase date (FIFO)
           const availableBatches = await tx
             .select()
@@ -1101,22 +1119,22 @@ export class DatabaseStorage implements IStorage {
               )
             )
             .orderBy(productBatches.purchaseDate);
-          
+
           let remainingQuantity = quantityNeeded;
           let itemProfit = 0;
-          
+
           // Allocate from each batch until we've fulfilled the quantity
           for (const batch of availableBatches) {
             if (remainingQuantity <= 0) break;
-            
+
             // Calculate how much we can take from this batch
             const quantityFromBatch = Math.min(
               remainingQuantity,
               parseFloat(batch.remainingQuantity.toString())
             );
-            
+
             if (quantityFromBatch <= 0) continue;
-            
+
             // Update the batch's remaining quantity
             await tx
               .update(productBatches)
@@ -1125,7 +1143,7 @@ export class DatabaseStorage implements IStorage {
                 updatedAt: new Date()
               })
               .where(eq(productBatches.id, batch.id));
-            
+
             // Record which batch was used for this item
             const batchCost = parseFloat(batch.capitalCost.toString());
             await tx
@@ -1136,25 +1154,25 @@ export class DatabaseStorage implements IStorage {
                 quantity: quantityFromBatch.toString(),
                 capitalCost: batch.capitalCost
               });
-            
+
             // Calculate profit for this portion of the item
             const sellingPrice = parseFloat(item.unitPrice.toString());
             const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
             itemProfit += batchProfit;
-            
+
             // Reduce the remaining quantity needed
             remainingQuantity -= quantityFromBatch;
           }
-          
+
           // Update the item with its profit
           await tx
             .update(invoiceItems)
             .set({ profit: itemProfit.toString() })
             .where(eq(invoiceItems.id, item.id));
-          
+
           totalProfit += itemProfit;
         }
-        
+
         // Update the invoice with its new status and total profit
         const [updatedInvoice] = await tx
           .update(invoices)
@@ -1165,13 +1183,13 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(invoices.id, id))
           .returning();
-        
+
         // Create a transaction record for this invoice if not exist yet
         const [existingTransaction] = await tx
           .select()
           .from(transactions)
           .where(eq(transactions.invoiceId, id));
-        
+
         if (!existingTransaction) {
           await tx
             .insert(transactions)
@@ -1185,7 +1203,7 @@ export class DatabaseStorage implements IStorage {
               referenceNumber: invoice.invoiceNumber,
             });
         }
-        
+
         return updatedInvoice;
       });
     } else {
@@ -1198,22 +1216,22 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, id))
         .returning();
-      
+
       return updatedInvoice;
     }
   }
-  
+
   async deleteInvoice(id: number): Promise<void> {
     return withTransaction(async (tx) => {
       const [invoice] = await tx
         .select()
         .from(invoices)
         .where(eq(invoices.id, id));
-      
+
       if (!invoice) {
         throw new Error(`Invoice with ID ${id} not found`);
       }
-      
+
       // If the invoice is not a draft, we need to restore quantities to batches
       if (invoice.status !== 'draft') {
         // Get all invoice item batch allocations
@@ -1225,7 +1243,7 @@ export class DatabaseStorage implements IStorage {
             eq(invoiceItemBatches.invoiceItemId, invoiceItems.id)
           )
           .where(eq(invoiceItems.invoiceId, id));
-        
+
         // Restore quantities to each batch
         for (const allocation of allocations) {
           await tx
@@ -1236,52 +1254,52 @@ export class DatabaseStorage implements IStorage {
             })
             .where(eq(productBatches.id, allocation.batchId));
         }
-        
+
         // Delete transaction record for this invoice
         await tx
           .delete(transactions)
           .where(eq(transactions.invoiceId, id));
       }
-      
+
       // Delete invoice items and their batch allocations (cascading)
       await tx
         .delete(invoiceItems)
         .where(eq(invoiceItems.invoiceId, id));
-      
+
       // Delete the invoice
       await tx
         .delete(invoices)
         .where(eq(invoices.id, id));
     });
   }
-  
+
   // Quotation methods
   async getQuotation(id: number): Promise<Quotation | undefined> {
     const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
     return quotation;
   }
-  
+
   async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: QuotationItem[]; client?: Client } | undefined> {
     const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
-    
+
     if (!quotation) {
       return undefined;
     }
-    
+
     const items = await db
       .select()
       .from(quotationItems)
       .where(eq(quotationItems.quotationId, id))
       .orderBy(quotationItems.id);
-    
+
     let client;
     if (quotation.clientId) {
       [client] = await db.select().from(clients).where(eq(clients.id, quotation.clientId));
     }
-    
+
     return { quotation, items, client };
   }
-  
+
   async getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]> {
     const results = await db
       .select({
@@ -1310,10 +1328,10 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(clients, eq(quotations.clientId, clients.id))
       .where(eq(quotations.storeId, storeId))
       .orderBy(desc(quotations.issueDate));
-    
+
     return results;
   }
-  
+
   async createQuotation(quotationData: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation> {
     return withTransaction(async (tx) => {
       // Generate unique quotation number with YYMM format
@@ -1322,7 +1340,7 @@ export class DatabaseStorage implements IStorage {
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Get month with leading zero
       const yearMonth = year + month;
       const quotationNumber = await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
-      
+
       // Create the quotation
       const [newQuotation] = await tx
         .insert(quotations)
@@ -1331,7 +1349,7 @@ export class DatabaseStorage implements IStorage {
           quotationNumber
         })
         .returning();
-      
+
       // Create all quotation items
       for (const item of items) {
         await tx
@@ -1341,11 +1359,11 @@ export class DatabaseStorage implements IStorage {
             quotationId: newQuotation.id
           });
       }
-      
+
       return newQuotation;
     });
   }
-  
+
   async updateQuotation(id: number, quotationData: Partial<InsertQuotation>): Promise<Quotation> {
     const [updatedQuotation] = await db
       .update(quotations)
@@ -1354,7 +1372,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedQuotation;
   }
-  
+
   async convertQuotationToInvoice(id: number): Promise<Invoice> {
     return withTransaction(async (tx) => {
       // Get the quotation with its items
@@ -1362,24 +1380,24 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(quotations)
         .where(eq(quotations.id, id));
-      
+
       if (!quotation) {
         throw new Error(`Quotation with ID ${id} not found`);
       }
-      
+
       const items = await tx
         .select()
         .from(quotationItems)
         .where(eq(quotationItems.quotationId, id));
-      
+
       // Generate a unique invoice number using the standard generation function
       const today = new Date();
       const year = today.getFullYear().toString().slice(-2);
       const month = (today.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
-      
+
       const invoiceNumber = await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
-      
+
       // Create a new invoice based on the quotation
       const [newInvoice] = await tx
         .insert(invoices)
@@ -1399,7 +1417,7 @@ export class DatabaseStorage implements IStorage {
           notes: quotation.notes,
         })
         .returning();
-      
+
       // Copy all items from quotation to invoice
       for (const item of items) {
         await tx
@@ -1417,7 +1435,7 @@ export class DatabaseStorage implements IStorage {
             totalAmount: item.totalAmount,
           });
       }
-      
+
       // Update the quotation to mark it as converted
       await tx
         .update(quotations)
@@ -1427,50 +1445,50 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(quotations.id, id));
-      
+
       return newInvoice;
     });
   }
-  
+
   async deleteQuotation(id: number): Promise<void> {
     return withTransaction(async (tx) => {
       // Delete quotation items (cascading)
       await tx
         .delete(quotationItems)
         .where(eq(quotationItems.quotationId, id));
-      
+
       // Delete the quotation
       await tx
         .delete(quotations)
         .where(eq(quotations.id, id));
     });
   }
-  
+
   // Purchase Order methods
   async getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined> {
     const [purchaseOrder] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
     return purchaseOrder;
   }
-  
+
   async getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined> {
     const [purchaseOrder] = await db
       .select()
       .from(purchaseOrders)
       .where(eq(purchaseOrders.id, id));
-    
+
     if (!purchaseOrder) {
       return undefined;
     }
-    
+
     const items = await db
       .select()
       .from(purchaseOrderItems)
       .where(eq(purchaseOrderItems.purchaseOrderId, id))
       .orderBy(purchaseOrderItems.id);
-    
+
     return { purchaseOrder, items };
   }
-  
+
   async getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]> {
     return db
       .select()
@@ -1478,7 +1496,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(purchaseOrders.storeId, storeId))
       .orderBy(desc(purchaseOrders.orderDate));
   }
-  
+
   async createPurchaseOrder(purchaseOrderData: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder> {
     return withTransaction(async (tx) => {
       // Generate purchase order number using the standard generation function
@@ -1486,9 +1504,9 @@ export class DatabaseStorage implements IStorage {
       const year = orderDate.getFullYear().toString().slice(-2);
       const month = (orderDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
-      
+
       const purchaseOrderNumber = await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
-      
+
       // Create purchase order
       const [newPurchaseOrder] = await tx
         .insert(purchaseOrders)
@@ -1497,7 +1515,7 @@ export class DatabaseStorage implements IStorage {
           purchaseOrderNumber
         })
         .returning();
-      
+
       // Create purchase order items
       for (const item of items) {
         await tx
@@ -1514,11 +1532,11 @@ export class DatabaseStorage implements IStorage {
             discount: item.discount?.toString() || '0'
           });
       }
-      
+
       return newPurchaseOrder;
     });
   }
-  
+
   async updatePurchaseOrder(id: number, purchaseOrderData: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder> {
     return withTransaction(async (tx) => {
       // Update purchase order
@@ -1527,12 +1545,12 @@ export class DatabaseStorage implements IStorage {
         .set({ ...purchaseOrderData, updatedAt: new Date() })
         .where(eq(purchaseOrders.id, id))
         .returning();
-      
+
       // Delete existing items
       await tx
         .delete(purchaseOrderItems)
         .where(eq(purchaseOrderItems.purchaseOrderId, id));
-      
+
       // Create new items
       for (const item of items) {
         await tx
@@ -1549,30 +1567,30 @@ export class DatabaseStorage implements IStorage {
             discount: item.discount?.toString() || '0'
           });
       }
-      
+
       return updatedPurchaseOrder;
     });
   }
-  
+
   async updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder> {
     const updateData: any = {
       status: status as any,
       updatedAt: new Date()
     };
-    
+
     if (deliveredDate) {
       updateData.deliveredDate = deliveredDate;
     }
-    
+
     const [updatedPurchaseOrder] = await db
       .update(purchaseOrders)
       .set(updateData)
       .where(eq(purchaseOrders.id, id))
       .returning();
-    
+
     return updatedPurchaseOrder;
   }
-  
+
   async receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder> {
     return withTransaction(async (tx) => {
       // Get the purchase order
@@ -1580,13 +1598,13 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(purchaseOrders)
         .where(eq(purchaseOrders.id, purchaseOrderId));
-      
+
       if (!purchaseOrder) {
         throw new Error(`Purchase order with ID ${purchaseOrderId} not found`);
       }
-      
+
       let allItemsFullyReceived = true;
-      
+
       // Process each item
       for (const item of items) {
         // Get the current purchase order item
@@ -1594,21 +1612,21 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(purchaseOrderItems)
           .where(eq(purchaseOrderItems.id, item.itemId));
-        
+
         if (!poItem) {
           throw new Error(`Purchase order item with ID ${item.itemId} not found`);
         }
-        
+
         // Calculate new received quantity
         const currentReceived = parseFloat(poItem.receivedQuantity || '0');
         const newReceivedQuantity = currentReceived + item.quantityReceived;
         const totalOrdered = parseFloat(poItem.quantity);
-        
+
         // Prevent receiving more than ordered
         if (newReceivedQuantity > totalOrdered) {
           throw new Error(`Cannot receive ${item.quantityReceived} items. Maximum remaining: ${totalOrdered - currentReceived}`);
         }
-        
+
         // Update the purchase order item with new received quantity
         await tx
           .update(purchaseOrderItems)
@@ -1617,25 +1635,25 @@ export class DatabaseStorage implements IStorage {
             updatedAt: new Date()
           })
           .where(eq(purchaseOrderItems.id, item.itemId));
-        
+
         // Create or update product batch to add inventory
         if (item.quantityReceived > 0) {
           // Find existing batch or create a new one
           const batchReference = `PO-${purchaseOrder.purchaseOrderNumber}-${poItem.id}`;
           const batchDescription = `Received from PO ${purchaseOrder.purchaseOrderNumber} - ${poItem.description}`;
-          
+
           // Try to find existing batch for this PO item
           const [existingBatch] = await tx
             .select()
             .from(productBatches)
             .where(eq(productBatches.batchNumber, batchReference))
             .limit(1);
-          
+
           if (existingBatch) {
             // Update existing batch
             const newQuantity = parseFloat(existingBatch.totalQuantity) + item.quantityReceived;
             const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + item.quantityReceived;
-            
+
             await tx
               .update(productBatches)
               .set({
@@ -1659,13 +1677,13 @@ export class DatabaseStorage implements IStorage {
               });
           }
         }
-        
+
         // Check if this item is fully received
         if (newReceivedQuantity < totalOrdered) {
           allItemsFullyReceived = false;
         }
       }
-      
+
       // Determine new purchase order status
       let newStatus: string;
       if (allItemsFullyReceived) {
@@ -1674,32 +1692,32 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(purchaseOrderItems)
           .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
-        
+
         const allFullyReceived = allItems.every(item => 
           parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity)
         );
-        
+
         newStatus = allFullyReceived ? 'received' : 'partial';
       } else {
         newStatus = 'partial';
       }
-      
+
       // Update purchase order status and delivered date if fully received
       const updateData: any = {
         status: newStatus as any,
         updatedAt: new Date()
       };
-      
+
       if (newStatus === 'received') {
         updateData.deliveredDate = new Date();
       }
-      
+
       const [updatedPurchaseOrder] = await tx
         .update(purchaseOrders)
         .set(updateData)
         .where(eq(purchaseOrders.id, purchaseOrderId))
         .returning();
-      
+
       return updatedPurchaseOrder;
     });
   }
@@ -1710,20 +1728,20 @@ export class DatabaseStorage implements IStorage {
       await tx
         .delete(purchaseOrderItems)
         .where(eq(purchaseOrderItems.purchaseOrderId, id));
-      
+
       // Delete the purchase order
       await tx
         .delete(purchaseOrders)
         .where(eq(purchaseOrders.id, id));
     });
   }
-  
+
   // Transaction methods
   async getTransaction(id: number): Promise<Transaction | undefined> {
     const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
     return transaction;
   }
-  
+
   async getTransactions(storeId: number): Promise<Transaction[]> {
     return db
       .select()
@@ -1731,7 +1749,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactions.storeId, storeId))
       .orderBy(desc(transactions.date));
   }
-  
+
   async getTransactionsByType(storeId: number, type: string): Promise<Transaction[]> {
     return db
       .select()
@@ -1744,7 +1762,7 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(transactions.date));
   }
-  
+
   async createTransaction(transactionData: InsertTransaction): Promise<Transaction> {
     const [newTransaction] = await db
       .insert(transactions)
@@ -1752,7 +1770,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return newTransaction;
   }
-  
+
   async updateTransaction(id: number, transactionData: Partial<InsertTransaction>): Promise<Transaction> {
     const [updatedTransaction] = await db
       .update(transactions)
@@ -1761,11 +1779,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedTransaction;
   }
-  
+
   async deleteTransaction(id: number): Promise<void> {
     await db.delete(transactions).where(eq(transactions.id, id));
   }
-  
+
   // Settings methods
   async getSetting(storeId: number, key: string): Promise<Setting | undefined> {
     const [setting] = await db
@@ -1779,14 +1797,14 @@ export class DatabaseStorage implements IStorage {
       );
     return setting;
   }
-  
+
   async getSettings(storeId: number): Promise<Setting[]> {
     return db
       .select()
       .from(settings)
       .where(eq(settings.storeId, storeId));
   }
-  
+
   async setSetting(settingData: InsertSetting): Promise<Setting> {
     // Check if setting exists
     const [existingSetting] = await db
@@ -1798,7 +1816,7 @@ export class DatabaseStorage implements IStorage {
           eq(settings.key, settingData.key)
         )
       );
-    
+
     if (existingSetting) {
       // Update existing setting
       const [updatedSetting] = await db
@@ -1819,11 +1837,11 @@ export class DatabaseStorage implements IStorage {
       return newSetting;
     }
   }
-  
+
   async deleteSetting(id: number): Promise<void> {
     await db.delete(settings).where(eq(settings.id, id));
   }
-  
+
   // Print Settings methods
   async getPrintSettings(storeId: number): Promise<PrintSettings | undefined> {
     const [printSetting] = await db
@@ -1832,7 +1850,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(printSettings.storeId, storeId));
     return printSetting;
   }
-  
+
   async createPrintSettings(settingsData: InsertPrintSettings): Promise<PrintSettings> {
     const [newSettings] = await db
       .insert(printSettings)
@@ -1840,7 +1858,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return newSettings;
   }
-  
+
   async updatePrintSettings(storeId: number, settingsData: Partial<InsertPrintSettings>): Promise<PrintSettings> {
     const [updatedSettings] = await db
       .update(printSettings)
@@ -1849,7 +1867,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedSettings;
   }
-  
+
   // Import/Export methods
   async createImportExportLog(logData: InsertImportExportLog): Promise<ImportExportLog> {
     const [newLog] = await db
@@ -1858,7 +1876,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return newLog;
   }
-  
+
   async getImportExportLogs(userId: number): Promise<ImportExportLog[]> {
     return db
       .select()
@@ -1866,38 +1884,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(importExportLogs.userId, userId))
       .orderBy(desc(importExportLogs.completedAt));
   }
-  
+
   // Dashboard metrics
   async getDashboardStats(storeId: number): Promise<DashboardStats> {
     // Get current date
     const today = new Date();
     const startOfDay = new Date(today);
     startOfDay.setHours(0, 0, 0, 0);
-    
+
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday of current week
+    startOfWeek.setDate(today.getDay()); // Sunday of current week
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
+
     // Format dates as strings for PostgreSQL
     const startOfDayStr = startOfDay.toISOString().split('T')[0];
     const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
-    
+
     // Calculate total revenue and expenses
     const revenueResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as total
       FROM ${transactions}
       WHERE store_id = ${storeId} AND type = 'income'
     `);
-    
+
     const expensesResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as total
       FROM ${transactions}
       WHERE store_id = ${storeId} AND type = 'expense'
     `);
-    
+
     // Calculate open invoices (excluding paid and cancelled)
     const openInvoicesResult = await db.execute(sql`
       SELECT 
@@ -1906,14 +1924,14 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoices}
       WHERE store_id = ${storeId} AND status IN ('draft', 'sent', 'overdue')
     `);
-    
+
     // Count clients
     const clientsResult = await db.execute(sql`
       SELECT COUNT(*) as count
       FROM ${clients}
       WHERE store_id = ${storeId}
     `);
-    
+
     // Count products
     const productsResult = await db.execute(sql`
       SELECT COUNT(DISTINCT p.id) as count
@@ -1921,7 +1939,7 @@ export class DatabaseStorage implements IStorage {
       JOIN ${productBatches} pb ON p.id = pb.product_id
       WHERE pb.store_id = ${storeId} AND p.is_active = true
     `);
-    
+
     // Count products with low stock
     const lowStockResult = await db.execute(sql`
       SELECT COUNT(DISTINCT p.id) as count
@@ -1931,7 +1949,7 @@ export class DatabaseStorage implements IStorage {
       GROUP BY p.id
       HAVING SUM(pb.remaining_quantity::numeric) <= p.min_stock
     `);
-    
+
     // Count sales by periods
     const salesTodayResult = await db.execute(sql`
       SELECT COUNT(*) as count
@@ -1940,7 +1958,7 @@ export class DatabaseStorage implements IStorage {
         AND status = 'paid'
         AND issue_date >= ${startOfDayStr}
     `);
-    
+
     const salesThisWeekResult = await db.execute(sql`
       SELECT COUNT(*) as count
       FROM ${invoices}
@@ -1948,7 +1966,7 @@ export class DatabaseStorage implements IStorage {
         AND status = 'paid'
         AND issue_date >= ${startOfWeekStr}
     `);
-    
+
     const salesThisMonthResult = await db.execute(sql`
       SELECT COUNT(*) as count
       FROM ${invoices}
@@ -1956,14 +1974,14 @@ export class DatabaseStorage implements IStorage {
         AND status = 'paid'
         AND issue_date >= ${startOfMonthStr}
     `);
-    
+
     // Calculate total profit
     const profitResult = await db.execute(sql`
       SELECT COALESCE(SUM(total_profit::numeric), 0) as total
       FROM ${invoices}
       WHERE store_id = ${storeId} AND status = 'paid'
     `);
-    
+
     return {
       totalRevenue: parseFloat(revenueResult[0]?.total || '0'),
       totalExpenses: parseFloat(expensesResult[0]?.total || '0'),
@@ -1982,7 +2000,7 @@ export class DatabaseStorage implements IStorage {
       }
     };
   }
-  
+
   async getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]> {
     const result = await db.execute(sql`
       WITH client_stats AS (
@@ -2013,7 +2031,7 @@ export class DatabaseStorage implements IStorage {
       ORDER BY total_spent DESC
       LIMIT ${limit}
     `);
-    
+
     return result.map(row => ({
       id: row.id,
       name: row.name,
@@ -2035,7 +2053,7 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoices}
       WHERE store_id = ${storeId}
     `);
-    
+
     const row = result[0];
     return {
       paid: parseInt(row.paid || '0'),
@@ -2060,9 +2078,9 @@ export class DatabaseStorage implements IStorage {
       WHERE i.store_id = ${storeId} AND i.status = 'paid'
       GROUP BY c.id, c.name
       HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
-      
+
       UNION ALL
-      
+
       SELECT 
         NULL as category_id,
         'Uncategorized' as category_name,
@@ -2075,10 +2093,10 @@ export class DatabaseStorage implements IStorage {
       WHERE p.category_id IS NULL AND i.store_id = ${storeId} AND i.status = 'paid'
       GROUP BY p.category_id
       HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
-      
+
       ORDER BY total_revenue DESC
     `);
-    
+
     return result.map(row => ({
       categoryId: row.category_id ? parseInt(row.category_id as string) : null,
       categoryName: row.category_name as string,
@@ -2087,7 +2105,7 @@ export class DatabaseStorage implements IStorage {
       productCount: parseInt(row.product_count as string || '0')
     }));
   }
-  
+
   async getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData> {
     // Generate series of dates between start and end
     const dateList = [];
@@ -2096,18 +2114,18 @@ export class DatabaseStorage implements IStorage {
       dateList.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     // Format dates for display
     const dateLabels = dateList.map(date => {
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       return `${day}/${month}`;
     });
-    
+
     // Format dates as strings for PostgreSQL
     const startStr = start.toISOString().split('T')[0];
     const endStr = end.toISOString().split('T')[0];
-    
+
     // Get revenue data
     const revenueResult = await db.execute(sql`
       SELECT 
@@ -2122,12 +2140,12 @@ export class DatabaseStorage implements IStorage {
       GROUP BY DATE(date)
       ORDER BY DATE(date)
     `);
-    
+
     // Initialize data arrays
     const revenueData = Array(dateList.length).fill(0);
     const expenseData = Array(dateList.length).fill(0);
     const profitData = Array(dateList.length).fill(0);
-    
+
     // Populate data arrays from query results
     revenueResult.forEach(row => {
       const rowDate = new Date(row.date);
@@ -2136,14 +2154,14 @@ export class DatabaseStorage implements IStorage {
         date.getMonth() === rowDate.getMonth() &&
         date.getFullYear() === rowDate.getFullYear()
       );
-      
+
       if (index !== -1) {
         revenueData[index] = parseFloat(row.income || '0');
         expenseData[index] = parseFloat(row.expenses || '0');
         profitData[index] = revenueData[index] - expenseData[index];
       }
     });
-    
+
     return {
       dates: dateLabels,
       revenue: revenueData,
@@ -2151,7 +2169,7 @@ export class DatabaseStorage implements IStorage {
       profit: profitData
     };
   }
-  
+
   async getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]> {
     const result = await db.execute(sql`
       WITH product_sales AS (
@@ -2183,7 +2201,7 @@ export class DatabaseStorage implements IStorage {
       ORDER BY total_profit DESC
       LIMIT ${limit}
     `);
-    
+
     return result.map(row => ({
       id: row.id,
       name: row.name,
@@ -2194,7 +2212,7 @@ export class DatabaseStorage implements IStorage {
       profitMargin: parseFloat(row.profit_margin || '0')
     }));
   }
-  
+
   async getInventoryValueStats(storeId: number): Promise<InventoryValueStats> {
     // Get inventory summary stats
     const summaryResult = await db.execute(sql`
@@ -2211,7 +2229,7 @@ export class DatabaseStorage implements IStorage {
       JOIN ${products} p ON pb.product_id = p.id
       WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
     `);
-    
+
     // Get value by category
     const categoryResult = await db.execute(sql`
       SELECT 
@@ -2224,7 +2242,7 @@ export class DatabaseStorage implements IStorage {
       GROUP BY c.name
       ORDER BY value DESC
     `);
-    
+
     return {
       totalItems: parseInt(summaryResult[0]?.total_items || '0'),
       totalValue: parseFloat(summaryResult[0]?.total_value || '0'),
@@ -2236,7 +2254,7 @@ export class DatabaseStorage implements IStorage {
       }))
     };
   }
-  
+
   async getFinancialReport(storeId: number, dateRange: string): Promise<any> {
     const { startDate, endDate } = this.getDateRangeFromString(dateRange);
     const startStr = startDate.toISOString().split('T')[0];
@@ -2465,7 +2483,7 @@ export class DatabaseStorage implements IStorage {
     const productFilter = productId 
       ? sql`AND pb.product_id = ${productId}` 
       : sql``;
-    
+
     const result = await db.execute(sql`
       WITH batch_sales AS (
         SELECT 
@@ -2506,7 +2524,7 @@ export class DatabaseStorage implements IStorage {
         CASE WHEN ${productId ? true : false} THEN NULL ELSE p.name END,
         pb.purchase_date DESC
     `);
-    
+
     return result.map(row => ({
       productId: row.product_id,
       productName: row.product_name,
@@ -2526,9 +2544,9 @@ export class DatabaseStorage implements IStorage {
       const year = issueDate.getFullYear().toString().slice(-2);
       const month = (issueDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
-      
+
       console.log('Generating invoice number for yearMonth:', yearMonth);
-      
+
       return withTransaction(async (tx) => {
         return await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
       });
@@ -2544,9 +2562,9 @@ export class DatabaseStorage implements IStorage {
       const year = currentDate.getFullYear().toString().slice(-2);
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
-      
+
       console.log('Generating quotation number for yearMonth:', yearMonth);
-      
+
       return withTransaction(async (tx) => {
         return await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
       });
@@ -2562,9 +2580,9 @@ export class DatabaseStorage implements IStorage {
       const year = currentDate.getFullYear().toString().slice(-2);
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
-      
+
       console.log('Generating purchase order number for yearMonth:', yearMonth);
-      
+
       return withTransaction(async (tx) => {
         return await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
       });
