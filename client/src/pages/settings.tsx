@@ -859,15 +859,17 @@ export default function SettingsPage() {
                                   console.log("File berhasil diupload ke:", uploadURL);
 
                                   try {
-                                    const response = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                                    const responseObj = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                                    const responseData = await responseObj.json();
 
-                                    console.log("Logo API response:", response);
+                                    console.log("Logo API response:", responseData);
 
-                                    // Update the form field with the normalized path
-                                    field.onChange(response.logoPath);
+                                    // Update the form field with the uploaded URL
+                                    const logoUrl = responseData.logoPath || responseData.logoURL || uploadURL;
+                                    field.onChange(logoUrl);
 
                                     // Mark form as dirty so save button is enabled
-                                    companyForm.setValue('logoUrl', response.logoPath, { 
+                                    companyForm.setValue('logoUrl', logoUrl, { 
                                       shouldDirty: true,
                                       shouldTouch: true,
                                       shouldValidate: true
