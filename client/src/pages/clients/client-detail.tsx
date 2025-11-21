@@ -18,12 +18,14 @@ type Client = {
   address: string;
   taxNumber: string;
   clientNumber: string;
+  createdAt: string;
 };
 
 type ClientStats = {
   totalPurchases: number;
   unpaidInvoicesCount: number;
   lastPurchaseDate: string | null;
+  firstPurchaseDate: string | null;
 };
 
 type MonthlyPurchase = {
@@ -193,6 +195,16 @@ export default function ClientDetailPage() {
                   )}
                 </div>
               </div>
+
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Client Since</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white" data-testid="text-created-date">
+                    {client.createdAt ? format(new Date(client.createdAt), 'MMM d, yyyy') : 'Unknown'}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -221,6 +233,16 @@ export default function ClientDetailPage() {
                   ) : (
                     <p className="text-sm text-gray-400">Not provided</p>
                   )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <ShoppingCart className="h-5 w-5 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">First Purchase</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white" data-testid="text-first-purchase">
+                    {stats?.firstPurchaseDate ? format(new Date(stats.firstPurchaseDate), 'MMM d, yyyy') : 'No purchases yet'}
+                  </p>
                 </div>
               </div>
             </div>
