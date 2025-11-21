@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -21,6 +21,15 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -48,6 +57,8 @@ type Client = {
 
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -76,6 +87,120 @@ export default function ClientsPage() {
       });
     }
   });
+
+  // Export clients mutation
+  const exportMutation = useMutation({
+    mutationFn: async (format: 'csv' | 'xlsx') => {
+      const response = await fetch(`/api/clients/export/${format}?storeId=1`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export clients');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `clients-${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      return true;
+    },
+    onSuccess: (_, format) => {
+      toast({
+        title: "Export successful",
+        description: `Clients exported as ${format.toUpperCase()} file.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Export failed",
+        description: `Failed to export clients: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Import clients mutation
+  const importMutation = useMutation({
+    mutationFn: async (data: any[]) => {
+      const response = await apiRequest('POST', '/api/clients/import', { data, storeId: 1 });
+      return await response.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      toast({
+        title: "Import completed",
+        description: result.message,
+      });
+      setImportFile(null);
+      setIsImportDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Import failed",
+        description: `Failed to import clients: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      if (fileExtension === 'csv' || fileExtension === 'xlsx') {
+        setImportFile(file);
+      } else {
+        toast({
+          title: "Invalid file",
+          description: "Please select a CSV or XLSX file.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+
+    try {
+      const fileExtension = importFile.name.split('.').pop()?.toLowerCase();
+      
+      if (fileExtension === 'csv') {
+        const text = await importFile.text();
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const data = lines.slice(1).filter(line => line.trim()).map(line => {
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          const row: any = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || '';
+          });
+          return row;
+        });
+        importMutation.mutate(data);
+      } else if (fileExtension === 'xlsx') {
+        toast({
+          title: "XLSX Import",
+          description: "XLSX import is not yet supported. Please use CSV format.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "File processing error",
+        description: "Failed to process the uploaded file.",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Filter clients based on search query
   const filteredClients = clients
@@ -98,12 +223,48 @@ export default function ClientsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage your client information</p>
         </div>
         
-        <Link href="/clients/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Client
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" data-testid="button-export-clients">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem 
+                onClick={() => exportMutation.mutate('csv')}
+                disabled={exportMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportMutation.mutate('xlsx')}
+                disabled={exportMutation.isPending}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export as XLSX
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setIsImportDialogOpen(true)}
+            data-testid="button-import-clients"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import
           </Button>
-        </Link>
+          
+          <Link href="/clients/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Client
+            </Button>
+          </Link>
+        </div>
       </div>
       
       <Card>
@@ -265,6 +426,72 @@ export default function ClientsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Import Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Clients</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or XLSX file to import multiple clients at once.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Select File</Label>
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={handleFileChange}
+                data-testid="input-client-import-file"
+              />
+              <p className="text-sm text-gray-500">
+                Supported formats: CSV, XLSX
+              </p>
+            </div>
+            
+            {importFile && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    {importFile.name}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  File ready for import
+                </p>
+              </div>
+            )}
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <h4 className="font-medium text-amber-900 mb-1">Required Columns</h4>
+              <p className="text-sm text-amber-800">
+                Your file should include these columns: Name, Email, Phone, Address, Tax Number, Notes
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsImportDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport}
+              disabled={!importFile || importMutation.isPending}
+              data-testid="button-confirm-client-import"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {importMutation.isPending ? "Importing..." : "Import Clients"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
