@@ -664,6 +664,11 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
+  async getProductBySku(sku: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.sku, sku));
+    return product;
+  }
+
   async getProducts(storeId?: number): Promise<Product[]> {
     const query = db.select().from(products).where(eq(products.isActive, true));
 

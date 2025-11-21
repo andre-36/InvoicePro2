@@ -1967,25 +1967,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let successCount = 0;
+      let updateCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
 
       for (const row of data) {
         try {
-          const productData = {
-            name: row.Name || row.name,
-            sku: row.SKU || row.sku,
-            description: row.Description || row.description || '',
-            currentSellingPrice: row['Current Price'] || row.currentSellingPrice || '0',
-            unit: row.Unit || row.unit || 'piece',
-            minStock: parseInt(row['Min Stock'] || row.minStock || '0'),
-            weight: row.Weight || row.weight || null,
-            dimensions: row.Dimensions || row.dimensions || null,
-            isActive: (row['Is Active'] || row.isActive || 'Yes').toLowerCase() === 'yes' || (row['Is Active'] || row.isActive || 'Yes') === true
-          };
+          const sku = row.SKU || row.sku;
+          
+          if (!sku) {
+            errorCount++;
+            errors.push(`Row ${data.indexOf(row) + 1}: SKU is required`);
+            continue;
+          }
 
-          await storage.createProduct(productData);
-          successCount++;
+          // Check if product exists
+          const existingProduct = await storage.getProductBySku(sku);
+          
+          // Build update object only with fields that are present
+          const productData: any = {};
+          
+          if (row.Name || row.name) {
+            productData.name = row.Name || row.name;
+          }
+          
+          if (row.Description !== undefined || row.description !== undefined) {
+            productData.description = row.Description || row.description || '';
+          }
+          
+          if (row['Current Price'] !== undefined || row.currentSellingPrice !== undefined) {
+            productData.currentSellingPrice = row['Current Price'] || row.currentSellingPrice;
+          }
+          
+          if (row['Cost Price'] !== undefined || row.costPrice !== undefined) {
+            productData.costPrice = row['Cost Price'] || row.costPrice;
+          }
+          
+          if (row['Lowest Price'] !== undefined || row.lowestPrice !== undefined) {
+            productData.lowestPrice = row['Lowest Price'] || row.lowestPrice;
+          }
+          
+          if (row.Unit || row.unit) {
+            productData.unit = row.Unit || row.unit;
+          }
+          
+          if (row['Min Stock'] !== undefined || row.minStock !== undefined) {
+            productData.minStock = parseInt(row['Min Stock'] || row.minStock || '0');
+          }
+          
+          if (row.Weight !== undefined || row.weight !== undefined) {
+            productData.weight = row.Weight || row.weight || null;
+          }
+          
+          if (row.Dimensions !== undefined || row.dimensions !== undefined) {
+            productData.dimensions = row.Dimensions || row.dimensions || null;
+          }
+          
+          if (row['Is Active'] !== undefined || row.isActive !== undefined) {
+            const activeValue = row['Is Active'] || row.isActive;
+            productData.isActive = activeValue === 'Yes' || activeValue === 'yes' || activeValue === true || activeValue === 'TRUE';
+          }
+
+          if (existingProduct) {
+            // Update existing product
+            await storage.updateProduct(existingProduct.id, productData);
+            updateCount++;
+          } else {
+            // Create new product (requires minimum fields)
+            const newProductData = {
+              sku,
+              name: productData.name || sku,
+              description: productData.description || '',
+              currentSellingPrice: productData.currentSellingPrice || '0',
+              unit: productData.unit || 'piece',
+              minStock: productData.minStock || 0,
+              weight: productData.weight || null,
+              dimensions: productData.dimensions || null,
+              isActive: productData.isActive !== undefined ? productData.isActive : true,
+              costPrice: productData.costPrice || null,
+              lowestPrice: productData.lowestPrice || null
+            };
+            
+            await storage.createProduct(newProductData);
+            successCount++;
+          }
         } catch (error) {
           errorCount++;
           errors.push(`Row ${data.indexOf(row) + 1}: ${error.message}`);
@@ -1994,8 +2059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: `Import completed. ${successCount} products imported successfully, ${errorCount} errors.`,
+        message: `Import completed. ${successCount} new products created, ${updateCount} products updated, ${errorCount} errors.`,
         successCount,
+        updateCount,
         errorCount,
         errors: errors.slice(0, 10) // Limit error messages
       });
