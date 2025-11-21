@@ -2064,8 +2064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Failed to generate upload URL");
       }
       
-      // Send JSON response with uploadURL
-      res.json({ uploadURL: uploadURL });
+      // Explicitly set content type and send response
+      res.setHeader('Content-Type', 'application/json');
+      const responseData = { uploadURL: uploadURL };
+      console.log("Sending response:", JSON.stringify(responseData));
+      res.send(JSON.stringify(responseData));
     } catch (error: any) {
       console.error("Error getting upload URL:", error);
       res.status(500).json({ 
