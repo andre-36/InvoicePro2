@@ -31,6 +31,7 @@ const extendedClientSchema = insertClientSchema
     ),
     phone: z.string().optional(),
     address: z.string().optional(),
+    addressLink: z.string().optional(),
     taxNumber: z.string().optional(),
     notes: z.string().optional(),
   });
@@ -75,6 +76,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
       email: "",
       phone: "",
       address: "",
+      addressLink: "",
       taxNumber: "",
       notes: "",
     }
@@ -88,6 +90,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
         email: clientData.email ?? "",
         phone: clientData.phone ?? "",
         address: clientData.address ?? "",
+        addressLink: clientData.addressLink ?? "",
         taxNumber: clientData.taxNumber ?? "",
         notes: clientData.notes ?? "",
       });
@@ -241,6 +244,24 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
                       placeholder="Enter full address" 
                       className="resize-none" 
                       rows={3}
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="addressLink"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address Link (Google Maps)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="https://maps.google.com/..." 
+                      type="url"
                       {...field} 
                     />
                   </FormControl>

@@ -51,6 +51,7 @@ export const clients = pgTable("clients", {
   email: varchar("email", { length: 100 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
+  addressLink: varchar("address_link", { length: 500 }),
   taxNumber: varchar("tax_number", { length: 50 }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

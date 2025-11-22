@@ -16,6 +16,7 @@ type Client = {
   email: string;
   phone: string;
   address: string;
+  addressLink: string;
   taxNumber: string;
   clientNumber: string;
   createdAt: string;
@@ -213,9 +214,23 @@ export default function ClientDetailPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
                   {client.address ? (
-                    <p className="text-sm font-medium text-gray-900 dark:text-white" data-testid="text-address">
-                      {client.address}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white" data-testid="text-address">
+                        {client.address}
+                      </p>
+                      {client.addressLink && (
+                        <a 
+                          href={client.addressLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                          data-testid="link-address-map"
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                          View on Google Maps
+                        </a>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-400">Not provided</p>
                   )}

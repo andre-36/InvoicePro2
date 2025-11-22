@@ -52,6 +52,7 @@ type Client = {
   email: string;
   phone: string;
   address: string;
+  addressLink: string;
   taxNumber: string;
 };
 
