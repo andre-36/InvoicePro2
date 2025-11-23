@@ -447,20 +447,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const saveAndSend = async () => {
-    console.log('=== SAVE AND SEND CLICKED ===');
     form.setValue('invoice.status', 'sent');
     
-    // Filter out empty rows (rows with no description)
-    const currentItems = form.getValues('items');
-    console.log('Current items from form:', currentItems);
-    const nonEmptyItems = currentItems.filter(item => item.description && item.description.trim() !== '');
-    console.log('Non-empty items:', nonEmptyItems);
+    // Filter out empty rows (rows with no description) from the state
+    const nonEmptyItems = items.filter(item => item.description && item.description.trim() !== '');
     
     // Check if there's at least one item
     if (nonEmptyItems.length === 0) {
       toast({
-        title: "Validation Error",
-        description: "Please add at least one item to the invoice.",
+        title: "Please Add Items",
+        description: "Add at least one item to the invoice before creating.",
         variant: "destructive",
       });
       return;
@@ -468,39 +464,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     
     // Validate invoice fields
     const invoiceData = form.getValues('invoice');
-    if (!invoiceData.clientId || invoiceData.clientId === 0) {
+    if (!invoiceData.clientId) {
       toast({
-        title: "Validation Error",
-        description: "Please select a client for the invoice.",
+        title: "Please Select Client",
+        description: "Select a client before creating the invoice.",
         variant: "destructive",
       });
       return;
     }
     
-    // Validate all items have required fields
-    const invalidItems = nonEmptyItems.filter(item => 
-      !item.description || 
-      !item.quantity || parseFloat(item.quantity) <= 0 ||
-      !item.price || parseFloat(item.price) < 0
-    );
-    
-    if (invalidItems.length > 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please ensure all items have a description, valid quantity, and price.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Update both items state and form value with filtered list
-    setItems(nonEmptyItems);
+    // Update form items with non-empty ones
     form.setValue('items', nonEmptyItems);
     
-    // Wait a bit for form to update
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Submit directly without trigger (we already validated manually)
+    // Submit the form
     form.handleSubmit(onSubmit)();
   };
 
