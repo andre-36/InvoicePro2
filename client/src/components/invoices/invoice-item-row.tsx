@@ -53,17 +53,27 @@ export function InvoiceItemRow({
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const commandRef = useRef<HTMLDivElement>(null);
-  
+
+  // Define onUpdate to be used within handleProductChange for direct state updates
+  const onUpdate = (index: number, updatedItem: InvoiceItem) => {
+    setProductId(updatedItem.productId?.toString() || "");
+    setDescription(updatedItem.description);
+    setQuantity(updatedItem.quantity);
+    setPrice(updatedItem.price);
+    setTaxRate(updatedItem.taxRate);
+    updateItem(index, updatedItem);
+  };
+
   // Calculate totals when inputs change
   useEffect(() => {
     const qty = parseFloat(quantity) || 0;
     const prc = parseFloat(price) || 0;
     const rate = parseFloat(taxRate) || 0;
-    
+
     const subtotal = (qty * prc).toString();
     const tax = (parseFloat(subtotal) * rate / 100).toString();
     const total = (parseFloat(subtotal) + parseFloat(tax)).toString();
-    
+
     const updatedItem: InvoiceItem = {
       ...item,
       description,
@@ -75,20 +85,54 @@ export function InvoiceItemRow({
       total,
       productId: productId && productId !== "0" ? parseInt(productId) : null
     };
-    
+
     updateItem(index, updatedItem);
   }, [description, quantity, price, taxRate, productId, index, updateItem, item]);
-  
+
   // Handle product selection
   const handleProductChange = (value: string) => {
-    setProductId(value);
-    
-    try {
-      console.log("Selected product ID:", value);
-      // If value is "0", it means "Enter manually"
-      onProductSelect(index, value && value !== "0" ? parseInt(value) : null);
-    } catch (error) {
-      console.error("Error selecting product:", error);
+    console.log('Selected product ID:', value);
+
+    if (value === "0") {
+      // Manual entry selected - clear all fields
+      const clearedItem = {
+        productId: 0,
+        description: "",
+        quantity: "1",
+        price: "0",
+        taxRate: "0",
+        subtotal: "0",
+        tax: "0",
+        total: "0",
+      };
+      console.log('Clearing item at index', index);
+      onUpdate(index, clearedItem);
+    } else {
+      const selectedProduct = products.find(p => p.id.toString() === value);
+      console.log('Found product:', selectedProduct);
+
+      if (selectedProduct) {
+        // Calculate values based on current quantity
+        const qty = parseFloat(item.quantity) || 1;
+        const price = parseFloat(selectedProduct.price);
+        const taxRate = parseFloat(selectedProduct.taxRate);
+        const subtotal = qty * price;
+        const tax = subtotal * (taxRate / 100);
+        const total = subtotal + tax;
+
+        const updatedItem = {
+          productId: selectedProduct.id,
+          description: selectedProduct.name,
+          quantity: item.quantity || "1",
+          price: selectedProduct.price,
+          taxRate: selectedProduct.taxRate,
+          subtotal: subtotal.toFixed(2),
+          tax: tax.toFixed(2),
+          total: total.toFixed(2),
+        };
+        console.log('Setting item at index', index, ':', updatedItem);
+        onUpdate(index, updatedItem);
+      }
     }
   };
 
@@ -98,7 +142,7 @@ export function InvoiceItemRow({
       <td className="text-center text-sm text-gray-500">
         {index + 1}
       </td>
-      
+
       {/* Product selection */}
       <td>
         <Popover open={open} onOpenChange={setOpen}>
@@ -122,7 +166,7 @@ export function InvoiceItemRow({
               ref={commandRef}
               onKeyDown={(e) => {
                 const items = [{ id: "0", name: "Enter manually" }, ...products];
-                
+
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setSelectedIndex(prev => Math.min(prev + 1, items.length - 1));
@@ -193,7 +237,7 @@ export function InvoiceItemRow({
           </PopoverContent>
         </Popover>
       </td>
-      
+
       {/* Quantity */}
       <td>
         <Input
@@ -205,7 +249,7 @@ export function InvoiceItemRow({
           className="excel-cell-input-right"
         />
       </td>
-      
+
       {/* Price */}
       <td>
         <div className="relative">
@@ -222,7 +266,7 @@ export function InvoiceItemRow({
           />
         </div>
       </td>
-      
+
       {/* Tax Rate */}
       <td>
         <Select
@@ -242,12 +286,12 @@ export function InvoiceItemRow({
           </SelectContent>
         </Select>
       </td>
-      
+
       {/* Subtotal */}
       <td className="text-right text-sm font-medium text-gray-900">
         {formatCurrency(item.subtotal || "0")}
       </td>
-      
+
       {/* Actions */}
       <td className="text-center">
         <Button
