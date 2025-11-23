@@ -446,8 +446,25 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     form.handleSubmit(onSubmit)();
   };
 
-  const saveAndSend = () => {
+  const saveAndSend = async () => {
     form.setValue('invoice.status', 'sent');
+    
+    // Trigger validation
+    const isValid = await form.trigger();
+    
+    if (!isValid) {
+      // Show validation errors
+      const errors = form.formState.errors;
+      console.log('Form validation errors:', errors);
+      
+      toast({
+        title: "Validation Error",
+        description: "Please check all required fields and fix any errors.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     form.handleSubmit(onSubmit)();
   };
 
