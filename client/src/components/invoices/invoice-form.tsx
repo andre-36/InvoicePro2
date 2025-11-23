@@ -84,6 +84,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   ]);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState("invoice");
+
   // Payment dialog state
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null);
@@ -609,7 +612,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           </CardHeader>
           
           <CardContent className="p-4 md:p-6">
-            <Tabs defaultValue="invoice" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className={`grid w-full ${invoiceId ? 'grid-cols-2' : 'grid-cols-1'} mb-6`}>
                 <TabsTrigger value="invoice">Invoice Details & Items</TabsTrigger>
                 {invoiceId && (
