@@ -453,8 +453,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     try {
       console.log('=== SAVE AND SEND CALLED ===');
       
-      form.setValue('invoice.status', 'sent');
-      
       // Use state items instead of form values since state is updated in real-time
       console.log('Items from state:', JSON.stringify(items, null, 2));
       console.log('Number of items:', items.length);
@@ -493,13 +491,18 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         return;
       }
       
-      // Update form items with non-empty ones
-      form.setValue('items', nonEmptyItems);
+      console.log('Calling mutation directly...');
       
-      console.log('Submitting form...');
+      // Call mutation directly with validated data
+      const formData = {
+        invoice: {
+          ...invoiceData,
+          status: 'sent'
+        },
+        items: nonEmptyItems
+      };
       
-      // Submit the form directly
-      await form.handleSubmit(onSubmit)();
+      mutation.mutate(formData);
     } catch (error) {
       console.error('Error in saveAndSend:', error);
       toast({
