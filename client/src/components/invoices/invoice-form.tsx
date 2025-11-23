@@ -452,17 +452,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const saveAndSend = async () => {
     form.setValue('invoice.status', 'sent');
     
-    // Get items from form field values (not from state, since form is the source of truth)
-    const formItems = form.getValues('items') || [];
-    console.log('Items from form:', formItems);
+    // Use state items instead of form values since state is updated in real-time
     console.log('Items from state:', items);
     
-    // Filter out empty rows (rows with no description) from the form
-    const nonEmptyItems = formItems.filter(item => item.description && item.description.trim() !== '');
+    // Filter out empty rows (rows with no description)
+    const nonEmptyItems = items.filter(item => item.description && item.description.trim() !== '');
+    
+    console.log('Non-empty items:', nonEmptyItems);
     
     // Check if there's at least one item
     if (nonEmptyItems.length === 0) {
-      console.log('No non-empty items found');
       toast({
         title: "Please Add Items",
         description: "Add at least one item to the invoice before creating.",
@@ -473,7 +472,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     
     // Validate invoice fields
     const invoiceData = form.getValues('invoice');
-    if (!invoiceData.clientId) {
+    if (!invoiceData.clientId || invoiceData.clientId === 0) {
       toast({
         title: "Please Select Client",
         description: "Select a client before creating the invoice.",
@@ -482,8 +481,27 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       return;
     }
     
+    // Validate all items have required fields
+    const invalidItems = nonEmptyItems.filter(item => 
+      !item.description || 
+      !item.quantity || parseFloat(item.quantity) <= 0 ||
+      !item.price || parseFloat(item.price) < 0
+    );
+    
+    if (invalidItems.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please ensure all items have a description, valid quantity, and price.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Update form items with non-empty ones
     form.setValue('items', nonEmptyItems);
+    
+    // Wait a bit for form to update
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Submit the form
     form.handleSubmit(onSubmit)();
