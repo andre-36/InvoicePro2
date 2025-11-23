@@ -463,8 +463,12 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       return;
     }
     
-    // Update items with filtered list
+    // Update both items state and form value with filtered list
+    setItems(nonEmptyItems);
     form.setValue('items', nonEmptyItems);
+    
+    // Wait a bit for form to update
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Trigger validation
     const isValid = await form.trigger();
