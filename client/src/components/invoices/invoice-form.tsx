@@ -346,6 +346,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     const newItems = [...items];
     newItems[index] = updatedItem;
     setItems(newItems);
+    // Also update the form field to keep them in sync
+    form.setValue(`items.${index}`, updatedItem);
   };
 
   // Handle product selection
@@ -360,7 +362,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     
     try {
       const quantity = items[index].quantity || "1";
-      const price = (product.price || "0").toString();
+      const price = (product.currentSellingPrice || product.price || "0").toString();
       const taxRate = (product.taxRate || "0").toString();
       const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
       const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
@@ -368,7 +370,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       
       const updatedItem: InvoiceItem = {
         ...items[index],
-        description: product.name || "",
+        description: product.name || `Product ${productId}`,
         price,
         taxRate,
         subtotal,
@@ -377,6 +379,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         productId
       };
       
+      console.log('Setting item at index', index, ':', updatedItem);
       updateItem(index, updatedItem);
     } catch (error) {
       console.error("Error updating item:", error);
