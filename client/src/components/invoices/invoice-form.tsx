@@ -229,14 +229,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         return apiRequest('POST', '/api/invoices', formattedValues);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
       toast({
         title: invoiceId ? "Invoice updated" : "Invoice created",
         description: invoiceId ? "Your invoice has been updated successfully." : "Your invoice has been created successfully.",
       });
-      if (onSuccess) onSuccess();
+      // Small delay to ensure queries are refetched before navigation
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+      }, 100);
     },
     onError: (error) => {
       toast({
@@ -449,49 +452,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const handleBackClick = () => {
-    // Get the current form data
-    const formData = form.getValues();
-    
-    // Check if there are any filled items worth saving as draft
-    const hasValidItems = formData.items.some(item => 
-      item.description.trim() !== '' || 
-      (item.quantity !== '1' && item.quantity !== '0') ||
-      (item.price !== '0' && item.price !== '')
-    );
-    
-    // Check if basic invoice data is filled
-    const hasBasicData = formData.invoice.clientId || 
-                        formData.invoice.notes?.trim();
-
-    // If there's meaningful data and this is a new invoice, save as draft
-    if ((hasValidItems || hasBasicData) && !invoiceId) {
-      // Filter out empty items - keep items with description, productId, or modified values
-      const validItems = formData.items.filter(item => 
-        item.description.trim() !== '' || 
-        item.productId !== null ||
-        (item.quantity !== '1' && item.quantity !== '0') ||
-        (item.price !== '0' && item.price !== '')
-      );
-
-      // Only save if there are items to save
-      if (validItems.length > 0) {
-        toast({
-          title: "Saving Draft",
-          description: "Saving your progress as draft...",
-        });
-        
-        form.setValue('invoice.status', 'draft');
-        form.setValue('items', validItems);
-        
-        form.handleSubmit(onSubmit, () => {
-          // On error, still navigate back
-          onSuccess?.();
-        })();
-        return;
-      }
-    }
-    
-    // If no meaningful data or this is an edit, just navigate back
+    // Just navigate back without auto-saving
+    // User should explicitly save if they want to keep changes
     onSuccess?.();
   };
   
