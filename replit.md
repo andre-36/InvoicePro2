@@ -10,6 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 23, 2025 - Invoice Payment Tracking
+- **Feature**: Implemented comprehensive invoice payment tracking system
+  - Added invoice_payments database table with payment date, type, amount, notes, and reference fields
+  - Backend: Implemented nested REST API routes (/api/invoices/:invoiceId/payments) for payment CRUD operations
+  - UI: Added Payments tab to invoice form using shadcn Tabs component
+  - Payment management includes add, edit, and delete functionality via dialog interface
+  - Supports multiple payment types: Cash, Check, Card, Bank Transfer, and Other
+  - TanStack Query integration with proper cache invalidation for real-time updates
+  - Payment tab shows count badge when payments exist and is disabled for unsaved invoices
+
 ### October 29, 2025 - Security Improvements and Bug Fixes
 - **Security**: Fixed critical privilege escalation vulnerability in user update endpoints
   - Added three safe update schemas: updateUserProfileSchema, updateUserCompanySchema, updateUserPaymentSchema
