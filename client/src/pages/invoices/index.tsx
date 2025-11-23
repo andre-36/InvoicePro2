@@ -40,10 +40,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDF } from "@/lib/pdf-generator";
 
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-
 type Invoice = {
   id: number;
   invoiceNumber: string;
@@ -67,8 +63,6 @@ export default function InvoicesPage() {
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
   });
-
-  const [, navigate] = useLocation();
 
   // Handle create invoice navigation
   const handleCreateInvoice = () => {
