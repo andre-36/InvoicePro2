@@ -447,11 +447,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const saveAndSend = async () => {
+    console.log('=== SAVE AND SEND CLICKED ===');
     form.setValue('invoice.status', 'sent');
     
     // Filter out empty rows (rows with no description)
     const currentItems = form.getValues('items');
+    console.log('Current items from form:', currentItems);
     const nonEmptyItems = currentItems.filter(item => item.description && item.description.trim() !== '');
+    console.log('Non-empty items:', nonEmptyItems);
     
     // Check if there's at least one item
     if (nonEmptyItems.length === 0) {
