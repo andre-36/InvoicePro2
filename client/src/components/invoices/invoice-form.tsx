@@ -449,6 +449,23 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const saveAndSend = async () => {
     form.setValue('invoice.status', 'sent');
     
+    // Filter out empty rows (rows with no description)
+    const currentItems = form.getValues('items');
+    const nonEmptyItems = currentItems.filter(item => item.description && item.description.trim() !== '');
+    
+    // Check if there's at least one item
+    if (nonEmptyItems.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one item to the invoice.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Update items with filtered list
+    form.setValue('items', nonEmptyItems);
+    
     // Trigger validation
     const isValid = await form.trigger();
     
