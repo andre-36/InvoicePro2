@@ -449,11 +449,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const saveAndSend = async () => {
     form.setValue('invoice.status', 'sent');
     
-    // Filter out empty rows (rows with no description) from the state
-    const nonEmptyItems = items.filter(item => item.description && item.description.trim() !== '');
+    // Get items from form field values (not from state, since form is the source of truth)
+    const formItems = form.getValues('items') || [];
+    console.log('Items from form:', formItems);
+    console.log('Items from state:', items);
+    
+    // Filter out empty rows (rows with no description) from the form
+    const nonEmptyItems = formItems.filter(item => item.description && item.description.trim() !== '');
     
     // Check if there's at least one item
     if (nonEmptyItems.length === 0) {
+      console.log('No non-empty items found');
       toast({
         title: "Please Add Items",
         description: "Add at least one item to the invoice before creating.",
