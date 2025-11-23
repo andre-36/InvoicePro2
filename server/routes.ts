@@ -1992,7 +1992,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stores/:storeId/products/stock", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
-      const products = await storage.getProducts(storeId);
+      // Get ALL products, not just those with batches in this store
+      const products = await storage.getProducts();
       
       const productsWithStock = await Promise.all(
         products.map(async (product) => {

@@ -99,7 +99,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     queryKey: ['/api/clients'],
   });
 
-  // Fetch products for product selection
+  // Fetch all products for product selection
   const { data: products } = useQuery({
     queryKey: ['/api/products'],
   });
