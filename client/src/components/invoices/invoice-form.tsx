@@ -453,15 +453,23 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     form.setValue('invoice.status', 'sent');
     
     // Use state items instead of form values since state is updated in real-time
-    console.log('Items from state:', items);
+    console.log('=== SAVE AND SEND DEBUG ===');
+    console.log('Items from state:', JSON.stringify(items, null, 2));
+    console.log('Number of items:', items.length);
     
     // Filter out empty rows (rows with no description)
-    const nonEmptyItems = items.filter(item => item.description && item.description.trim() !== '');
+    const nonEmptyItems = items.filter(item => {
+      const hasDescription = item.description && item.description.trim() !== '';
+      console.log(`Item ${items.indexOf(item)}: description="${item.description}", hasDescription=${hasDescription}`);
+      return hasDescription;
+    });
     
-    console.log('Non-empty items:', nonEmptyItems);
+    console.log('Non-empty items count:', nonEmptyItems.length);
+    console.log('Non-empty items:', JSON.stringify(nonEmptyItems, null, 2));
     
     // Check if there's at least one item
     if (nonEmptyItems.length === 0) {
+      console.log('ERROR: No non-empty items found!');
       toast({
         title: "Please Add Items",
         description: "Add at least one item to the invoice before creating.",
