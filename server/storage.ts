@@ -2,7 +2,7 @@ import { eq, and, desc, gte, lt, sql, isNull, inArray, count } from "drizzle-orm
 import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
-  invoiceItemBatches, quotations, quotationItems, transactions, stores,
+  invoiceItemBatches, invoicePayments, quotations, quotationItems, transactions, stores,
   settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
   paymentTypes, paymentTerms,
 
@@ -11,6 +11,7 @@ import {
   type Product, type InsertProduct,
   type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
+  type InvoicePayment, type InsertInvoicePayment,
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
@@ -94,6 +95,12 @@ export interface IStorage {
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
+
+  // Invoice payment methods
+  getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]>;
+  createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
+  updateInvoicePayment(id: number, payment: Partial<InsertInvoicePayment>): Promise<InvoicePayment>;
+  deleteInvoicePayment(id: number): Promise<void>;
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
@@ -1280,6 +1287,46 @@ export class DatabaseStorage implements IStorage {
         .delete(invoices)
         .where(eq(invoices.id, id));
     });
+  }
+
+  // Invoice payment methods
+  async getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
+    const payments = await db
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, invoiceId))
+      .orderBy(desc(invoicePayments.paymentDate));
+    
+    return payments;
+  }
+
+  async createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment> {
+    const [newPayment] = await db
+      .insert(invoicePayments)
+      .values(payment)
+      .returning();
+    
+    return newPayment;
+  }
+
+  async updateInvoicePayment(id: number, payment: Partial<InsertInvoicePayment>): Promise<InvoicePayment> {
+    const [updatedPayment] = await db
+      .update(invoicePayments)
+      .set({ ...payment, updatedAt: new Date() })
+      .where(eq(invoicePayments.id, id))
+      .returning();
+    
+    if (!updatedPayment) {
+      throw new Error(`Invoice payment with ID ${id} not found`);
+    }
+    
+    return updatedPayment;
+  }
+
+  async deleteInvoicePayment(id: number): Promise<void> {
+    await db
+      .delete(invoicePayments)
+      .where(eq(invoicePayments.id, id));
   }
 
   // Quotation methods

@@ -19,6 +19,7 @@ import {
   insertProductBatchSchema,
   insertInvoiceSchema,
   insertInvoiceItemSchema,
+  insertInvoicePaymentSchema,
   insertQuotationSchema,
   insertQuotationItemSchema,
   insertTransactionSchema,
@@ -1079,6 +1080,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting invoice:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Invoice payment routes
+  app.get("/api/invoices/:invoiceId/payments", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const payments = await storage.getInvoicePayments(invoiceId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error getting invoice payments:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/payments", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      
+      // Validate the payment data
+      const validatedData = validateRequestBody(insertInvoicePaymentSchema, req, res);
+      if (!validatedData) return;
+
+      // Ensure the invoiceId in the URL matches the one in the body
+      const paymentData = {
+        ...validatedData,
+        invoiceId: invoiceId
+      };
+      
+      const newPayment = await storage.createInvoicePayment(paymentData);
+      res.status(201).json(newPayment);
+    } catch (error) {
+      console.error("Error creating invoice payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      
+      // Validate the payment data
+      const validatedData = validateRequestBody(insertInvoicePaymentSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedPayment = await storage.updateInvoicePayment(paymentId, validatedData);
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error("Error updating invoice payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      await storage.deleteInvoicePayment(paymentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting invoice payment:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
