@@ -40,6 +40,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDF } from "@/lib/pdf-generator";
 
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+
 type Invoice = {
   id: number;
   invoiceNumber: string;
@@ -63,6 +67,13 @@ export default function InvoicesPage() {
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
   });
+
+  const [, navigate] = useLocation();
+
+  // Handle create invoice navigation
+  const handleCreateInvoice = () => {
+    navigate('/invoices/create');
+  };
 
   // Delete invoice mutation
   const deleteMutation = useMutation({
@@ -106,6 +117,13 @@ export default function InvoicesPage() {
     }
   });
   
+  // Render create invoice button in the header or action area
+  // This should be added to your page layout where appropriate:
+  // <Button onClick={handleCreateInvoice}>
+  //   <Plus className="h-4 w-4 mr-2" />
+  //   Create Invoice
+  // </Button>
+
   // Handle generating PDF
   const handleGeneratePDF = async (invoice: Invoice) => {
     try {
