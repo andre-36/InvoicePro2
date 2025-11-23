@@ -612,7 +612,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             <Tabs defaultValue="invoice" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="invoice">Invoice Details</TabsTrigger>
-                <TabsTrigger value="payments" disabled={!invoiceId}>
+                <TabsTrigger value="payments">
                   Payments {invoiceId && invoicePayments.length > 0 && `(${invoicePayments.length})`}
                 </TabsTrigger>
               </TabsList>
@@ -835,26 +835,35 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               </TabsContent>
               
               <TabsContent value="payments" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-medium text-gray-900">Payment Records</h4>
-                  <Button
-                    type="button"
-                    onClick={handleAddPayment}
-                    size="sm"
-                    data-testid="button-add-payment"
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Add Payment
-                  </Button>
-                </div>
-
-                {invoicePayments.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                    <p>No payments recorded yet</p>
-                    <p className="text-sm">Click "Add Payment" to record a payment</p>
+                {!invoiceId ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <DollarSign className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium text-gray-700 mb-2">Save Invoice First</p>
+                    <p className="text-sm">You need to save this invoice before you can record payments.</p>
+                    <p className="text-sm">Click "Create Invoice" or "Update Invoice" to save your changes.</p>
                   </div>
                 ) : (
+                  <>
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-lg font-medium text-gray-900">Payment Records</h4>
+                      <Button
+                        type="button"
+                        onClick={handleAddPayment}
+                        size="sm"
+                        data-testid="button-add-payment"
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        Add Payment
+                      </Button>
+                    </div>
+
+                    {invoicePayments.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                        <p>No payments recorded yet</p>
+                        <p className="text-sm">Click "Add Payment" to record a payment</p>
+                      </div>
+                    ) : (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
@@ -906,8 +915,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   </div>
                 )}
 
-                {/* Payment Dialog */}
-                <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+                    {/* Payment Dialog */}
+                    <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>{editingPayment ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
@@ -981,6 +990,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                  </>
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
