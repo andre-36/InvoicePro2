@@ -3,10 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Calendar } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertInvoiceSchema } from "@shared/schema";
+import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
+import type { InvoicePayment } from "@shared/schema";
 import { InvoiceItemRow } from "@/components/invoices/invoice-item-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { generatePDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -81,6 +84,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   ]);
 
+  // Payment dialog state
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+    paymentType: 'Cash',
+    amount: '',
+    notes: ''
+  });
+
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
     queryKey: ['/api/clients'],
@@ -89,6 +102,59 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Fetch products for product selection
   const { data: products } = useQuery({
     queryKey: ['/api/products'],
+  });
+
+  // Fetch invoice payments if editing an existing invoice
+  const { data: invoicePayments = [] } = useQuery<InvoicePayment[]>({
+    queryKey: ['/api/invoices', invoiceId, 'payments'],
+    enabled: !!invoiceId,
+  });
+
+  // Mutation for creating a payment
+  const createPaymentMutation = useMutation({
+    mutationFn: async (payment: any) => {
+      return await apiRequest(`/api/invoices/${invoiceId}/payments`, 'POST', payment);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
+      toast({ title: "Success", description: "Payment added successfully" });
+      setPaymentDialogOpen(false);
+      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: `Failed to add payment: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating a payment
+  const updatePaymentMutation = useMutation({
+    mutationFn: async ({ id, payment }: { id: number; payment: any }) => {
+      return await apiRequest(`/api/invoices/${invoiceId}/payments/${id}`, 'PUT', payment);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
+      toast({ title: "Success", description: "Payment updated successfully" });
+      setPaymentDialogOpen(false);
+      setEditingPayment(null);
+      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: `Failed to update payment: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  // Mutation for deleting a payment
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (paymentId: number) => {
+      return await apiRequest(`/api/invoices/${invoiceId}/payments/${paymentId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
+      toast({ title: "Success", description: "Payment deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: `Failed to delete payment: ${error.message}`, variant: "destructive" });
+    }
   });
 
   // If editing an existing invoice, fetch its data
@@ -319,6 +385,53 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   };
 
+  // Payment handlers
+  const handleAddPayment = () => {
+    if (!invoiceId) {
+      toast({
+        title: "Info",
+        description: "Please save the invoice first before adding payments",
+        variant: "default",
+      });
+      return;
+    }
+    setEditingPayment(null);
+    setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+    setPaymentDialogOpen(true);
+  };
+
+  const handleEditPayment = (payment: InvoicePayment) => {
+    setEditingPayment(payment);
+    setPaymentForm({
+      paymentDate: payment.paymentDate,
+      paymentType: payment.paymentType,
+      amount: payment.amount,
+      notes: payment.notes || ''
+    });
+    setPaymentDialogOpen(true);
+  };
+
+  const handleDeletePayment = (paymentId: number) => {
+    if (confirm('Are you sure you want to delete this payment?')) {
+      deletePaymentMutation.mutate(paymentId);
+    }
+  };
+
+  const handlePaymentSubmit = () => {
+    const paymentData = {
+      paymentDate: paymentForm.paymentDate,
+      paymentType: paymentForm.paymentType,
+      amount: paymentForm.amount,
+      notes: paymentForm.notes
+    };
+
+    if (editingPayment) {
+      updatePaymentMutation.mutate({ id: editingPayment.id, payment: paymentData });
+    } else {
+      createPaymentMutation.mutate(paymentData);
+    }
+  };
+
   // Submit the form
   const onSubmit = (values: InvoiceFormValues) => {
     mutation.mutate(values);
@@ -496,9 +609,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           </CardHeader>
           
           <CardContent className="p-4 md:p-6">
-            <div className="space-y-6">
-              {/* Invoice Details Section */}
-              <div>
+            <Tabs defaultValue="invoice" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="invoice">Invoice Details</TabsTrigger>
+                <TabsTrigger value="payments" disabled={!invoiceId}>
+                  Payments {invoiceId && invoicePayments.length > 0 && `(${invoicePayments.length})`}
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="invoice" className="space-y-6">
+                {/* Invoice Details Section */}
+                <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -711,7 +832,157 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   )}
                 />
               </div>
-            </div>
+              </TabsContent>
+              
+              <TabsContent value="payments" className="space-y-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-medium text-gray-900">Payment Records</h4>
+                  <Button
+                    type="button"
+                    onClick={handleAddPayment}
+                    size="sm"
+                    data-testid="button-add-payment"
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add Payment
+                  </Button>
+                </div>
+
+                {invoicePayments.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>No payments recorded yet</p>
+                    <p className="text-sm">Click "Add Payment" to record a payment</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {invoicePayments.map((payment) => (
+                          <tr key={payment.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {format(new Date(payment.paymentDate), 'MMM dd, yyyy')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{payment.paymentType}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+                              {formatCurrency(parseFloat(payment.amount))}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{payment.notes || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-center">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditPayment(payment)}
+                                className="mr-1"
+                                data-testid={`button-edit-payment-${payment.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePayment(payment.id)}
+                                className="text-red-600 hover:text-red-700"
+                                data-testid={`button-delete-payment-${payment.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Payment Dialog */}
+                <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{editingPayment ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                        <Input
+                          type="date"
+                          value={paymentForm.paymentDate}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                          data-testid="input-payment-date"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Payment Type</label>
+                        <Select
+                          value={paymentForm.paymentType}
+                          onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value })}
+                        >
+                          <SelectTrigger data-testid="select-payment-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Check">Check</SelectItem>
+                            <SelectItem value="Card">Card</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={paymentForm.amount}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                          placeholder="0.00"
+                          data-testid="input-payment-amount"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <Textarea
+                          value={paymentForm.notes}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                          rows={2}
+                          placeholder="Optional notes..."
+                          data-testid="input-payment-notes"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPaymentDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handlePaymentSubmit}
+                        disabled={createPaymentMutation.isPending || updatePaymentMutation.isPending}
+                        data-testid="button-save-payment"
+                      >
+                        {editingPayment ? 'Update Payment' : 'Add Payment'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </TabsContent>
+            </Tabs>
           </CardContent>
           
           <CardFooter className="flex justify-end space-x-3 p-4 md:p-6 border-t border-gray-200">
