@@ -450,69 +450,64 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const saveAndSend = async () => {
-    form.setValue('invoice.status', 'sent');
-    
-    // Use state items instead of form values since state is updated in real-time
-    console.log('=== SAVE AND SEND DEBUG ===');
-    console.log('Items from state:', JSON.stringify(items, null, 2));
-    console.log('Number of items:', items.length);
-    
-    // Filter out empty rows (rows with no description)
-    const nonEmptyItems = items.filter(item => {
-      const hasDescription = item.description && item.description.trim() !== '';
-      console.log(`Item ${items.indexOf(item)}: description="${item.description}", hasDescription=${hasDescription}`);
-      return hasDescription;
-    });
-    
-    console.log('Non-empty items count:', nonEmptyItems.length);
-    console.log('Non-empty items:', JSON.stringify(nonEmptyItems, null, 2));
-    
-    // Check if there's at least one item
-    if (nonEmptyItems.length === 0) {
-      console.log('ERROR: No non-empty items found!');
+    try {
+      console.log('=== SAVE AND SEND CALLED ===');
+      
+      form.setValue('invoice.status', 'sent');
+      
+      // Use state items instead of form values since state is updated in real-time
+      console.log('Items from state:', JSON.stringify(items, null, 2));
+      console.log('Number of items:', items.length);
+      
+      // Filter out empty rows (rows with no description)
+      const nonEmptyItems = items.filter(item => {
+        const hasDescription = item.description && item.description.trim() !== '';
+        console.log(`Item description="${item.description}", hasDescription=${hasDescription}`);
+        return hasDescription;
+      });
+      
+      console.log('Non-empty items count:', nonEmptyItems.length);
+      console.log('Non-empty items:', JSON.stringify(nonEmptyItems, null, 2));
+      
+      // Check if there's at least one item
+      if (nonEmptyItems.length === 0) {
+        console.log('ERROR: No non-empty items found!');
+        toast({
+          title: "Please Add Items",
+          description: "Add at least one item to the invoice before creating.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate invoice fields
+      const invoiceData = form.getValues('invoice');
+      console.log('Client ID:', invoiceData.clientId);
+      
+      if (!invoiceData.clientId || invoiceData.clientId === 0) {
+        toast({
+          title: "Please Select Client",
+          description: "Select a client before creating the invoice.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Update form items with non-empty ones
+      form.setValue('items', nonEmptyItems);
+      
+      console.log('Submitting form...');
+      
+      // Submit the form directly
+      await form.handleSubmit(onSubmit)();
+    } catch (error) {
+      console.error('Error in saveAndSend:', error);
       toast({
-        title: "Please Add Items",
-        description: "Add at least one item to the invoice before creating.",
+        title: "Error",
+        description: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
-      return;
     }
-    
-    // Validate invoice fields
-    const invoiceData = form.getValues('invoice');
-    if (!invoiceData.clientId || invoiceData.clientId === 0) {
-      toast({
-        title: "Please Select Client",
-        description: "Select a client before creating the invoice.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Validate all items have required fields
-    const invalidItems = nonEmptyItems.filter(item => 
-      !item.description || 
-      !item.quantity || parseFloat(item.quantity) <= 0 ||
-      !item.price || parseFloat(item.price) < 0
-    );
-    
-    if (invalidItems.length > 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please ensure all items have a description, valid quantity, and price.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Update form items with non-empty ones
-    form.setValue('items', nonEmptyItems);
-    
-    // Wait a bit for form to update
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Submit the form
-    form.handleSubmit(onSubmit)();
   };
 
   const handleBackClick = () => {
@@ -1034,7 +1029,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             </Button>
             <Button
               type="button"
-              onClick={saveAndSend}
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('Create Invoice button clicked');
+                saveAndSend();
+              }}
               disabled={mutation.isPending}
             >
               <Check className="mr-1.5 h-4 w-4" />
