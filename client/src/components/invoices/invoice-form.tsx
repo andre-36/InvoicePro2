@@ -168,15 +168,15 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     queryKey: ['/api/invoices/next-number'],
     enabled: !invoiceId, // Only for new invoices
   });
-  
-  // Generate fallback number if API fails
+
+  // Generate fallback invoice number if API fails
   const generateFallbackInvoiceNumber = () => {
     const today = new Date();
     const year = today.getFullYear().toString().slice(-2);
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     return `INV-${year}${month}-0001`;
   };
-  
+
   const nextInvoiceNumber = nextInvoiceNumberData?.invoiceNumber || 
     (isNumberError ? generateFallbackInvoiceNumber() : null);
 
@@ -212,7 +212,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         issueDate: values.invoice.issueDate.toISOString(),
         dueDate: values.invoice.dueDate.toISOString(),
       };
-      
+
       // For new invoices, don't send invoiceNumber - let server generate it
       // The schema already excludes invoiceNumber for new invoices
 
@@ -263,9 +263,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         discount: invoiceData.discount.toString(),
         total: invoiceData.total.toString(),
       };
-      
+
       form.setValue('invoice', invoice);
-      
+
       if (invoiceData.items && invoiceData.items.length > 0) {
         const formattedItems = invoiceData.items.map(item => ({
           ...item,
@@ -276,7 +276,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           tax: item.tax.toString(),
           total: item.total.toString(),
         }));
-        
+
         setItems(formattedItems);
         form.setValue('items', formattedItems);
       }
@@ -289,21 +289,21 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       // Calculate subtotal, tax, and total
       let subtotal = 0;
       let tax = 0;
-      
+
       items.forEach(item => {
         subtotal += parseFloat(item.subtotal || "0");
         tax += parseFloat(item.tax || "0");
       });
-      
+
       // Apply discount
       const discountValue = parseFloat(form.getValues('invoice.discount') || "0");
       const total = subtotal + tax - discountValue;
-      
+
       // Update form values
       form.setValue('invoice.subtotal', subtotal.toFixed(2));
       form.setValue('invoice.tax', tax.toFixed(2));
       form.setValue('invoice.total', total.toFixed(2));
-      
+
       // Update items in the form
       form.setValue('items', items);
     }
@@ -322,7 +322,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       total: "0",
       productId: null
     };
-    
+
     setItems([...items, newItem]);
   };
 
@@ -342,32 +342,74 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   // Update an invoice item
-  const updateItem = (index: number, updatedItem: InvoiceItem) => {
-    const newItems = [...items];
-    newItems[index] = updatedItem;
-    setItems(newItems);
-    // Also update the form field to keep them in sync
-    form.setValue(`items.${index}`, updatedItem);
+  const updateItem = (index: number, field: keyof InvoiceItem, value: string) => {
+    setItems(prevItems => {
+      const newItems = [...prevItems];
+      newItems[index] = {
+        ...newItems[index],
+        [field]: value
+      };
+
+      // Recalculate totals when quantity, price, or taxRate changes
+      if (field === 'quantity' || field === 'price' || field === 'taxRate') {
+        const quantity = parseFloat(newItems[index].quantity) || 0;
+        const price = parseFloat(newItems[index].price) || 0;
+        const taxRate = parseFloat(newItems[index].taxRate) || 0;
+
+        const subtotal = quantity * price;
+        const tax = (subtotal * taxRate) / 100;
+        const total = subtotal + tax;
+
+        newItems[index].subtotal = subtotal.toFixed(2);
+        newItems[index].tax = tax.toFixed(2);
+        newItems[index].total = total.toFixed(2);
+      }
+
+      return newItems;
+    });
   };
 
   // Handle product selection
   const handleProductSelect = (index: number, productId: number | null) => {
-    if (!productId || !products) return;
-    
+    if (!productId || !products) {
+      // If null is passed, clear the item's product-related fields
+      if (productId === null) {
+        const updatedItem: InvoiceItem = {
+          ...items[index],
+          description: "",
+          price: "0",
+          taxRate: "0",
+          subtotal: "0",
+          tax: "0",
+          total: "0",
+          productId: null,
+        };
+        updateItem(index, 'description', ''); // Clear description too
+        setItems(prevItems => {
+          const newItems = [...prevItems];
+          newItems[index] = updatedItem;
+          return newItems;
+        });
+      }
+      return;
+    }
+
+
     const product = products.find(p => p.id === productId);
     if (!product) {
       console.error(`Product with id ${productId} not found`);
       return;
     }
-    
+
     try {
       const quantity = items[index].quantity || "1";
+      // Use currentSellingPrice if available, otherwise fall back to price
       const price = (product.currentSellingPrice || product.price || "0").toString();
       const taxRate = (product.taxRate || "0").toString();
       const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
       const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
       const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
-      
+
       const updatedItem: InvoiceItem = {
         ...items[index],
         description: product.name || `Product ${productId}`,
@@ -378,9 +420,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         total,
         productId
       };
-      
+
       console.log('Setting item at index', index, ':', updatedItem);
-      updateItem(index, updatedItem);
+      // Use updateItem for consistency, it will also trigger recalculations if needed
+      updateItem(index, 'description', product.name || ''); // Ensure description is updated
+      updateItem(index, 'price', price);
+      updateItem(index, 'taxRate', taxRate);
+      updateItem(index, 'subtotal', subtotal);
+      updateItem(index, 'tax', tax);
+      updateItem(index, 'total', total);
+      updateItem(index, 'productId', productId.toString()); // Ensure productId is updated
+
     } catch (error) {
       console.error("Error updating item:", error);
       toast({
@@ -452,21 +502,21 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const saveAndSend = async () => {
     try {
       console.log('=== SAVE AND SEND CALLED ===');
-      
+
       // Use state items instead of form values since state is updated in real-time
       console.log('Items from state:', JSON.stringify(items, null, 2));
       console.log('Number of items:', items.length);
-      
+
       // Filter out empty rows (rows with no description)
       const nonEmptyItems = items.filter(item => {
         const hasDescription = item.description && item.description.trim() !== '';
         console.log(`Item description="${item.description}", hasDescription=${hasDescription}`);
         return hasDescription;
       });
-      
+
       console.log('Non-empty items count:', nonEmptyItems.length);
       console.log('Non-empty items:', JSON.stringify(nonEmptyItems, null, 2));
-      
+
       // Check if there's at least one item
       if (nonEmptyItems.length === 0) {
         console.log('ERROR: No non-empty items found!');
@@ -477,11 +527,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         });
         return;
       }
-      
+
       // Validate invoice fields
       const invoiceData = form.getValues('invoice');
       console.log('Client ID:', invoiceData.clientId);
-      
+
       if (!invoiceData.clientId || invoiceData.clientId === 0) {
         toast({
           title: "Please Select Client",
@@ -490,9 +540,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         });
         return;
       }
-      
+
       console.log('Calling mutation directly...');
-      
+
       // Call mutation directly with validated data
       const formData = {
         invoice: {
@@ -501,7 +551,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         },
         items: nonEmptyItems
       };
-      
+
       mutation.mutate(formData);
     } catch (error) {
       console.error('Error in saveAndSend:', error);
@@ -518,16 +568,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     // User should explicitly save if they want to keep changes
     onSuccess?.();
   };
-  
+
   // Handle invoice PDF generation
   const handleGeneratePDF = async () => {
     if (!form.formState.isValid) {
       form.trigger();
       return;
     }
-    
+
     const values = form.getValues();
-    
+
     // Check if clients data is loaded
     if (!clients || !Array.isArray(clients)) {
       toast({
@@ -540,7 +590,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
     // Find the selected client
     const client = clients.find(c => c.id === values.invoice.clientId);
-    
+
     if (!client) {
       toast({
         title: "Error",
@@ -549,7 +599,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       });
       return;
     }
-    
+
     try {
       // Prepare safe data for PDF
       const safeClient = {
@@ -571,7 +621,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         total: values.invoice.total || "0",
         notes: values.invoice.notes,
       };
-      
+
       console.log("Generating PDF with:", { 
         invoice: safeInvoice,
         items: values.items,
@@ -583,7 +633,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         items: values.items || [],
         client: safeClient
       });
-      
+
       toast({
         title: "Success",
         description: "Invoice PDF has been generated",
@@ -631,7 +681,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             </CardTitle>
             <div className="w-9"></div> {/* Spacer to center title */}
           </CardHeader>
-          
+
           <CardContent className="p-4 md:p-6">
             <Tabs defaultValue="invoice" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -640,12 +690,12 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   Payments {invoiceId && invoicePayments.length > 0 && `(${invoicePayments.length})`}
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="invoice" className="space-y-6">
                 {/* Invoice Details Section */}
                 <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h4>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Invoice Number field - auto-generated for new invoices, display for existing */}
                   <div>
@@ -657,7 +707,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       data-testid="input-invoice-number"
                     />
                   </div>
-                  
+
                   <FormField
                     control={form.control}
                     name="invoice.issueDate"
@@ -675,7 +725,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="invoice.dueDate"
@@ -695,11 +745,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   />
                 </div>
               </div>
-              
+
               {/* Client Section */}
               <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Client Information</h4>
-                
+
                 <div className="mb-4">
                   <FormField
                     control={form.control}
@@ -730,11 +780,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   />
                 </div>
               </div>
-              
+
               {/* Items Section */}
               <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Items</h4>
-                
+
                 <div className="overflow-x-auto mb-4 invoice-table-container">
                   <table className="excel-table min-w-full">
                     <thead>
@@ -793,7 +843,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   </table>
                 </div>
               </div>
-              
+
               {/* Totals Section */}
               <div className="border-t border-gray-200 pt-4">
                 <div className="sm:w-1/2 ml-auto">
@@ -835,7 +885,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   </div>
                 </div>
               </div>
-              
+
               {/* Notes Section */}
               <div>
                 <FormField
@@ -857,7 +907,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 />
               </div>
               </TabsContent>
-              
+
               <TabsContent value="payments" className="space-y-4">
                 {!invoiceId ? (
                   <div className="text-center py-12 text-gray-500">
@@ -1019,7 +1069,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               </TabsContent>
             </Tabs>
           </CardContent>
-          
+
           <CardFooter className="flex justify-end space-x-3 p-4 md:p-6 border-t border-gray-200">
             <Button
               type="button"
