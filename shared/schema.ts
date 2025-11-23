@@ -213,6 +213,23 @@ export const invoiceItemBatches = pgTable("invoice_item_batches", {
   };
 });
 
+// Invoice payments table
+export const invoicePayments = pgTable("invoice_payments", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  paymentType: varchar("payment_type", { length: 50 }).notNull(), // Cash, Check, Card, Bank Transfer, etc.
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    invoiceIdIdx: index("invoice_payments_invoice_id_idx").on(table.invoiceId),
+    paymentDateIdx: index("invoice_payments_payment_date_idx").on(table.paymentDate)
+  };
+});
+
 // Quotations table
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
@@ -449,6 +466,7 @@ export const insertProductSchema = createInsertSchema(products).omit({ id: true,
 export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, invoiceNumber: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoicePaymentSchema = createInsertSchema(invoicePayments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemBatchSchema = createInsertSchema(invoiceItemBatches).omit({ id: true, createdAt: true });
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, quotationNumber: true, createdAt: true, updatedAt: true });
 export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit({ id: true, createdAt: true, updatedAt: true });
@@ -488,6 +506,9 @@ export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+
+export type InvoicePayment = typeof invoicePayments.$inferSelect;
+export type InsertInvoicePayment = z.infer<typeof insertInvoicePaymentSchema>;
 
 export type InvoiceItemBatch = typeof invoiceItemBatches.$inferSelect;
 export type InsertInvoiceItemBatch = z.infer<typeof insertInvoiceItemBatchSchema>;
@@ -567,6 +588,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   store: one(stores, { fields: [invoices.storeId], references: [stores.id] }),
   client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
   items: many(invoiceItems),
+  payments: many(invoicePayments),
   transactions: many(transactions)
 }));
 
@@ -574,4 +596,8 @@ export const invoiceItemsRelations = relations(invoiceItems, ({ one, many }) => 
   invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
   product: one(products, { fields: [invoiceItems.productId], references: [products.id] }),
   batches: many(invoiceItemBatches)
+}));
+
+export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoicePayments.invoiceId], references: [invoices.id] })
 }));
