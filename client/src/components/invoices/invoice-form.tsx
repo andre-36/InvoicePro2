@@ -610,11 +610,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           
           <CardContent className="p-4 md:p-6">
             <Tabs defaultValue="invoice" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="invoice">Invoice Details</TabsTrigger>
-                <TabsTrigger value="payments" disabled={!invoiceId}>
-                  Payments {invoiceId && invoicePayments.length > 0 && `(${invoicePayments.length})`}
-                </TabsTrigger>
+              <TabsList className={`grid w-full ${invoiceId ? 'grid-cols-2' : 'grid-cols-1'} mb-6`}>
+                <TabsTrigger value="invoice">Invoice Details & Items</TabsTrigger>
+                {invoiceId && (
+                  <TabsTrigger value="payments">
+                    Payments {invoicePayments.length > 0 && `(${invoicePayments.length})`}
+                  </TabsTrigger>
+                )}
               </TabsList>
               
               <TabsContent value="invoice" className="space-y-6">
