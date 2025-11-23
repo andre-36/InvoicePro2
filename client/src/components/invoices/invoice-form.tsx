@@ -463,6 +463,33 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       return;
     }
     
+    // Validate invoice fields
+    const invoiceData = form.getValues('invoice');
+    if (!invoiceData.clientId || invoiceData.clientId === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a client for the invoice.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate all items have required fields
+    const invalidItems = nonEmptyItems.filter(item => 
+      !item.description || 
+      !item.quantity || parseFloat(item.quantity) <= 0 ||
+      !item.price || parseFloat(item.price) < 0
+    );
+    
+    if (invalidItems.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please ensure all items have a description, valid quantity, and price.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Update both items state and form value with filtered list
     setItems(nonEmptyItems);
     form.setValue('items', nonEmptyItems);
@@ -470,22 +497,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     // Wait a bit for form to update
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    // Trigger validation
-    const isValid = await form.trigger();
-    
-    if (!isValid) {
-      // Show validation errors
-      const errors = form.formState.errors;
-      console.log('Form validation errors:', errors);
-      
-      toast({
-        title: "Validation Error",
-        description: "Please check all required fields and fix any errors.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    // Submit directly without trigger (we already validated manually)
     form.handleSubmit(onSubmit)();
   };
 
