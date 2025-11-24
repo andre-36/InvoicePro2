@@ -1042,11 +1042,29 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Update the invoice with the total profit
+      // Calculate invoice totals from items
+      let invoiceSubtotal = 0;
+      let invoiceTaxAmount = 0;
+
+      for (const item of items) {
+        invoiceSubtotal += parseFloat(item.subtotal.toString());
+        invoiceTaxAmount += parseFloat(item.taxAmount?.toString() || "0");
+      }
+
+      const discount = parseFloat(invoiceData.discount?.toString() || "0");
+      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount;
+
+      // Update the invoice with calculated totals and total profit
       if (invoiceData.status !== 'draft') {
         await tx
           .update(invoices)
-          .set({ totalProfit: totalProfit.toString() })
+          .set({ 
+            subtotal: invoiceSubtotal.toString(),
+            taxAmount: invoiceTaxAmount.toString(),
+            totalAmount: invoiceTotalAmount.toString(),
+            totalProfit: totalProfit.toString(),
+            updatedAt: new Date()
+          })
           .where(eq(invoices.id, newInvoice.id));
 
         // Create a transaction record for this invoice
@@ -1056,14 +1074,25 @@ export class DatabaseStorage implements IStorage {
             storeId: invoiceData.storeId,
             type: 'income',
             date: invoiceData.issueDate,
-            amount: invoiceData.totalAmount,
-            description: `Invoice #${invoiceData.invoiceNumber}`,
+            amount: invoiceTotalAmount.toString(),
+            description: `Invoice #${invoiceNumber}`,
             invoiceId: newInvoice.id,
-            referenceNumber: invoiceData.invoiceNumber,
+            referenceNumber: invoiceNumber,
           });
+      } else {
+        // For draft invoices, still update the totals
+        await tx
+          .update(invoices)
+          .set({ 
+            subtotal: invoiceSubtotal.toString(),
+            taxAmount: invoiceTaxAmount.toString(),
+            totalAmount: invoiceTotalAmount.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(invoices.id, newInvoice.id));
       }
 
-      // Return the invoice with the updated total profit
+      // Return the invoice with the updated totals
       const [updatedInvoice] = await tx
         .select()
         .from(invoices)
