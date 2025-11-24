@@ -818,7 +818,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           index={index}
                           item={item}
                           products={products || []}
-                          updateItem={updateItem}
+                          updateItem={(idx, updatedItem) => {
+                            setItems(prevItems => {
+                              const newItems = [...prevItems];
+                              newItems[idx] = updatedItem;
+                              return newItems;
+                            });
+                          }}
                           removeItem={removeItem}
                           onProductSelect={handleProductSelect}
                         />
