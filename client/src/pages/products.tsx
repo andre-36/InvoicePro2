@@ -73,8 +73,8 @@ const productSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   description: z.string().optional(),
   currentSellingPrice: z.string().min(1, "Price is required"),
-  costPrice: z.string().optional(),
-  lowestPrice: z.string().optional(),
+  costPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
+  lowestPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
 }).refine((data) => {
   if (data.lowestPrice && data.currentSellingPrice) {
     const price = parseFloat(data.currentSellingPrice);
