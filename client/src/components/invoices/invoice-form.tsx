@@ -542,13 +542,26 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       console.log('Calling mutation directly...');
 
+      // Transform items to match database schema
+      const transformedItems = nonEmptyItems.map(item => ({
+        productId: item.productId || 0,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        taxRate: item.taxRate,
+        taxAmount: item.tax,
+        discount: "0",
+        subtotal: item.subtotal,
+        totalAmount: item.total
+      }));
+
       // Call mutation directly with validated data
       const formData = {
         invoice: {
           ...invoiceData,
           status: 'sent'
         },
-        items: nonEmptyItems
+        items: transformedItems
       };
 
       mutation.mutate(formData);
