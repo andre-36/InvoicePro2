@@ -58,10 +58,9 @@ type Product = {
   name: string;
   sku: string;
   description: string;
-  price: string;
+  currentSellingPrice: string;
   costPrice?: string;
   lowestPrice?: string;
-  taxRate: string;
   minStock?: number;
   currentStock?: number;
   isLowStock?: boolean;
@@ -73,20 +72,19 @@ const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   sku: z.string().min(1, "SKU is required"),
   description: z.string().optional(),
-  price: z.string().min(1, "Price is required"),
+  currentSellingPrice: z.string().min(1, "Price is required"),
   costPrice: z.string().optional(),
   lowestPrice: z.string().optional(),
-  taxRate: z.string().default("0"),
 }).refine((data) => {
-  if (data.lowestPrice && data.price) {
-    const price = parseFloat(data.price);
+  if (data.lowestPrice && data.currentSellingPrice) {
+    const price = parseFloat(data.currentSellingPrice);
     const lowestPrice = parseFloat(data.lowestPrice);
     return price >= lowestPrice;
   }
   return true;
 }, {
   message: "Unit price cannot be lower than lowest price",
-  path: ["price"],
+  path: ["currentSellingPrice"],
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -288,10 +286,9 @@ export default function ProductsPage() {
       name: "",
       sku: "",
       description: "",
-      price: "",
+      currentSellingPrice: "",
       costPrice: "",
       lowestPrice: "",
-      taxRate: "0",
     }
   });
   
@@ -302,10 +299,9 @@ export default function ProductsPage() {
       name: product.name,
       sku: product.sku,
       description: product.description,
-      price: product.price,
+      currentSellingPrice: product.currentSellingPrice || "",
       costPrice: product.costPrice || "",
       lowestPrice: product.lowestPrice || "",
-      taxRate: product.taxRate
     });
     setIsDialogOpen(true);
   };
@@ -317,8 +313,7 @@ export default function ProductsPage() {
       name: "",
       sku: "",
       description: "",
-      price: "",
-      taxRate: "0"
+      currentSellingPrice: "",
     });
     setIsDialogOpen(true);
   };
@@ -432,7 +427,6 @@ export default function ProductsPage() {
                     <TableHead>Price</TableHead>
                     <TableHead>Cost Price</TableHead>
                     <TableHead>Lowest Price</TableHead>
-                    <TableHead>Tax Rate</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -474,10 +468,9 @@ export default function ProductsPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>{formatCurrency(product.price)}</TableCell>
+                      <TableCell>{formatCurrency(product.currentSellingPrice || "0")}</TableCell>
                       <TableCell>{product.costPrice ? formatCurrency(product.costPrice) : "—"}</TableCell>
                       <TableCell>{product.lowestPrice ? formatCurrency(product.lowestPrice) : "—"}</TableCell>
-                      <TableCell>{product.taxRate}%</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -606,53 +599,31 @@ export default function ProductsPage() {
                     )}
                   />
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Unit Price*</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span className="text-gray-500 sm:text-sm">Rp</span>
-                              </div>
-                              <Input 
-                                placeholder="0" 
-                                type="number"
-                                step="1"
-                                min="0"
-                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                {...field} 
-                              />
+                  <FormField
+                    control={form.control}
+                    name="currentSellingPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unit Price*</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 sm:text-sm">Rp</span>
                             </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="taxRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tax Rate (%)</FormLabel>
-                          <FormControl>
                             <Input 
                               placeholder="0" 
                               type="number"
-                              step="0.1"
+                              step="1"
                               min="0"
+                              className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
                               {...field} 
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -716,13 +687,13 @@ export default function ProductsPage() {
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                           <h4 className="font-medium text-blue-900 mb-1">Current Price</h4>
                           <p className="text-lg font-semibold text-blue-800">
-                            {formatCurrency(editingProduct.price)}
+                            {formatCurrency(editingProduct.currentSellingPrice || "0")}
                           </p>
                         </div>
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <h4 className="font-medium text-green-900 mb-1">Tax Rate</h4>
+                          <h4 className="font-medium text-green-900 mb-1">Stock Status</h4>
                           <p className="text-lg font-semibold text-green-800">
-                            {editingProduct.taxRate}%
+                            {editingProduct.currentStock || 0} units
                           </p>
                         </div>
                       </div>
