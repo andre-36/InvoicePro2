@@ -12,8 +12,7 @@ interface Product {
   id: number;
   name: string;
   description: string;
-  price: string;
-  taxRate: string;
+  currentSellingPrice: string;
 }
 
 interface InvoiceItem {
@@ -114,8 +113,8 @@ export function InvoiceItemRow({
       if (selectedProduct) {
         // Calculate values based on current quantity
         const qty = parseFloat(item.quantity) || 1;
-        const price = parseFloat(selectedProduct.price);
-        const taxRate = parseFloat(selectedProduct.taxRate);
+        const price = parseFloat(selectedProduct.currentSellingPrice || "0");
+        const taxRate = 0; // Default tax rate, can be adjusted manually
         const subtotal = qty * price;
         const tax = subtotal * (taxRate / 100);
         const total = subtotal + tax;
@@ -124,8 +123,8 @@ export function InvoiceItemRow({
           productId: selectedProduct.id,
           description: selectedProduct.name,
           quantity: item.quantity || "1",
-          price: selectedProduct.price,
-          taxRate: selectedProduct.taxRate,
+          price: (selectedProduct.currentSellingPrice || "0"),
+          taxRate: "0",
           subtotal: subtotal.toFixed(2),
           tax: tax.toFixed(2),
           total: total.toFixed(2),

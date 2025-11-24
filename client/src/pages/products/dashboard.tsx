@@ -50,8 +50,7 @@ type Product = {
   name: string;
   sku: string;
   description: string;
-  price: string;
-  taxRate: string;
+  currentSellingPrice: string;
 };
 
 export default function ProductDashboard({ id }: ProductDashboardProps) {
