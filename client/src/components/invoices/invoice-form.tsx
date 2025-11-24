@@ -405,7 +405,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const quantity = items[index].quantity || "1";
       // Use currentSellingPrice if available, otherwise fall back to price
       const price = (product.currentSellingPrice || product.price || "0").toString();
-      const taxRate = (product.taxRate || "0").toString();
+      const taxRate = "0"; // Default to 0% tax
       const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
       const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
       const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
@@ -422,14 +422,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       };
 
       console.log('Setting item at index', index, ':', updatedItem);
-      // Use updateItem for consistency, it will also trigger recalculations if needed
-      updateItem(index, 'description', product.name || ''); // Ensure description is updated
-      updateItem(index, 'price', price);
-      updateItem(index, 'taxRate', taxRate);
-      updateItem(index, 'subtotal', subtotal);
-      updateItem(index, 'tax', tax);
-      updateItem(index, 'total', total);
-      updateItem(index, 'productId', productId.toString()); // Ensure productId is updated
+      
+      // Update the items state with the complete updated item
+      setItems(prevItems => {
+        const newItems = [...prevItems];
+        newItems[index] = updatedItem;
+        return newItems;
+      });
 
     } catch (error) {
       console.error("Error updating item:", error);
