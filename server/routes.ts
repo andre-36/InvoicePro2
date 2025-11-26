@@ -1131,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'income' as const,
           category: 'invoice_payment',
           amount: parseFloat(validatedData.amount),
-          date: new Date(validatedData.paymentDate),
+          date: validatedData.paymentDate,
           description: `Payment received for invoice ${invoice.invoiceNumber}`,
           reference: `Invoice #${invoice.invoiceNumber}`,
           userId: req.user.id
