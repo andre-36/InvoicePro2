@@ -1170,17 +1170,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete the payment
       await storage.deleteInvoicePayment(paymentId);
       
-      // Get the invoice and check if we need to update its status
+      // Get the invoice and recalculate if status needs updating
       const invoice = await storage.getInvoice(invoiceId);
-      if (invoice && invoice.status === 'paid') {
-        // Get all remaining payments
+      if (invoice) {
+        // Get all remaining payments after deletion
         const allPayments = await storage.getInvoicePayments(invoiceId);
         const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
         const invoiceTotal = parseFloat(invoice.totalAmount);
         
-        // If payments no longer cover the full amount, change status back to 'sent'
-        if (totalPayments < invoiceTotal) {
+        // If invoice was 'paid' but payments no longer cover full amount, revert to 'sent'
+        if (invoice.status === 'paid' && totalPayments < invoiceTotal) {
           await storage.updateInvoice(invoiceId, { status: 'sent' });
+          console.log(`Invoice ${invoiceId} status changed from 'paid' to 'sent' (payments: ${totalPayments}, total: ${invoiceTotal})`);
         }
       }
       
