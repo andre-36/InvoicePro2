@@ -1180,11 +1180,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Find and delete the transaction created for this payment
           const transactions = await storage.getTransactionsByType(invoice.storeId, 'income');
           const matchingTransaction = transactions.find(t => 
+            t.category === 'invoice_payment' &&
             t.reference === `Invoice #${invoice.invoiceNumber}` &&
-            parseFloat(t.amount) === parseFloat(payment.amount)
+            Math.abs(parseFloat(t.amount) - parseFloat(payment.amount)) < 0.01
           );
           if (matchingTransaction) {
             await storage.deleteTransaction(matchingTransaction.id);
+            console.log(`Transaction ${matchingTransaction.id} deleted for payment ${paymentId}`);
+          } else {
+            console.log(`No matching transaction found for payment ${paymentId} (amount: ${payment.amount}, invoice: ${invoice.invoiceNumber})`);
           }
         }
       }
