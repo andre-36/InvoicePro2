@@ -1111,6 +1111,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const newPayment = await storage.createInvoicePayment(paymentData);
+      
+      // Get the invoice to check if it's fully paid and get store/user info
+      const invoice = await storage.getInvoice(invoiceId);
+      if (invoice) {
+        // Get all payments for this invoice including the new one
+        const allPayments = await storage.getInvoicePayments(invoiceId);
+        const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const invoiceTotal = parseFloat(invoice.totalAmount);
+        
+        // If fully paid, update invoice status to "paid"
+        if (totalPayments >= invoiceTotal && invoice.status !== 'paid') {
+          await storage.updateInvoice(invoiceId, { status: 'paid' });
+        }
+        
+        // Create a transaction entry for this payment as income
+        const transactionData = {
+          storeId: invoice.storeId,
+          type: 'income' as const,
+          category: 'invoice_payment',
+          amount: parseFloat(validatedData.amount),
+          date: new Date(validatedData.paymentDate),
+          description: `Payment received for invoice ${invoice.invoiceNumber}`,
+          reference: `Invoice #${invoice.invoiceNumber}`,
+          userId: req.user.id
+        };
+        await storage.createTransaction(transactionData);
+      }
+      
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating invoice payment:", error);
