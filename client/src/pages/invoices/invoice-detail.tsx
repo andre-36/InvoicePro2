@@ -262,6 +262,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     deletePaymentMutation.mutate(paymentId);
   };
 
+  // Calculate total payments made
+  const totalPaymentsMade = invoicePayments.reduce((sum: number, payment: any) => {
+    return sum + parseFloat(payment.amount || 0);
+  }, 0);
+
+  const invoiceTotal = invoice ? parseFloat(invoice.totalAmount) : 0;
+  const canAddPayment = totalPaymentsMade < invoiceTotal || editingPayment;
+
   const handlePaymentSubmit = () => {
     if (!paymentForm.amount) {
       toast({
@@ -617,11 +625,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
           <TabsContent value="payments" className="m-0 p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Payment Records</h3>
+              <div>
+                <h3 className="text-lg font-medium">Payment Records</h3>
+                {totalPaymentsMade >= invoiceTotal && (
+                  <p className="text-sm text-green-600 mt-1">Invoice is fully paid</p>
+                )}
+              </div>
               <Button
                 size="sm"
                 onClick={handleAddPayment}
+                disabled={!canAddPayment}
                 data-testid="button-add-payment"
+                title={!canAddPayment ? "Invoice is fully paid. No more payments can be added unless the invoice total is increased." : ""}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Payment
