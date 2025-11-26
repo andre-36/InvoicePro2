@@ -273,6 +273,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     }
 
     const data = {
+      invoiceId: id,
       paymentDate: paymentForm.paymentDate,
       paymentType: paymentForm.paymentType,
       amount: paymentForm.amount,
