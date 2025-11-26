@@ -165,6 +165,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       setPaymentDialogOpen(false);
       setPaymentForm({
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
@@ -222,6 +224,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       toast({
         title: "Success",
         description: "Payment deleted successfully.",
