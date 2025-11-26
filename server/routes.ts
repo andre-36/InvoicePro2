@@ -1164,8 +1164,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, async (req, res) => {
     try {
+      const invoiceId = parseInt(req.params.invoiceId);
       const paymentId = parseInt(req.params.paymentId);
+      
+      // Delete the payment
       await storage.deleteInvoicePayment(paymentId);
+      
+      // Get the invoice and check if we need to update its status
+      const invoice = await storage.getInvoice(invoiceId);
+      if (invoice && invoice.status === 'paid') {
+        // Get all remaining payments
+        const allPayments = await storage.getInvoicePayments(invoiceId);
+        const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const invoiceTotal = parseFloat(invoice.totalAmount);
+        
+        // If payments no longer cover the full amount, change status back to 'sent'
+        if (totalPayments < invoiceTotal) {
+          await storage.updateInvoice(invoiceId, { status: 'sent' });
+        }
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting invoice payment:", error);
