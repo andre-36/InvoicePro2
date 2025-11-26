@@ -1167,8 +1167,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceId = parseInt(req.params.invoiceId);
       const paymentId = parseInt(req.params.paymentId);
       
+      // Get the payment details before deleting (to find matching transaction)
+      const payment = await storage.getInvoicePayment(paymentId);
+      
       // Delete the payment
       await storage.deleteInvoicePayment(paymentId);
+      
+      // Delete the corresponding transaction if it exists
+      if (payment) {
+        const invoice = await storage.getInvoice(invoiceId);
+        if (invoice) {
+          // Find and delete the transaction created for this payment
+          const transactions = await storage.getTransactionsByType(invoice.storeId, 'income');
+          const matchingTransaction = transactions.find(t => 
+            t.reference === `Invoice #${invoice.invoiceNumber}` &&
+            parseFloat(t.amount) === parseFloat(payment.amount)
+          );
+          if (matchingTransaction) {
+            await storage.deleteTransaction(matchingTransaction.id);
+          }
+        }
+      }
       
       // Get the invoice and recalculate if status needs updating
       const invoice = await storage.getInvoice(invoiceId);
