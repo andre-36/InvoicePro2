@@ -727,14 +727,24 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={paymentForm.amount}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                      placeholder="0.00"
-                      data-testid="input-payment-amount"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                        placeholder="0.00"
+                        data-testid="input-payment-amount"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: invoice!.totalAmount.toString() })}
+                        data-testid="button-fill-amount"
+                      >
+                        Fill
+                      </Button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
