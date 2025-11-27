@@ -164,11 +164,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       return apiRequest('POST', `/api/invoices/${id}/payments`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
       if (invoice) {
-        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'], refetchType: 'all' });
       }
       setPaymentDialogOpen(false);
       setPaymentForm({
@@ -226,11 +226,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       return apiRequest('DELETE', `/api/invoices/${id}/payments/${paymentId}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
       if (invoice) {
-        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'], refetchType: 'all' });
       }
       toast({
         title: "Success",

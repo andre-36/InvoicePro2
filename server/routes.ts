@@ -1133,9 +1133,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: parseFloat(validatedData.amount),
           date: validatedData.paymentDate,
           description: `Payment received for invoice ${invoice.invoiceNumber}`,
-          reference: `Invoice #${invoice.invoiceNumber}`,
-          userId: req.user.id
+          referenceNumber: `Invoice #${invoice.invoiceNumber}`,
         };
+        console.log("Creating transaction with data:", transactionData);
         await storage.createTransaction(transactionData);
       }
       
@@ -1182,8 +1182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Find all transactions for this invoice with category 'invoice_payment'
           const invoiceTransactions = transactions.filter(t => 
             t.category === 'invoice_payment' &&
-            t.reference === `Invoice #${invoice.invoiceNumber}`
+            t.referenceNumber === `Invoice #${invoice.invoiceNumber}`
           );
+          console.log(`Found ${invoiceTransactions.length} transactions for invoice ${invoice.invoiceNumber}`);
           // Find the one matching this payment amount (with small tolerance for decimals)
           const matchingTransaction = invoiceTransactions.find(t =>
             Math.abs(parseFloat(t.amount) - parseFloat(payment.amount)) < 0.01
