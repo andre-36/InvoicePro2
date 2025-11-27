@@ -1177,18 +1177,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment) {
         const invoice = await storage.getInvoice(invoiceId);
         if (invoice) {
-          // Find and delete the transaction created for this payment
+          // Find and delete the transaction created for this payment using reference (most reliable)
           const transactions = await storage.getTransactionsByType(invoice.storeId, 'income');
-          const matchingTransaction = transactions.find(t => 
+          // Find all transactions for this invoice with category 'invoice_payment'
+          const invoiceTransactions = transactions.filter(t => 
             t.category === 'invoice_payment' &&
-            t.reference === `Invoice #${invoice.invoiceNumber}` &&
+            t.reference === `Invoice #${invoice.invoiceNumber}`
+          );
+          // Find the one matching this payment amount (with small tolerance for decimals)
+          const matchingTransaction = invoiceTransactions.find(t =>
             Math.abs(parseFloat(t.amount) - parseFloat(payment.amount)) < 0.01
           );
           if (matchingTransaction) {
             await storage.deleteTransaction(matchingTransaction.id);
             console.log(`Transaction ${matchingTransaction.id} deleted for payment ${paymentId}`);
           } else {
-            console.log(`No matching transaction found for payment ${paymentId} (amount: ${payment.amount}, invoice: ${invoice.invoiceNumber})`);
+            console.log(`No matching transaction found for payment ${paymentId}. Found ${invoiceTransactions.length} invoice transactions. Payment amount: ${payment.amount}`);
+            // If no exact match, delete the oldest matching transaction for this invoice (fallback)
+            if (invoiceTransactions.length > 0) {
+              await storage.deleteTransaction(invoiceTransactions[invoiceTransactions.length - 1].id);
+              console.log(`Deleted oldest matching transaction as fallback`);
+            }
           }
         }
       }

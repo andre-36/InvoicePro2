@@ -167,7 +167,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores', '1', 'transactions'] });
+      if (invoice) {
+        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'] });
+      }
       setPaymentDialogOpen(false);
       setPaymentForm({
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
@@ -227,7 +229,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores', '1', 'transactions'] });
+      if (invoice) {
+        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'] });
+      }
       toast({
         title: "Success",
         description: "Payment deleted successfully.",
