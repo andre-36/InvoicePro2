@@ -731,7 +731,7 @@ export class DatabaseStorage implements IStorage {
   async getProductStats(productId: number): Promise<ProductStats> {
     // Get current stock from product batches
     const stockResult = await db.execute(sql`
-      SELECT COALESCE(SUM(quantity), 0) as current_stock
+      SELECT COALESCE(SUM(remaining_quantity), 0) as current_stock
       FROM ${productBatches}
       WHERE product_id = ${productId}
     `);
@@ -740,9 +740,9 @@ export class DatabaseStorage implements IStorage {
     // Get sales statistics from invoice items
     const salesResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(CAST(quantity AS DECIMAL)), 0) as total_sales,
-        COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total_revenue,
-        COALESCE(AVG(CAST(price AS DECIMAL)), 0) as avg_price,
+        COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as total_sales,
+        COALESCE(SUM(CAST(ii.total_amount AS DECIMAL)), 0) as total_revenue,
+        COALESCE(AVG(CAST(ii.unit_price AS DECIMAL)), 0) as avg_price,
         COUNT(*) as sales_count
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
@@ -755,7 +755,7 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate average cost from product batches
     const costResult = await db.execute(sql`
-      SELECT COALESCE(AVG(CAST(unit_cost AS DECIMAL)), 0) as avg_cost
+      SELECT COALESCE(AVG(CAST(capital_cost AS DECIMAL)), 0) as avg_cost
       FROM ${productBatches}
       WHERE product_id = ${productId}
     `);
@@ -785,8 +785,8 @@ export class DatabaseStorage implements IStorage {
         i.invoice_number,
         c.name as client_name,
         CAST(ii.quantity AS DECIMAL) as quantity,
-        ii.price as unit_price,
-        ii.total,
+        ii.unit_price,
+        ii.total_amount,
         i.issue_date as date,
         i.status
       FROM ${invoiceItems} ii
@@ -802,7 +802,7 @@ export class DatabaseStorage implements IStorage {
       clientName: row.client_name || 'Unknown Client',
       quantity: parseInt(row.quantity?.toString() || '0'),
       unitPrice: row.unit_price || '0',
-      total: row.total || '0',
+      total: row.total_amount || '0',
       date: row.date ? new Date(row.date).toISOString().split('T')[0] : '',
       status: row.status || 'pending'
     }));
