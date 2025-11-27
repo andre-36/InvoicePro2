@@ -168,7 +168,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
       if (invoice) {
-        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
       setPaymentDialogOpen(false);
       setPaymentForm({
@@ -230,7 +230,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
       if (invoice) {
-        queryClient.invalidateQueries({ queryKey: ['/api/stores', invoice.storeId.toString(), 'transactions'], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
       toast({
         title: "Success",
