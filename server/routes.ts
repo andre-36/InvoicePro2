@@ -1177,12 +1177,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment) {
         const invoice = await storage.getInvoice(invoiceId);
         if (invoice) {
-          // Find and delete the transaction created for this payment using reference (most reliable)
+          // Find and delete the transaction created for this payment
           const transactions = await storage.getTransactionsByType(invoice.storeId, 'income');
           // Find all transactions for this invoice with category 'invoice_payment'
+          // Match by description containing the invoice number (most reliable since referenceNumber might be null)
           const invoiceTransactions = transactions.filter(t => 
             t.category === 'invoice_payment' &&
-            t.referenceNumber === `Invoice #${invoice.invoiceNumber}`
+            t.description.includes(invoice.invoiceNumber)
           );
           console.log(`Found ${invoiceTransactions.length} transactions for invoice ${invoice.invoiceNumber}`);
           // Find the one matching this payment amount (with small tolerance for decimals)
