@@ -1059,7 +1059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const invoiceId = parseInt(req.params.id);
       const schema = z.object({
-        status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"])
+        status: z.enum(["draft", "sent", "paid", "overdue", "cancelled", "void"])
       });
       
       const validatedData = validateRequestBody(schema, req, res);
@@ -1073,13 +1073,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
+  // Void invoice endpoint (replaces delete - invoices should never be deleted, only voided)
+  app.post("/api/invoices/:id/void", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
-      await storage.deleteInvoice(invoiceId);
-      res.json({ success: true });
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      if (invoice.status === 'void') {
+        return res.status(400).json({ error: "Invoice is already voided" });
+      }
+      
+      const updatedInvoice = await storage.updateInvoiceStatus(invoiceId, 'void');
+      res.json(updatedInvoice);
     } catch (error) {
-      console.error("Error deleting invoice:", error);
+      console.error("Error voiding invoice:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

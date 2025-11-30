@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Trash2, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -67,23 +67,23 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const client = invoiceData?.client;
   const invoicePayments = paymentsData || [];
 
-  // Delete invoice mutation
-  const deleteMutation = useMutation({
+  // Void invoice mutation (replaces delete - invoices should never be deleted, only voided)
+  const voidMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('DELETE', `/api/invoices/${id}`, undefined);
+      return apiRequest('POST', `/api/invoices/${id}/void`, undefined);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       toast({
-        title: "Invoice deleted",
-        description: "The invoice has been deleted successfully.",
+        title: "Invoice voided",
+        description: "The invoice has been voided successfully.",
       });
-      navigate("/invoices");
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Failed to delete invoice: ${error.message}`,
+        description: `Failed to void invoice: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -318,6 +318,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+      case 'void':
+        return <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -372,7 +374,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     );
   }
 
-  const isEditable = invoice.status !== 'paid' && invoice.status !== 'cancelled';
+  const isEditable = invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'void';
 
   return (
     <div className="space-y-6">
@@ -476,34 +478,38 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </Dialog>
           )}
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete invoice {invoice.invoiceNumber}? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => deleteMutation.mutate()}
-                  className="bg-red-600 hover:bg-red-700"
+          {invoice.status !== 'void' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                  data-testid="button-void-invoice"
                 >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Ban className="h-4 w-4" />
+                  <span>Void</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Void Invoice</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to void invoice {invoice.invoiceNumber}? This will make the invoice inactive and prevent any further edits. The invoice will remain visible for record-keeping purposes.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => voidMutation.mutate()}
+                    className="bg-red-600 hover:bg-red-700"
+                    data-testid="button-confirm-void"
+                  >
+                    Void Invoice
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
       
