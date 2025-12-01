@@ -433,6 +433,24 @@ export const importExportLogs = pgTable("import_export_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 
+// Product Units table - untuk multi-unit conversion dengan harga berbeda
+export const productUnits = pgTable("product_units", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  unitName: varchar("unit_name", { length: 50 }).notNull(), // 'pcs', 'dus', 'box', dll
+  conversionToBase: numeric("conversion_to_base", { precision: 15, scale: 2 }).notNull(), // berapa base unit dalam 1 unit ini
+  isBaseUnit: boolean("is_base_unit").default(false).notNull(),
+  sellingPrice: numeric("selling_price", { precision: 15, scale: 2 }).notNull(), // harga jual untuk unit ini
+  costPrice: numeric("cost_price", { precision: 15, scale: 2 }), // harga modal untuk unit ini (optional)
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    productIdIdx: index("product_units_product_id_idx").on(table.productId)
+  };
+});
+
 // Define the insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 
@@ -478,6 +496,7 @@ export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit(
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
 export const insertPaymentTypeSchema = createInsertSchema(paymentTypes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPaymentTermSchema = createInsertSchema(paymentTerms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProductUnitSchema = createInsertSchema(productUnits).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Define types for TypeScript
 export type User = typeof users.$inferSelect;
@@ -543,6 +562,9 @@ export type InsertPaymentTerm = z.infer<typeof insertPaymentTermSchema>;
 export type ImportExportLog = typeof importExportLogs.$inferSelect;
 export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
 
+export type ProductUnit = typeof productUnits.$inferSelect;
+export type InsertProductUnit = z.infer<typeof insertProductUnitSchema>;
+
 // Custom relation types
 export type ProductWithBatches = Product & { batches: ProductBatch[] };
 export type InvoiceWithItems = Invoice & { items: InvoiceItem[], client: Client };
@@ -581,7 +603,12 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
   batches: many(productBatches),
   invoiceItems: many(invoiceItems),
-  quotationItems: many(quotationItems)
+  quotationItems: many(quotationItems),
+  units: many(productUnits)
+}));
+
+export const productUnitsRelations = relations(productUnits, ({ one }) => ({
+  product: one(products, { fields: [productUnits.productId], references: [products.id] })
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
