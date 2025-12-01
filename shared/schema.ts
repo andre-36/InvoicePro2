@@ -110,6 +110,7 @@ export const products = pgTable("products", {
   minStock: integer("min_stock").default(0),
   weight: numeric("weight", { precision: 10, scale: 2 }),
   dimensions: varchar("dimensions", { length: 100 }),
+  isBundle: boolean("is_bundle").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -118,6 +119,21 @@ export const products = pgTable("products", {
     skuIdx: index("products_sku_idx").on(table.sku),
     categoryIdIdx: index("products_category_id_idx").on(table.categoryId),
     nameIdx: index("products_name_idx").on(table.name) 
+  };
+});
+
+// Bundle items table - tracks which products are in a bundle
+export const bundleItems = pgTable("bundle_items", {
+  id: serial("id").primaryKey(),
+  bundleProductId: integer("bundle_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  componentProductId: integer("component_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    bundleProductIdIdx: index("bundle_items_bundle_product_id_idx").on(table.bundleProductId),
+    componentProductIdIdx: index("bundle_items_component_product_id_idx").on(table.componentProductId)
   };
 });
 
@@ -481,6 +497,7 @@ export const insertClientSchema = createInsertSchema(clients).omit({ id: true, c
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBundleItemSchema = createInsertSchema(bundleItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, invoiceNumber: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true, updatedAt: true });
@@ -516,6 +533,9 @@ export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+export type BundleItem = typeof bundleItems.$inferSelect;
+export type InsertBundleItem = z.infer<typeof insertBundleItemSchema>;
 
 export type ProductBatch = typeof productBatches.$inferSelect;
 export type InsertProductBatch = z.infer<typeof insertProductBatchSchema>;
@@ -604,7 +624,22 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   batches: many(productBatches),
   invoiceItems: many(invoiceItems),
   quotationItems: many(quotationItems),
-  units: many(productUnits)
+  units: many(productUnits),
+  bundleItems: many(bundleItems, { relationName: 'bundleItemsBundleProduct' }),
+  componentOfBundles: many(bundleItems, { relationName: 'bundleItemsComponentProduct' })
+}));
+
+export const bundleItemsRelations = relations(bundleItems, ({ one }) => ({
+  bundleProduct: one(products, {
+    fields: [bundleItems.bundleProductId],
+    references: [products.id],
+    relationName: 'bundleItemsBundleProduct'
+  }),
+  componentProduct: one(products, {
+    fields: [bundleItems.componentProductId],
+    references: [products.id],
+    relationName: 'bundleItemsComponentProduct'
+  })
 }));
 
 export const productUnitsRelations = relations(productUnits, ({ one }) => ({
