@@ -29,7 +29,6 @@ import {
   insertPrintSettingsSchema,
   insertPaymentTypeSchema,
   insertPaymentTermSchema,
-  insertProductUnitSchema,
   loginSchema,
   updateUserProfileSchema,
   updateUserCompanySchema,
@@ -2523,72 +2522,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting payment term:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  // Product Units routes
-  app.get("/api/products/:productId/units", requireAuth, async (req, res) => {
-    try {
-      const productId = parseInt(req.params.productId);
-      const units = await storage.getProductUnits(productId);
-      res.json(units);
-    } catch (error) {
-      console.error("Error getting product units:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  app.get("/api/product-units/:id", requireAuth, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const unit = await storage.getProductUnit(id);
-      
-      if (!unit) {
-        return res.status(404).json({ error: "Product unit not found" });
-      }
-      
-      res.json(unit);
-    } catch (error) {
-      console.error("Error getting product unit:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  app.post("/api/product-units", requireAuth, async (req, res) => {
-    try {
-      const validatedData = validateRequestBody(insertProductUnitSchema, req, res);
-      if (!validatedData) return;
-      
-      const newUnit = await storage.createProductUnit(validatedData);
-      res.status(201).json(newUnit);
-    } catch (error) {
-      console.error("Error creating product unit:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  app.put("/api/product-units/:id", requireAuth, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const validatedData = validateRequestBody(insertProductUnitSchema.partial(), req, res);
-      if (!validatedData) return;
-      
-      const updatedUnit = await storage.updateProductUnit(id, validatedData);
-      res.json(updatedUnit);
-    } catch (error) {
-      console.error("Error updating product unit:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  app.delete("/api/product-units/:id", requireAuth, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.deleteProductUnit(id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting product unit:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

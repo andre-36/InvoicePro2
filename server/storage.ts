@@ -4,7 +4,8 @@ import {
   users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
   invoiceItemBatches, invoicePayments, quotations, quotationItems, transactions, stores,
   settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
-  paymentTypes, paymentTerms, productUnits,
+  paymentTypes, paymentTerms,
+
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
   type Product, type InsertProduct,
@@ -16,8 +17,7 @@ import {
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
   type PrintSettings, type InsertPrintSettings,
-  type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm,
-  type ProductUnit, type InsertProductUnit
+  type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm
 } from "../shared/schema";
 
 import session from "express-session";
@@ -160,13 +160,6 @@ export interface IStorage {
   createPaymentTerm(paymentTerm: InsertPaymentTerm): Promise<PaymentTerm>;
   updatePaymentTerm(id: number, paymentTerm: Partial<InsertPaymentTerm>): Promise<PaymentTerm>;
   deletePaymentTerm(id: number): Promise<void>;
-
-  // Product Units methods
-  getProductUnits(productId: number): Promise<ProductUnit[]>;
-  getProductUnit(id: number): Promise<ProductUnit | undefined>;
-  createProductUnit(unitData: InsertProductUnit): Promise<ProductUnit>;
-  updateProductUnit(id: number, unitData: Partial<InsertProductUnit>): Promise<ProductUnit>;
-  deleteProductUnit(id: number): Promise<void>;
 
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
@@ -1341,7 +1334,7 @@ export class DatabaseStorage implements IStorage {
       .from(invoicePayments)
       .where(eq(invoicePayments.invoiceId, invoiceId))
       .orderBy(desc(invoicePayments.paymentDate));
-
+    
     return payments;
   }
 
@@ -1350,7 +1343,7 @@ export class DatabaseStorage implements IStorage {
       .insert(invoicePayments)
       .values(payment)
       .returning();
-
+    
     return newPayment;
   }
 
@@ -1360,11 +1353,11 @@ export class DatabaseStorage implements IStorage {
       .set({ ...payment, updatedAt: new Date() })
       .where(eq(invoicePayments.id, id))
       .returning();
-
+    
     if (!updatedPayment) {
       throw new Error(`Invoice payment with ID ${id} not found`);
     }
-
+    
     return updatedPayment;
   }
 
@@ -2045,40 +2038,739 @@ export class DatabaseStorage implements IStorage {
     await db.delete(paymentTerms).where(eq(paymentTerms.id, id));
   }
 
-  // Product Units methods
-  async getProductUnits(productId: number): Promise<ProductUnit[]> {
-    return await db
-      .select()
-      .from(productUnits)
-      .where(eq(productUnits.productId, productId))
-      .orderBy(productUnits.isBaseUnit, productUnits.unitName);
-  }
-
-  async getProductUnit(id: number): Promise<ProductUnit | undefined> {
-    const [unit] = await db
-      .select()
-      .from(productUnits)
-      .where(eq(productUnits.id, id))
-      .limit(1);
-    return unit;
-  }
-
-  async createProductUnit(unitData: InsertProductUnit): Promise<ProductUnit> {
-    const [newUnit] = await db.insert(productUnits).values(unitData).returning();
-    return newUnit;
-  }
-
-  async updateProductUnit(id: number, unitData: Partial<InsertProductUnit>): Promise<ProductUnit> {
-    const [updatedUnit] = await db
-      .update(productUnits)
-      .set({ ...unitData, updatedAt: new Date() })
-      .where(eq(productUnits.id, id))
+  // Import/Export methods
+  async createImportExportLog(logData: InsertImportExportLog): Promise<ImportExportLog> {
+    const [newLog] = await db
+      .insert(importExportLogs)
+      .values(logData)
       .returning();
-    return updatedUnit;
+    return newLog;
   }
 
-  async deleteProductUnit(id: number): Promise<void> {
-    await db.delete(productUnits).where(eq(productUnits.id, id));
+  async getImportExportLogs(userId: number): Promise<ImportExportLog[]> {
+    return db
+      .select()
+      .from(importExportLogs)
+      .where(eq(importExportLogs.userId, userId))
+      .orderBy(desc(importExportLogs.completedAt));
+  }
+
+  // Dashboard metrics
+  async getDashboardStats(storeId: number): Promise<DashboardStats> {
+    // Get current date
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDay()); // Sunday of current week
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Format dates as strings for PostgreSQL
+    const startOfDayStr = startOfDay.toISOString().split('T')[0];
+    const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
+    const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+
+    // Calculate total revenue and expenses
+    const revenueResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE store_id = ${storeId} AND type = 'income'
+    `);
+
+    const expensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE store_id = ${storeId} AND type = 'expense'
+    `);
+
+    // Calculate open invoices (excluding paid and cancelled)
+    const openInvoicesResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(total_amount::numeric), 0) as value
+      FROM ${invoices}
+      WHERE store_id = ${storeId} AND status IN ('draft', 'sent', 'overdue')
+    `);
+
+    // Count clients
+    const clientsResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${clients}
+      WHERE store_id = ${storeId}
+    `);
+
+    // Count products
+    const productsResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM ${products} p
+      JOIN ${productBatches} pb ON p.id = pb.product_id
+      WHERE pb.store_id = ${storeId} AND p.is_active = true
+    `);
+
+    // Count products with low stock
+    const lowStockResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM ${products} p
+      JOIN ${productBatches} pb ON p.id = pb.product_id
+      WHERE pb.store_id = ${storeId} AND p.is_active = true
+      GROUP BY p.id
+      HAVING SUM(pb.remaining_quantity::numeric) <= p.min_stock
+    `);
+
+    // Count sales by periods
+    const salesTodayResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfDayStr}
+    `);
+
+    const salesThisWeekResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfWeekStr}
+    `);
+
+    const salesThisMonthResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startOfMonthStr}
+    `);
+
+    // Calculate total profit
+    const profitResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_profit::numeric), 0) as total
+      FROM ${invoices}
+      WHERE store_id = ${storeId} AND status = 'paid'
+    `);
+
+    return {
+      totalRevenue: parseFloat(revenueResult[0]?.total || '0'),
+      totalExpenses: parseFloat(expensesResult[0]?.total || '0'),
+      totalProfit: parseFloat(profitResult[0]?.total || '0'),
+      openInvoices: {
+        count: parseInt(openInvoicesResult[0]?.count || '0'),
+        value: parseFloat(openInvoicesResult[0]?.value || '0')
+      },
+      totalClients: parseInt(clientsResult[0]?.count || '0'),
+      productsCount: parseInt(productsResult[0]?.count || '0'),
+      lowStockCount: parseInt(lowStockResult[0]?.count || '0'),
+      salesCount: {
+        today: parseInt(salesTodayResult[0]?.count || '0'),
+        thisWeek: parseInt(salesThisWeekResult[0]?.count || '0'),
+        thisMonth: parseInt(salesThisMonthResult[0]?.count || '0')
+      }
+    };
+  }
+
+  async getTopClients(storeId: number, limit: number): Promise<ClientWithSalesStats[]> {
+    const result = await db.execute(sql`
+      WITH client_stats AS (
+        SELECT 
+          c.id,
+          c.name,
+          c.email,
+          COUNT(DISTINCT i.id) as invoice_count,
+          COALESCE(SUM(i.total_amount::numeric), 0) as total_spent,
+          MAX(i.issue_date) as last_purchase_date
+        FROM ${clients} c
+        LEFT JOIN ${invoices} i ON c.id = i.client_id AND i.status = 'paid'
+        WHERE c.store_id = ${storeId}
+        GROUP BY c.id, c.name, c.email
+      )
+      SELECT 
+        id,
+        name,
+        email,
+        invoice_count,
+        total_spent,
+        CASE 
+          WHEN invoice_count > 0 THEN total_spent / invoice_count 
+          ELSE 0 
+        END as average_spend,
+        last_purchase_date
+      FROM client_stats
+      ORDER BY total_spent DESC
+      LIMIT ${limit}
+    `);
+
+    return result.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      invoiceCount: parseInt(row.invoice_count || '0'),
+      totalSpent: parseFloat(row.total_spent || '0'),
+      averageSpend: parseFloat(row.average_spend || '0'),
+      lastPurchaseDate: row.last_purchase_date
+    }));
+  }
+
+  async getInvoiceStatusSummary(storeId: number): Promise<InvoiceStatusSummary> {
+    const result = await db.execute(sql`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'paid') as paid,
+        COUNT(*) FILTER (WHERE status IN ('sent', 'draft')) as pending,
+        COUNT(*) FILTER (WHERE status = 'overdue') as overdue,
+        COUNT(*) as total
+      FROM ${invoices}
+      WHERE store_id = ${storeId}
+    `);
+
+    const row = result[0];
+    return {
+      paid: parseInt(row.paid || '0'),
+      pending: parseInt(row.pending || '0'),
+      overdue: parseInt(row.overdue || '0'),
+      total: parseInt(row.total || '0')
+    };
+  }
+
+  async getProductSalesByCategory(storeId: number): Promise<CategorySalesData[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        c.id as category_id,
+        c.name as category_name,
+        COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
+        COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
+        COUNT(DISTINCT p.id) as product_count
+      FROM ${categories} c
+      INNER JOIN ${products} p ON c.id = p.category_id
+      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
+      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE i.store_id = ${storeId} AND i.status = 'paid'
+      GROUP BY c.id, c.name
+      HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
+
+      UNION ALL
+
+      SELECT 
+        NULL as category_id,
+        'Uncategorized' as category_name,
+        COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
+        COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
+        COUNT(DISTINCT p.id) as product_count
+      FROM ${products} p
+      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
+      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE p.category_id IS NULL AND i.store_id = ${storeId} AND i.status = 'paid'
+      GROUP BY p.category_id
+      HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
+
+      ORDER BY total_revenue DESC
+    `);
+
+    return result.map(row => ({
+      categoryId: row.category_id ? parseInt(row.category_id as string) : null,
+      categoryName: row.category_name as string,
+      totalRevenue: parseFloat(row.total_revenue as string || '0'),
+      totalQuantity: parseFloat(row.total_quantity as string || '0'),
+      productCount: parseInt(row.product_count as string || '0')
+    }));
+  }
+
+  async getRevenueData(storeId: number, start: Date, end: Date): Promise<RevenueData> {
+    // Generate series of dates between start and end
+    const dateList = [];
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      dateList.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Format dates for display
+    const dateLabels = dateList.map(date => {
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      return `${day}/${month}`;
+    });
+
+    // Format dates as strings for PostgreSQL
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    // Get revenue data
+    const revenueResult = await db.execute(sql`
+      SELECT 
+        DATE(date) as date,
+        COALESCE(SUM(CASE WHEN type = 'income' THEN amount::numeric ELSE 0 END), 0) as income,
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount::numeric ELSE 0 END), 0) as expenses
+      FROM ${transactions}
+      WHERE 
+        store_id = ${storeId} AND
+        date >= ${startStr} AND
+        date <= ${endStr}
+      GROUP BY DATE(date)
+      ORDER BY DATE(date)
+    `);
+
+    // Initialize data arrays
+    const revenueData = Array(dateList.length).fill(0);
+    const expenseData = Array(dateList.length).fill(0);
+    const profitData = Array(dateList.length).fill(0);
+
+    // Populate data arrays from query results
+    revenueResult.forEach(row => {
+      const rowDate = new Date(row.date);
+      const index = dateList.findIndex(date => 
+        date.getDate() === rowDate.getDate() &&
+        date.getMonth() === rowDate.getMonth() &&
+        date.getFullYear() === rowDate.getFullYear()
+      );
+
+      if (index !== -1) {
+        revenueData[index] = parseFloat(row.income || '0');
+        expenseData[index] = parseFloat(row.expenses || '0');
+        profitData[index] = revenueData[index] - expenseData[index];
+      }
+    });
+
+    return {
+      dates: dateLabels,
+      revenue: revenueData,
+      expenses: expenseData,
+      profit: profitData
+    };
+  }
+
+  async getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]> {
+    const result = await db.execute(sql`
+      WITH product_sales AS (
+        SELECT 
+          p.id,
+          p.name,
+          p.sku,
+          SUM(ii.quantity::numeric) as total_sold,
+          SUM(ii.total_amount::numeric) as total_revenue,
+          SUM(ii.profit::numeric) as total_profit
+        FROM ${products} p
+        JOIN ${invoiceItems} ii ON p.id = ii.product_id
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        WHERE i.store_id = ${storeId} AND i.status = 'paid'
+        GROUP BY p.id, p.name, p.sku
+      )
+      SELECT 
+        id,
+        name,
+        sku,
+        total_sold,
+        total_revenue,
+        total_profit,
+        CASE 
+          WHEN total_revenue > 0 THEN (total_profit / total_revenue) * 100 
+          ELSE 0 
+        END as profit_margin
+      FROM product_sales
+      ORDER BY total_profit DESC
+      LIMIT ${limit}
+    `);
+
+    return result.map(row => ({
+      id: row.id,
+      name: row.name,
+      sku: row.sku,
+      totalSold: parseFloat(row.total_sold || '0'),
+      totalRevenue: parseFloat(row.total_revenue || '0'),
+      totalProfit: parseFloat(row.total_profit || '0'),
+      profitMargin: parseFloat(row.profit_margin || '0')
+    }));
+  }
+
+  async getInventoryValueStats(storeId: number): Promise<InventoryValueStats> {
+    // Get inventory summary stats
+    const summaryResult = await db.execute(sql`
+      SELECT 
+        COUNT(DISTINCT p.id) as total_items,
+        COUNT(pb.id) as batches_count,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as total_value,
+        CASE 
+          WHEN SUM(pb.remaining_quantity::numeric) > 0 
+          THEN SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric) / SUM(pb.remaining_quantity::numeric)
+          ELSE 0 
+        END as average_cost
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
+    `);
+
+    // Get value by category
+    const categoryResult = await db.execute(sql`
+      SELECT 
+        COALESCE(c.name, 'Uncategorized') as category,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as value
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      LEFT JOIN ${categories} c ON p.category_id = c.id
+      WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
+      GROUP BY c.name
+      ORDER BY value DESC
+    `);
+
+    return {
+      totalItems: parseInt(summaryResult[0]?.total_items || '0'),
+      totalValue: parseFloat(summaryResult[0]?.total_value || '0'),
+      batchesCount: parseInt(summaryResult[0]?.batches_count || '0'),
+      averageCost: parseFloat(summaryResult[0]?.average_cost || '0'),
+      valueByCategory: categoryResult.map(row => ({
+        category: row.category,
+        value: parseFloat(row.value || '0')
+      }))
+    };
+  }
+
+  async getFinancialReport(storeId: number, dateRange: string): Promise<any> {
+    const { startDate, endDate } = this.getDateRangeFromString(dateRange);
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    // Get sales revenue from paid invoices
+    const salesRevenueResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as sales_revenue
+      FROM ${invoices}
+      WHERE store_id = ${storeId} 
+        AND status = 'paid'
+        AND issue_date >= ${startStr}
+        AND issue_date <= ${endStr}
+    `);
+
+    // Get other income from transactions
+    const otherIncomeResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as other_income
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'income'
+        AND category != 'Sales'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Get total COGS from invoices
+    const cogsResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(iib.quantity::numeric * iib.capital_cost::numeric), 0) as total_cogs
+      FROM ${invoiceItemBatches} iib
+      JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE i.store_id = ${storeId}
+        AND i.status = 'paid'
+        AND i.issue_date >= ${startStr}
+        AND i.issue_date <= ${endStr}
+    `);
+
+    // Get inventory values
+    const inventoryResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CASE WHEN pb.purchase_date < ${startStr} THEN pb.remaining_quantity::numeric * pb.capital_cost::numeric ELSE 0 END), 0) as beginning_inventory,
+        COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as ending_inventory,
+        COALESCE(SUM(CASE WHEN pb.purchase_date >= ${startStr} AND pb.purchase_date <= ${endStr} THEN pb.initial_quantity::numeric * pb.capital_cost::numeric ELSE 0 END), 0) as purchases
+      FROM ${productBatches} pb
+      WHERE pb.store_id = ${storeId}
+    `);
+
+    // Get operating expenses
+    const operatingExpensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as operating_expenses
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    const salesRevenue = parseFloat(salesRevenueResult[0]?.sales_revenue || '0');
+    const otherIncome = parseFloat(otherIncomeResult[0]?.other_income || '0');
+    const totalRevenue = salesRevenue + otherIncome;
+
+    const beginningInventory = parseFloat(inventoryResult[0]?.beginning_inventory || '0');
+    const purchases = parseFloat(inventoryResult[0]?.purchases || '0');
+    const endingInventory = parseFloat(inventoryResult[0]?.ending_inventory || '0');
+    const totalCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+
+    const operatingExpenses = parseFloat(operatingExpensesResult[0]?.operating_expenses || '0');
+    const otherExpenses = 0; // Can be expanded later
+
+    const grossProfit = totalRevenue - totalCOGS;
+    const netProfit = grossProfit - operatingExpenses - otherExpenses;
+
+    const grossProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const netProfitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    return {
+      revenue: {
+        salesRevenue,
+        otherIncome,
+        totalRevenue
+      },
+      cogs: {
+        beginningInventory,
+        purchases,
+        endingInventory,
+        totalCOGS
+      },
+      expenses: {
+        operatingExpenses,
+        otherExpenses,
+        totalExpenses: operatingExpenses + otherExpenses
+      },
+      profit: {
+        grossProfit,
+        netProfit,
+        grossProfitMargin,
+        netProfitMargin
+      }
+    };
+  }
+
+  async getCashFlowReport(storeId: number, dateRange: string): Promise<any> {
+    const { startDate, endDate } = this.getDateRangeFromString(dateRange);
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    // Operating activities - cash from sales
+    const cashFromSalesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as cash_from_sales
+      FROM ${invoices}
+      WHERE store_id = ${storeId}
+        AND status = 'paid'
+        AND issue_date >= ${startStr}
+        AND issue_date <= ${endStr}
+    `);
+
+    // Cash paid to suppliers (from purchase orders)
+    const cashToSuppliersResult = await db.execute(sql`
+      SELECT COALESCE(SUM(total_amount::numeric), 0) as cash_to_suppliers
+      FROM ${purchaseOrders}
+      WHERE store_id = ${storeId}
+        AND status IN ('received', 'partial')
+        AND order_date >= ${startStr}
+        AND order_date <= ${endStr}
+    `);
+
+    // Cash paid for expenses
+    const cashForExpensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as cash_for_expenses
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Equipment purchases (if tracked in transactions)
+    const equipmentResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as equipment_purchases
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'expense'
+        AND category = 'Equipment'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    // Owner investment (if tracked)
+    const ownerInvestmentResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as owner_investment
+      FROM ${transactions}
+      WHERE store_id = ${storeId}
+        AND type = 'income'
+        AND category = 'Owner Investment'
+        AND date >= ${startStr}
+        AND date <= ${endStr}
+    `);
+
+    const cashFromSales = parseFloat(cashFromSalesResult[0]?.cash_from_sales || '0');
+    const cashPaidToSuppliers = parseFloat(cashToSuppliersResult[0]?.cash_to_suppliers || '0');
+    const cashPaidForExpenses = parseFloat(cashForExpensesResult[0]?.cash_for_expenses || '0');
+    const equipmentPurchases = parseFloat(equipmentResult[0]?.equipment_purchases || '0');
+    const ownerInvestment = parseFloat(ownerInvestmentResult[0]?.owner_investment || '0');
+
+    const netOperatingCashFlow = cashFromSales - cashPaidToSuppliers - cashPaidForExpenses;
+    const netInvestingCashFlow = -equipmentPurchases;
+    const netFinancingCashFlow = ownerInvestment;
+    const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
+
+    // Calculate beginning cash (simplified - would need a proper cash account)
+    const beginningCash = 0; // This should be tracked separately
+    const endingCash = beginningCash + netCashFlow;
+
+    return {
+      operating: {
+        cashFromSales,
+        cashPaidToSuppliers,
+        cashPaidForExpenses,
+        netOperatingCashFlow
+      },
+      investing: {
+        equipmentPurchases,
+        netInvestingCashFlow
+      },
+      financing: {
+        ownerInvestment,
+        netFinancingCashFlow
+      },
+      netCashFlow,
+      beginningCash,
+      endingCash
+    };
+  }
+
+  private getDateRangeFromString(dateRange: string): { startDate: Date; endDate: Date } {
+    const today = new Date();
+    const endDate = new Date(today);
+    let startDate = new Date(today);
+
+    switch (dateRange) {
+      case 'this_month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'last_month':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate.setDate(0); // Last day of previous month
+        break;
+      case 'this_quarter':
+        const quarter = Math.floor(today.getMonth() / 3);
+        startDate = new Date(today.getFullYear(), quarter * 3, 1);
+        break;
+      case 'this_year':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    return { startDate, endDate };
+  }
+
+  async getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]> {
+    // Generate SQL for optionally filtering by product ID
+    const productFilter = productId 
+      ? sql`AND pb.product_id = ${productId}` 
+      : sql``;
+
+    const result = await db.execute(sql`
+      WITH batch_sales AS (
+        SELECT 
+          iib.batch_id,
+          SUM(iib.quantity::numeric) as sold_quantity,
+          SUM(ii.unit_price::numeric * iib.quantity::numeric) as sales_value,
+          SUM(iib.capital_cost::numeric * iib.quantity::numeric) as cost_value
+        FROM ${invoiceItemBatches} iib
+        JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        WHERE i.store_id = ${storeId} AND i.status = 'paid'
+        GROUP BY iib.batch_id
+      )
+      SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        pb.batch_number,
+        pb.capital_cost,
+        pb.purchase_date,
+        COALESCE(bs.sold_quantity, 0) as sold_quantity,
+        CASE 
+          WHEN COALESCE(bs.sold_quantity, 0) > 0 
+          THEN bs.sales_value / bs.sold_quantity 
+          ELSE 0 
+        END as avg_selling_price,
+        CASE 
+          WHEN COALESCE(bs.cost_value, 0) > 0 
+          THEN (bs.sales_value - bs.cost_value) / bs.cost_value * 100
+          ELSE 0 
+        END as profit_margin,
+        COALESCE(bs.sales_value - bs.cost_value, 0) as total_profit
+      FROM ${productBatches} pb
+      JOIN ${products} p ON pb.product_id = p.id
+      LEFT JOIN batch_sales bs ON pb.id = bs.batch_id
+      WHERE pb.store_id = ${storeId} ${productFilter}
+      ORDER BY 
+        CASE WHEN ${productId ? true : false} THEN pb.purchase_date ELSE p.name END,
+        CASE WHEN ${productId ? true : false} THEN NULL ELSE p.name END,
+        pb.purchase_date DESC
+    `);
+
+    return result.map(row => ({
+      productId: row.product_id,
+      productName: row.product_name,
+      batchNumber: row.batch_number,
+      capitalCost: parseFloat(row.capital_cost || '0'),
+      avgSellingPrice: parseFloat(row.avg_selling_price || '0'),
+      profitMargin: parseFloat(row.profit_margin || '0'),
+      soldQuantity: parseFloat(row.sold_quantity || '0'),
+      totalProfit: parseFloat(row.total_profit || '0'),
+      purchaseDate: new Date(row.purchase_date)
+    }));
+  }
+
+  // Preview number generation methods
+  async getNextClientNumber(): Promise<string> {
+    try {
+      return withTransaction(async (tx) => {
+        return await generateSimpleSequentialNumber("C", clients, clients.clientNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextClientNumber:', error);
+      throw error;
+    }
+  }
+
+  async getNextInvoiceNumber(issueDate: Date = new Date()): Promise<string> {
+    try {
+      const year = issueDate.getFullYear().toString().slice(-2);
+      const month = (issueDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+
+      console.log('Generating invoice number for yearMonth:', yearMonth);
+
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextInvoiceNumber:', error);
+      throw error;
+    }
+  }
+
+  async getNextQuotationNumber(): Promise<string> {
+    try {
+      const currentDate = new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+
+      console.log('Generating quotation number for yearMonth:', yearMonth);
+
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("QUO", yearMonth, quotations, quotations.quotationNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextQuotationNumber:', error);
+      throw error;
+    }
+  }
+
+  async getNextPurchaseOrderNumber(orderDate?: Date): Promise<string> {
+    try {
+      const currentDate = orderDate || new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+
+      console.log('Generating purchase order number for yearMonth:', yearMonth);
+
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextPurchaseOrderNumber:', error);
+      throw error;
+    }
   }
 }
 
