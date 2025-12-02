@@ -661,21 +661,7 @@ export default function ProductsPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <Tabs defaultValue="edit" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="edit">Edit</TabsTrigger>
-                  <TabsTrigger value="bundle" disabled={productType !== "bundle"}>
-                    <Layers className="w-4 h-4 mr-1" />
-                    Bundle
-                  </TabsTrigger>
-                  <TabsTrigger value="units">
-                    <Scale className="w-4 h-4 mr-1" />
-                    Units
-                  </TabsTrigger>
-                  <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="edit" className="space-y-4 mt-4">
+              <div className="space-y-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -837,10 +823,10 @@ export default function ProductsPage() {
                       )}
                     />
                   </div>
-                </TabsContent>
                 
-                {/* Bundle Components Tab */}
-                <TabsContent value="bundle" className="space-y-4 mt-4">
+                {/* Bundle Components Section - only visible when productType is bundle */}
+                {productType === "bundle" && (
+                  <div className="space-y-4 border-t pt-4">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
                     <h4 className="font-medium text-purple-900 mb-1 flex items-center gap-2">
                       <Layers className="h-4 w-4" />
@@ -916,10 +902,12 @@ export default function ProductsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Component
                   </Button>
-                </TabsContent>
+                  </div>
+                )}
                 
-                {/* Multi-Unit Tab */}
-                <TabsContent value="units" className="space-y-4 mt-4">
+                {/* Multi-Unit Section - only visible when editing an existing product */}
+                {editingProduct && (
+                  <div className="space-y-4 border-t pt-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <h4 className="font-medium text-blue-900 mb-1 flex items-center gap-2">
                       <Scale className="h-4 w-4" />
@@ -1016,48 +1004,9 @@ export default function ProductsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Unit
                   </Button>
-                </TabsContent>
-                
-                <TabsContent value="dashboard" className="space-y-4 mt-4">
-                  {editingProduct ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                          <h4 className="font-medium text-blue-900 mb-1">Current Price</h4>
-                          <p className="text-lg font-semibold text-blue-800">
-                            {formatCurrency(editingProduct.currentSellingPrice || "0")}
-                          </p>
-                        </div>
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <h4 className="font-medium text-green-900 mb-1">Stock Status</h4>
-                          <p className="text-lg font-semibold text-green-800">
-                            {editingProduct.currentStock || 0} units
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Product Information</h4>
-                        <div className="space-y-2 text-sm text-gray-700">
-                          <div><span className="font-medium">SKU:</span> {editingProduct.sku}</div>
-                          <div><span className="font-medium">Description:</span> {editingProduct.description || "No description"}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <h4 className="font-medium text-yellow-900 mb-1">Quick Stats</h4>
-                        <p className="text-sm text-yellow-800">
-                          View detailed analytics and sales history for this product in the main Products dashboard.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-                      <p className="text-gray-600">Dashboard will be available after creating the product.</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+                  </div>
+                )}
+              </div>
               
               <DialogFooter className="pt-4">
                 <Button 
