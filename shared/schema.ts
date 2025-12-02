@@ -110,6 +110,8 @@ export const products = pgTable("products", {
   minStock: integer("min_stock").default(0),
   weight: numeric("weight", { precision: 10, scale: 2 }),
   dimensions: varchar("dimensions", { length: 100 }),
+  isBundle: boolean("is_bundle").default(false).notNull(),
+  hasMultipleUnits: boolean("has_multiple_units").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -118,6 +120,35 @@ export const products = pgTable("products", {
     skuIdx: index("products_sku_idx").on(table.sku),
     categoryIdIdx: index("products_category_id_idx").on(table.categoryId),
     nameIdx: index("products_name_idx").on(table.name) 
+  };
+});
+
+// Bundle Products table - stores components of a bundle
+export const bundleProducts = pgTable("bundle_products", {
+  id: serial("id").primaryKey(),
+  bundleProductId: integer("bundle_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  componentProductId: integer("component_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(), // How many of component needed per bundle
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    bundleProductIdIdx: index("bundle_products_bundle_product_id_idx").on(table.bundleProductId),
+    componentProductIdIdx: index("bundle_products_component_product_id_idx").on(table.componentProductId)
+  };
+});
+
+// Product Units table - stores multiple unit options for a product
+export const productUnits = pgTable("product_units", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  unitName: varchar("unit_name", { length: 50 }).notNull(), // pcs, box, pack, etc
+  conversionRate: numeric("conversion_rate", { precision: 15, scale: 2 }).notNull(), // quantity in base unit that equals 1 of this unit
+  price: numeric("price", { precision: 15, scale: 2 }).notNull(),
+  isBaseUnit: boolean("is_base_unit").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    productIdIdx: index("product_units_product_id_idx").on(table.productId)
   };
 });
 
