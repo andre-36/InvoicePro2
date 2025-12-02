@@ -8,6 +8,7 @@ export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 
 export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['draft', 'sent', 'received', 'partial', 'cancelled']);
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
 export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs']);
+export const productTypeEnum = pgEnum('product_type', ['standard', 'bundle']);
 
 // Users table
 export const users = pgTable("users", {
@@ -103,7 +104,8 @@ export const products = pgTable("products", {
   sku: varchar("sku", { length: 50 }).notNull(),
   description: text("description"),
   categoryId: integer("category_id").references(() => categories.id),
-  unit: varchar("unit", { length: 20 }).default("piece").notNull(), // piece, meter, kg, etc.
+  productType: productTypeEnum("product_type").default("standard").notNull(), // standard or bundle
+  unit: varchar("unit", { length: 20 }).default("piece").notNull(), // Base unit: piece, meter, kg, etc.
   currentSellingPrice: numeric("current_selling_price", { precision: 15, scale: 2 }),
   costPrice: numeric("cost_price", { precision: 15, scale: 2 }),
   lowestPrice: numeric("lowest_price", { precision: 15, scale: 2 }),
@@ -117,7 +119,42 @@ export const products = pgTable("products", {
   return {
     skuIdx: index("products_sku_idx").on(table.sku),
     categoryIdIdx: index("products_category_id_idx").on(table.categoryId),
-    nameIdx: index("products_name_idx").on(table.name) 
+    nameIdx: index("products_name_idx").on(table.name),
+    productTypeIdx: index("products_product_type_idx").on(table.productType)
+  };
+});
+
+// Product bundle components table - defines which products make up a bundle
+export const productBundleComponents = pgTable("product_bundle_components", {
+  id: serial("id").primaryKey(),
+  bundleProductId: integer("bundle_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  componentProductId: integer("component_product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(), // How many of this component per bundle
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    bundleProductIdIdx: index("bundle_components_bundle_id_idx").on(table.bundleProductId),
+    componentProductIdIdx: index("bundle_components_component_id_idx").on(table.componentProductId),
+    uniqueComponent: uniqueIndex("bundle_components_unique_idx").on(table.bundleProductId, table.componentProductId)
+  };
+});
+
+// Product units table - defines multiple units for a product (multi-unit conversion)
+export const productUnits = pgTable("product_units", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  unitCode: varchar("unit_code", { length: 20 }).notNull(), // e.g., "pcs", "box", "pack"
+  unitLabel: varchar("unit_label", { length: 50 }).notNull(), // Display name: "Piece", "Box", "Pack"
+  conversionFactor: numeric("conversion_factor", { precision: 15, scale: 4 }).notNull(), // How many base units in this unit (e.g., 1000 for box = 1000 pcs)
+  price: numeric("price", { precision: 15, scale: 2 }), // Selling price for this unit
+  isDefault: boolean("is_default").default(false).notNull(), // Is this the default selling unit?
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    productIdIdx: index("product_units_product_id_idx").on(table.productId),
+    uniqueUnit: uniqueIndex("product_units_unique_idx").on(table.productId, table.unitCode)
   };
 });
 
@@ -180,8 +217,10 @@ export const invoiceItems = pgTable("invoice_items", {
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
+  productUnitId: integer("product_unit_id").references(() => productUnits.id), // For multi-unit products
   description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(), // Quantity in selected unit
+  baseQuantity: numeric("base_quantity", { precision: 15, scale: 2 }), // Quantity converted to base unit (for stock deduction)
   unitPrice: numeric("unit_price", { precision: 15, scale: 2 }).notNull(),
   taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
   taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
@@ -194,7 +233,8 @@ export const invoiceItems = pgTable("invoice_items", {
 }, (table) => {
   return {
     invoiceIdIdx: index("invoice_items_invoice_id_idx").on(table.invoiceId),
-    productIdIdx: index("invoice_items_product_id_idx").on(table.productId)
+    productIdIdx: index("invoice_items_product_id_idx").on(table.productId),
+    productUnitIdIdx: index("invoice_items_product_unit_id_idx").on(table.productUnitId)
   };
 });
 
@@ -265,8 +305,10 @@ export const quotationItems = pgTable("quotation_items", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").references(() => quotations.id, { onDelete: 'cascade' }).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
+  productUnitId: integer("product_unit_id").references(() => productUnits.id), // For multi-unit products
   description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(), // Quantity in selected unit
+  baseQuantity: numeric("base_quantity", { precision: 15, scale: 2 }), // Quantity converted to base unit
   unitPrice: numeric("unit_price", { precision: 15, scale: 2 }).notNull(),
   taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
   taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
@@ -278,7 +320,8 @@ export const quotationItems = pgTable("quotation_items", {
 }, (table) => {
   return {
     quotationIdIdx: index("quotation_items_quotation_id_idx").on(table.quotationId),
-    productIdIdx: index("quotation_items_product_id_idx").on(table.productId)
+    productIdIdx: index("quotation_items_product_id_idx").on(table.productId),
+    productUnitIdIdx: index("quotation_items_product_unit_id_idx").on(table.productUnitId)
   };
 });
 
@@ -463,6 +506,8 @@ export const insertClientSchema = createInsertSchema(clients).omit({ id: true, c
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProductBundleComponentSchema = createInsertSchema(productBundleComponents).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProductUnitSchema = createInsertSchema(productUnits).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, invoiceNumber: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true, updatedAt: true });
@@ -497,6 +542,12 @@ export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+export type ProductBundleComponent = typeof productBundleComponents.$inferSelect;
+export type InsertProductBundleComponent = z.infer<typeof insertProductBundleComponentSchema>;
+
+export type ProductUnit = typeof productUnits.$inferSelect;
+export type InsertProductUnit = z.infer<typeof insertProductUnitSchema>;
 
 export type ProductBatch = typeof productBatches.$inferSelect;
 export type InsertProductBatch = z.infer<typeof insertProductBatchSchema>;
@@ -545,11 +596,16 @@ export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
 
 // Custom relation types
 export type ProductWithBatches = Product & { batches: ProductBatch[] };
+export type ProductWithDetails = Product & { 
+  batches: ProductBatch[]; 
+  bundleComponents?: (ProductBundleComponent & { componentProduct: Product })[]; 
+  units?: ProductUnit[];
+};
 export type InvoiceWithItems = Invoice & { items: InvoiceItem[], client: Client };
 export type QuotationWithItems = Quotation & { items: QuotationItem[], client: Client };
 export type PurchaseOrderWithItems = PurchaseOrder & { items: PurchaseOrderItem[] };
-export type InvoiceItemWithProduct = InvoiceItem & { product: Product };
-export type QuotationItemWithProduct = QuotationItem & { product: Product };
+export type InvoiceItemWithProduct = InvoiceItem & { product: Product; productUnit?: ProductUnit };
+export type QuotationItemWithProduct = QuotationItem & { product: Product; productUnit?: ProductUnit };
 export type PurchaseOrderItemWithProduct = PurchaseOrderItem & { product: Product };
 
 // Auth schemas
@@ -580,8 +636,19 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
 export const productsRelations = relations(products, ({ one, many }) => ({
   category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
   batches: many(productBatches),
+  bundleComponents: many(productBundleComponents),
+  units: many(productUnits),
   invoiceItems: many(invoiceItems),
   quotationItems: many(quotationItems)
+}));
+
+export const productBundleComponentsRelations = relations(productBundleComponents, ({ one }) => ({
+  bundleProduct: one(products, { fields: [productBundleComponents.bundleProductId], references: [products.id] }),
+  componentProduct: one(products, { fields: [productBundleComponents.componentProductId], references: [products.id] })
+}));
+
+export const productUnitsRelations = relations(productUnits, ({ one }) => ({
+  product: one(products, { fields: [productUnits.productId], references: [products.id] })
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
