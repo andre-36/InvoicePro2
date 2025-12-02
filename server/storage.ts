@@ -1,14 +1,16 @@
 import { eq, and, desc, gte, lt, sql, isNull, inArray, count } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
-  users, clients, suppliers, products, productBatches, invoices, invoiceItems, 
-  invoiceItemBatches, invoicePayments, quotations, quotationItems, transactions, stores,
-  settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, printSettings,
-  paymentTypes, paymentTerms,
+  users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
+  invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
+  transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
+  printSettings, paymentTypes, paymentTerms,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
   type Product, type InsertProduct,
+  type ProductBundleComponent, type InsertProductBundleComponent,
+  type ProductUnit, type InsertProductUnit,
   type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
   type InvoicePayment, type InsertInvoicePayment,
@@ -84,6 +86,17 @@ export interface IStorage {
   createProductBatch(batch: InsertProductBatch): Promise<ProductBatch>;
   updateProductBatch(id: number, batch: Partial<InsertProductBatch>): Promise<ProductBatch>;
   deleteProductBatch(id: number): Promise<void>;
+
+  // Product bundle component methods
+  getBundleComponents(bundleProductId: number): Promise<(ProductBundleComponent & { componentProduct: Product })[]>;
+  setBundleComponents(bundleProductId: number, components: { componentProductId: number; quantity: number | string }[]): Promise<ProductBundleComponent[]>;
+  getBundleStock(bundleProductId: number, storeId: number): Promise<number>;
+
+  // Product unit methods
+  getProductUnits(productId: number): Promise<ProductUnit[]>;
+  getProductUnit(id: number): Promise<ProductUnit | undefined>;
+  setProductUnits(productId: number, units: InsertProductUnit[]): Promise<ProductUnit[]>;
+  deleteProductUnit(id: number): Promise<void>;
 
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
@@ -849,6 +862,121 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductBatch(id: number): Promise<void> {
     await db.delete(productBatches).where(eq(productBatches.id, id));
+  }
+
+  // Product bundle component methods
+  async getBundleComponents(bundleProductId: number): Promise<(ProductBundleComponent & { componentProduct: Product })[]> {
+    const components = await db
+      .select()
+      .from(productBundleComponents)
+      .where(eq(productBundleComponents.bundleProductId, bundleProductId));
+    
+    // Fetch component products
+    const result: (ProductBundleComponent & { componentProduct: Product })[] = [];
+    for (const component of components) {
+      const [componentProduct] = await db
+        .select()
+        .from(products)
+        .where(eq(products.id, component.componentProductId));
+      if (componentProduct) {
+        result.push({ ...component, componentProduct });
+      }
+    }
+    return result;
+  }
+
+  async setBundleComponents(bundleProductId: number, components: { componentProductId: number; quantity: number | string }[]): Promise<ProductBundleComponent[]> {
+    // Delete existing components
+    await db.delete(productBundleComponents).where(eq(productBundleComponents.bundleProductId, bundleProductId));
+    
+    if (components.length === 0) {
+      return [];
+    }
+    
+    // Insert new components
+    const newComponents = await db
+      .insert(productBundleComponents)
+      .values(
+        components.map(c => ({
+          bundleProductId,
+          componentProductId: c.componentProductId,
+          quantity: String(c.quantity)
+        }))
+      )
+      .returning();
+    
+    return newComponents;
+  }
+
+  async getBundleStock(bundleProductId: number, storeId: number): Promise<number> {
+    // Get bundle components
+    const components = await db
+      .select()
+      .from(productBundleComponents)
+      .where(eq(productBundleComponents.bundleProductId, bundleProductId));
+    
+    if (components.length === 0) {
+      return 0;
+    }
+    
+    // Calculate minimum number of bundles that can be formed
+    let minBundles = Infinity;
+    
+    for (const component of components) {
+      // Get total stock for this component product in the store
+      const batches = await db
+        .select({ remainingQuantity: productBatches.remainingQuantity })
+        .from(productBatches)
+        .where(
+          and(
+            eq(productBatches.productId, component.componentProductId),
+            eq(productBatches.storeId, storeId)
+          )
+        );
+      
+      const totalStock = batches.reduce((sum, b) => sum + parseFloat(b.remainingQuantity || '0'), 0);
+      const requiredQty = parseFloat(component.quantity);
+      const possibleBundles = Math.floor(totalStock / requiredQty);
+      
+      minBundles = Math.min(minBundles, possibleBundles);
+    }
+    
+    return minBundles === Infinity ? 0 : minBundles;
+  }
+
+  // Product unit methods
+  async getProductUnits(productId: number): Promise<ProductUnit[]> {
+    return db
+      .select()
+      .from(productUnits)
+      .where(eq(productUnits.productId, productId))
+      .orderBy(productUnits.conversionFactor);
+  }
+
+  async getProductUnit(id: number): Promise<ProductUnit | undefined> {
+    const [unit] = await db.select().from(productUnits).where(eq(productUnits.id, id));
+    return unit;
+  }
+
+  async setProductUnits(productId: number, units: InsertProductUnit[]): Promise<ProductUnit[]> {
+    // Delete existing units for this product
+    await db.delete(productUnits).where(eq(productUnits.productId, productId));
+    
+    if (units.length === 0) {
+      return [];
+    }
+    
+    // Insert new units
+    const newUnits = await db
+      .insert(productUnits)
+      .values(units.map(u => ({ ...u, productId })))
+      .returning();
+    
+    return newUnits;
+  }
+
+  async deleteProductUnit(id: number): Promise<void> {
+    await db.delete(productUnits).where(eq(productUnits.id, id));
   }
 
   // Invoice methods

@@ -860,6 +860,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product bundle component routes
+  app.get("/api/products/:id/bundle-components", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const components = await storage.getBundleComponents(productId);
+      res.json(components);
+    } catch (error) {
+      console.error("Error getting bundle components:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/products/:id/bundle-components", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const componentsSchema = z.array(z.object({
+        componentProductId: z.number(),
+        quantity: z.union([z.number(), z.string()])
+      }));
+      
+      const validatedData = validateRequestBody(componentsSchema, req, res);
+      if (!validatedData) return;
+      
+      const components = await storage.setBundleComponents(productId, validatedData);
+      res.json(components);
+    } catch (error) {
+      console.error("Error setting bundle components:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/products/:id/bundle-stock/:storeId", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const storeId = parseInt(req.params.storeId);
+      const stock = await storage.getBundleStock(productId, storeId);
+      res.json({ stock });
+    } catch (error) {
+      console.error("Error getting bundle stock:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product unit routes
+  app.get("/api/products/:id/units", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const units = await storage.getProductUnits(productId);
+      res.json(units);
+    } catch (error) {
+      console.error("Error getting product units:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/products/:id/units", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const unitsSchema = z.array(z.object({
+        unitCode: z.string(),
+        unitLabel: z.string(),
+        conversionFactor: z.union([z.number(), z.string()]),
+        price: z.union([z.number(), z.string()]).nullable().optional(),
+        isDefault: z.boolean().optional()
+      }));
+      
+      const validatedData = validateRequestBody(unitsSchema, req, res);
+      if (!validatedData) return;
+      
+      // Convert to insert format
+      const units = validatedData.map(u => ({
+        productId,
+        unitCode: u.unitCode,
+        unitLabel: u.unitLabel,
+        conversionFactor: String(u.conversionFactor),
+        price: u.price ? String(u.price) : null,
+        isDefault: u.isDefault || false
+      }));
+      
+      const savedUnits = await storage.setProductUnits(productId, units);
+      res.json(savedUnits);
+    } catch (error) {
+      console.error("Error setting product units:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Product Batches routes
   app.get("/api/products/:productId/stores/:storeId/batches", requireAuth, async (req, res) => {
     try {
