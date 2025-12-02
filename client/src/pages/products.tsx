@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3, Layers, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +65,25 @@ type Product = {
   currentStock?: number;
   isLowStock?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  productType?: 'standard' | 'bundle';
+  baseUnit?: string;
+};
+
+type BundleComponent = {
+  id?: number;
+  componentProductId: number;
+  quantity: string;
+  componentProduct?: Product;
+};
+
+type ProductUnit = {
+  id?: number;
+  productId?: number;
+  unitCode: string;
+  unitLabel: string;
+  conversionFactor: string;
+  price: string | null;
+  isDefault: boolean;
 };
 
 // Schema for product form validation
@@ -75,6 +94,8 @@ const productSchema = z.object({
   currentSellingPrice: z.string().min(1, "Price is required"),
   costPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
   lowestPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
+  productType: z.enum(["standard", "bundle"]).optional().default("standard"),
+  baseUnit: z.string().optional(),
 }).refine((data) => {
   if (data.lowestPrice && data.currentSellingPrice) {
     const price = parseFloat(data.currentSellingPrice);
@@ -95,6 +116,8 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [bundleComponents, setBundleComponents] = useState<BundleComponent[]>([]);
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -194,13 +217,14 @@ export default function ProductsPage() {
   // Import products mutation
   const importMutation = useMutation({
     mutationFn: async (data: any[]) => {
-      return apiRequest('POST', '/api/products/import', { data });
+      const response = await apiRequest('POST', '/api/products/import', { data });
+      return response.json();
     },
-    onSuccess: (result) => {
+    onSuccess: (result: { message?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
       toast({
         title: "Import completed",
-        description: result.message,
+        description: result.message || "Products imported successfully",
       });
       setImportFile(null);
       setIsImportDialogOpen(false);
@@ -289,11 +313,15 @@ export default function ProductsPage() {
       currentSellingPrice: "",
       costPrice: "",
       lowestPrice: "",
+      productType: "standard",
+      baseUnit: "",
     }
   });
+
+  const productType = form.watch("productType");
   
   // Reset form with product data for editing
-  const handleEdit = (product: Product) => {
+  const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     form.reset({
       name: product.name,
@@ -302,7 +330,40 @@ export default function ProductsPage() {
       currentSellingPrice: product.currentSellingPrice || "",
       costPrice: product.costPrice || "",
       lowestPrice: product.lowestPrice || "",
+      productType: product.productType || "standard",
+      baseUnit: product.baseUnit || "",
     });
+    
+    // Load bundle components if product is a bundle
+    if (product.productType === "bundle") {
+      try {
+        const response = await fetch(`/api/products/${product.id}/bundle-components`, { credentials: 'include' });
+        if (response.ok) {
+          const components = await response.json();
+          setBundleComponents(components.map((c: any) => ({
+            componentProductId: c.componentProductId,
+            quantity: c.quantity,
+            componentProduct: c.componentProduct
+          })));
+        }
+      } catch (error) {
+        console.error("Failed to load bundle components:", error);
+      }
+    } else {
+      setBundleComponents([]);
+    }
+    
+    // Load product units
+    try {
+      const response = await fetch(`/api/products/${product.id}/units`, { credentials: 'include' });
+      if (response.ok) {
+        const units = await response.json();
+        setProductUnits(units);
+      }
+    } catch (error) {
+      console.error("Failed to load product units:", error);
+    }
+    
     setIsDialogOpen(true);
   };
   
@@ -314,16 +375,70 @@ export default function ProductsPage() {
       sku: "",
       description: "",
       currentSellingPrice: "",
+      productType: "standard",
+      baseUnit: "",
     });
+    setBundleComponents([]);
+    setProductUnits([]);
     setIsDialogOpen(true);
   };
   
   // Submit form handler
-  const onSubmit = (data: ProductFormValues) => {
-    productMutation.mutate({
-      id: editingProduct?.id,
-      data
-    });
+  const onSubmit = async (data: ProductFormValues) => {
+    try {
+      // First save the product
+      let productId = editingProduct?.id;
+      
+      if (productId) {
+        await apiRequest('PUT', `/api/products/${productId}`, data);
+      } else {
+        const response = await apiRequest('POST', '/api/products', data);
+        const newProduct = await response.json();
+        productId = newProduct.id;
+      }
+      
+      // Save bundle components if product is a bundle
+      if (data.productType === "bundle" && productId) {
+        await apiRequest('PUT', `/api/products/${productId}/bundle-components`, 
+          bundleComponents.map(c => ({
+            componentProductId: c.componentProductId,
+            quantity: c.quantity
+          }))
+        );
+      }
+      
+      // Save product units
+      if (productUnits.length > 0 && productId) {
+        await apiRequest('PUT', `/api/products/${productId}/units`, 
+          productUnits.map(u => ({
+            unitCode: u.unitCode,
+            unitLabel: u.unitLabel,
+            conversionFactor: u.conversionFactor,
+            price: u.price,
+            isDefault: u.isDefault
+          }))
+        );
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      setIsDialogOpen(false);
+      setEditingProduct(null);
+      setBundleComponents([]);
+      setProductUnits([]);
+      toast({
+        title: editingProduct ? "Product updated" : "Product created",
+        description: editingProduct 
+          ? "The product has been updated successfully." 
+          : "The product has been created successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save product. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   return (
@@ -534,7 +649,7 @@ export default function ProductsPage() {
       
       {/* Product dialog form */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
             <DialogDescription>
@@ -547,8 +662,16 @@ export default function ProductsPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <Tabs defaultValue="edit" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="edit">Edit</TabsTrigger>
+                  <TabsTrigger value="bundle" disabled={productType !== "bundle"}>
+                    <Layers className="w-4 h-4 mr-1" />
+                    Bundle
+                  </TabsTrigger>
+                  <TabsTrigger value="units">
+                    <Scale className="w-4 h-4 mr-1" />
+                    Units
+                  </TabsTrigger>
                   <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                 </TabsList>
                 
@@ -678,6 +801,221 @@ export default function ProductsPage() {
                       )}
                     />
                   </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="productType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Type</FormLabel>
+                          <FormControl>
+                            <select
+                              {...field}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                              <option value="standard">Standard Product</option>
+                              <option value="bundle">Bundle (Composite)</option>
+                            </select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="baseUnit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Base Unit</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., pcs, kg, meter" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+                
+                {/* Bundle Components Tab */}
+                <TabsContent value="bundle" className="space-y-4 mt-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+                    <h4 className="font-medium text-purple-900 mb-1 flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Bundle Product
+                    </h4>
+                    <p className="text-sm text-purple-800">
+                      Add component products that make up this bundle. Stock is automatically calculated based on available components.
+                    </p>
+                  </div>
+                  
+                  {bundleComponents.length > 0 && (
+                    <div className="space-y-2">
+                      {bundleComponents.map((component, index) => (
+                        <div key={index} className="flex items-center gap-2 bg-gray-50 p-2 rounded-md">
+                          <div className="flex-1">
+                            <select
+                              value={component.componentProductId}
+                              onChange={(e) => {
+                                const updated = [...bundleComponents];
+                                updated[index].componentProductId = parseInt(e.target.value);
+                                const selectedProduct = products?.find(p => p.id === parseInt(e.target.value));
+                                if (selectedProduct) {
+                                  updated[index].componentProduct = selectedProduct;
+                                }
+                                setBundleComponents(updated);
+                              }}
+                              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                            >
+                              <option value="">Select product...</option>
+                              {products?.filter(p => p.productType !== 'bundle' && p.id !== editingProduct?.id).map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="w-24">
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              placeholder="Qty"
+                              value={component.quantity}
+                              onChange={(e) => {
+                                const updated = [...bundleComponents];
+                                updated[index].quantity = e.target.value;
+                                setBundleComponents(updated);
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setBundleComponents(bundleComponents.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setBundleComponents([...bundleComponents, { componentProductId: 0, quantity: "1" }]);
+                    }}
+                    className="mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Component
+                  </Button>
+                </TabsContent>
+                
+                {/* Multi-Unit Tab */}
+                <TabsContent value="units" className="space-y-4 mt-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <h4 className="font-medium text-blue-900 mb-1 flex items-center gap-2">
+                      <Scale className="h-4 w-4" />
+                      Alternate Selling Units
+                    </h4>
+                    <p className="text-sm text-blue-800">
+                      Define alternative units for selling this product (e.g., box of 12, pack of 6). Each unit can have its own price.
+                    </p>
+                  </div>
+                  
+                  {productUnits.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-5 gap-2 text-xs font-medium text-gray-500 px-2">
+                        <span>Unit Code</span>
+                        <span>Label</span>
+                        <span>Conversion</span>
+                        <span>Price</span>
+                        <span></span>
+                      </div>
+                      {productUnits.map((unit, index) => (
+                        <div key={index} className="grid grid-cols-5 gap-2 items-center bg-gray-50 p-2 rounded-md">
+                          <Input
+                            placeholder="box"
+                            value={unit.unitCode}
+                            onChange={(e) => {
+                              const updated = [...productUnits];
+                              updated[index].unitCode = e.target.value;
+                              setProductUnits(updated);
+                            }}
+                          />
+                          <Input
+                            placeholder="Box of 12"
+                            value={unit.unitLabel}
+                            onChange={(e) => {
+                              const updated = [...productUnits];
+                              updated[index].unitLabel = e.target.value;
+                              setProductUnits(updated);
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            placeholder="12"
+                            value={unit.conversionFactor}
+                            onChange={(e) => {
+                              const updated = [...productUnits];
+                              updated[index].conversionFactor = e.target.value;
+                              setProductUnits(updated);
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Price"
+                            value={unit.price || ""}
+                            onChange={(e) => {
+                              const updated = [...productUnits];
+                              updated[index].price = e.target.value || null;
+                              setProductUnits(updated);
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setProductUnits(productUnits.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setProductUnits([...productUnits, { 
+                        unitCode: "", 
+                        unitLabel: "", 
+                        conversionFactor: "1",
+                        price: null,
+                        isDefault: false
+                      }]);
+                    }}
+                    className="mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Unit
+                  </Button>
                 </TabsContent>
                 
                 <TabsContent value="dashboard" className="space-y-4 mt-4">

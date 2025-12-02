@@ -8,11 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface ProductUnit {
+  id: number;
+  productId: number;
+  unitCode: string;
+  unitLabel: string;
+  conversionFactor: string;
+  price: string | null;
+  isDefault: boolean;
+}
+
 interface Product {
   id: number;
   name: string;
   description: string;
   currentSellingPrice: string;
+  productType?: 'standard' | 'bundle';
+  baseUnit?: string;
 }
 
 interface InvoiceItem {
@@ -25,6 +37,8 @@ interface InvoiceItem {
   tax: string;
   total: string;
   productId: number | null;
+  productUnitId?: number | null;
+  selectedUnit?: ProductUnit | null;
 }
 
 interface InvoiceItemRowProps {
@@ -33,7 +47,7 @@ interface InvoiceItemRowProps {
   products: Product[];
   updateItem: (index: number, item: InvoiceItem) => void;
   removeItem: (index: number) => void;
-  onProductSelect: (index: number, productId: number | null) => void;
+  onProductSelect: (index: number, productId: number | null, productUnitId?: number | null) => void;
 }
 
 export function InvoiceItemRow({ 
@@ -49,18 +63,78 @@ export function InvoiceItemRow({
   const [price, setPrice] = useState(item.price || "0");
   const [taxRate, setTaxRate] = useState(item.taxRate || "0");
   const [productId, setProductId] = useState<string>(item.productId?.toString() || "");
+  const [productUnitId, setProductUnitId] = useState<string>(item.productUnitId?.toString() || "");
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const commandRef = useRef<HTMLDivElement>(null);
 
+  // Fetch product units when product changes
+  useEffect(() => {
+    if (productId && productId !== "0") {
+      fetch(`/api/products/${productId}/units`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : [])
+        .then(units => setProductUnits(units || []))
+        .catch(() => setProductUnits([]));
+    } else {
+      setProductUnits([]);
+      setProductUnitId("");
+    }
+  }, [productId]);
+
   // Define onUpdate to be used within handleProductChange for direct state updates
   const onUpdate = (index: number, updatedItem: InvoiceItem) => {
     setProductId(updatedItem.productId?.toString() || "");
+    setProductUnitId(updatedItem.productUnitId?.toString() || "");
     setDescription(updatedItem.description);
     setQuantity(updatedItem.quantity);
     setPrice(updatedItem.price);
     setTaxRate(updatedItem.taxRate);
     updateItem(index, updatedItem);
+  };
+
+  // Handle unit selection
+  const handleUnitChange = (unitId: string) => {
+    setProductUnitId(unitId);
+    const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
+    
+    if (unitId && unitId !== "") {
+      const selectedUnit = productUnits.find(u => u.id.toString() === unitId);
+      if (selectedUnit) {
+        const newPrice = selectedUnit.price || price;
+        setPrice(newPrice);
+        
+        // Recalculate totals with new price
+        const qty = parseFloat(quantity) || 0;
+        const prc = parseFloat(newPrice) || 0;
+        const rate = parseFloat(taxRate) || 0;
+        const newSubtotal = (qty * prc).toString();
+        const newTax = (parseFloat(newSubtotal) * rate / 100).toString();
+        const newTotal = (parseFloat(newSubtotal) + parseFloat(newTax)).toString();
+        
+        const updatedItem: InvoiceItem = {
+          ...item,
+          productId: currentProductId,
+          productUnitId: parseInt(unitId),
+          selectedUnit,
+          price: newPrice,
+          subtotal: newSubtotal,
+          tax: newTax,
+          total: newTotal,
+        };
+        updateItem(index, updatedItem);
+        onProductSelect(index, currentProductId, parseInt(unitId));
+      }
+    } else {
+      const updatedItem: InvoiceItem = {
+        ...item,
+        productId: currentProductId,
+        productUnitId: null,
+        selectedUnit: null,
+      };
+      updateItem(index, updatedItem);
+      onProductSelect(index, currentProductId, null);
+    }
   };
 
   // Calculate totals when inputs change
@@ -82,11 +156,12 @@ export function InvoiceItemRow({
       subtotal,
       tax,
       total,
-      productId: productId && productId !== "0" ? parseInt(productId) : null
+      productId: productId && productId !== "0" ? parseInt(productId) : null,
+      productUnitId: productUnitId && productUnitId !== "" ? parseInt(productUnitId) : null
     };
 
     updateItem(index, updatedItem);
-  }, [description, quantity, price, taxRate, productId, index, updateItem, item]);
+  }, [description, quantity, price, taxRate, productId, productUnitId, index, updateItem, item]);
 
   // Handle product selection
   const handleProductChange = (value: string) => {
@@ -235,6 +310,27 @@ export function InvoiceItemRow({
             </Command>
           </PopoverContent>
         </Popover>
+      </td>
+
+      {/* Unit selection (only show if product has units) */}
+      <td className="w-[100px]">
+        {productUnits.length > 0 ? (
+          <Select value={productUnitId} onValueChange={handleUnitChange}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Unit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Base unit</SelectItem>
+              {productUnits.map((unit) => (
+                <SelectItem key={unit.id} value={unit.id.toString()}>
+                  {unit.unitLabel}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-xs text-gray-400 px-2">-</span>
+        )}
       </td>
 
       {/* Quantity */}

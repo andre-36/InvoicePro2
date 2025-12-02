@@ -48,6 +48,7 @@ const invoiceItemSchema = z.object({
   tax: z.string().optional(),
   total: z.string().optional(),
   productId: z.number().nullable().optional(),
+  productUnitId: z.number().nullable().optional(),
 });
 
 // Schema for the complete form - conditional based on whether editing
@@ -80,7 +81,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       subtotal: "0",
       tax: "0",
       total: "0",
-      productId: null
+      productId: null,
+      productUnitId: null
     }
   ]);
 
@@ -320,7 +322,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       subtotal: "0",
       tax: "0",
       total: "0",
-      productId: null
+      productId: null,
+      productUnitId: null
     };
 
     setItems([...items, newItem]);
@@ -370,7 +373,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   // Handle product selection
-  const handleProductSelect = (index: number, productId: number | null) => {
+  const handleProductSelect = (index: number, productId: number | null, productUnitId?: number | null) => {
     if (!productId || !products) {
       // If null is passed, clear the item's product-related fields
       if (productId === null) {
@@ -383,6 +386,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           tax: "0",
           total: "0",
           productId: null,
+          productUnitId: null,
         };
         updateItem(index, 'description', ''); // Clear description too
         setItems(prevItems => {
@@ -418,7 +422,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         subtotal,
         tax,
         total,
-        productId
+        productId,
+        productUnitId: productUnitId ?? null
       };
 
       console.log('Setting item at index', index, ':', updatedItem);
@@ -545,6 +550,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       // Transform items to match database schema
       const transformedItems = nonEmptyItems.map(item => ({
         productId: item.productId || 0,
+        productUnitId: item.productUnitId || null,
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.price,
@@ -804,16 +810,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <th scope="col" className="excel-header-cell text-center" style={{ width: '40px' }}>
                           #
                         </th>
-                        <th scope="col" className="excel-header-cell text-left" style={{ width: '40%' }}>
+                        <th scope="col" className="excel-header-cell text-left" style={{ width: '35%' }}>
                           Item / Description
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '100px' }}>
+                        <th scope="col" className="excel-header-cell text-center" style={{ width: '100px' }}>
+                          Unit
+                        </th>
+                        <th scope="col" className="excel-header-cell text-right" style={{ width: '80px' }}>
                           Quantity
                         </th>
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
                           Unit Price
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '100px' }}>
+                        <th scope="col" className="excel-header-cell text-right" style={{ width: '80px' }}>
                           Tax (%)
                         </th>
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
@@ -844,7 +853,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       ))}
                       {/* Add row button inside the table */}
                       <tr>
-                        <td colSpan={7} className="px-3 py-2 border-t border-gray-200">
+                        <td colSpan={8} className="px-3 py-2 border-t border-gray-200">
                           <Button
                             type="button"
                             variant="ghost"
