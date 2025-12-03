@@ -753,59 +753,62 @@ export default function ProductsPage() {
                     )}
                   />
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="costPrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cost Price</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span className="text-gray-500 sm:text-sm">Rp</span>
+                  {/* Hide cost price for bundles - it's calculated from components */}
+                  {productType !== "bundle" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="costPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cost Price</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                  <span className="text-gray-500 sm:text-sm">Rp</span>
+                                </div>
+                                <Input 
+                                  placeholder="0" 
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                  {...field} 
+                                />
                               </div>
-                              <Input 
-                                placeholder="0" 
-                                type="number"
-                                step="1"
-                                min="0"
-                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                {...field} 
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="lowestPrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lowest Price</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span className="text-gray-500 sm:text-sm">Rp</span>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="lowestPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lowest Price</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                  <span className="text-gray-500 sm:text-sm">Rp</span>
+                                </div>
+                                <Input 
+                                  placeholder="0" 
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                  {...field} 
+                                />
                               </div>
-                              <Input 
-                                placeholder="0" 
-                                type="number"
-                                step="1"
-                                min="0"
-                                className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                {...field} 
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
                   
                   <div className={editingProduct ? "grid grid-cols-2 gap-4" : ""}>
                     {/* Only show product type selector when editing an existing product */}
