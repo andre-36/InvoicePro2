@@ -95,10 +95,10 @@ export function InvoiceItemRow({
 
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
-    setProductUnitId(unitId);
+    setProductUnitId(unitId === "base" ? "" : unitId);
     const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
     
-    if (unitId && unitId !== "") {
+    if (unitId && unitId !== "base") {
       const selectedUnit = productUnits.find(u => u.id.toString() === unitId);
       if (selectedUnit) {
         const newPrice = selectedUnit.price || price;
@@ -315,12 +315,12 @@ export function InvoiceItemRow({
       {/* Unit selection (only show if product has units) */}
       <td className="w-[100px]">
         {productUnits.length > 0 ? (
-          <Select value={productUnitId} onValueChange={handleUnitChange}>
+          <Select value={productUnitId || "base"} onValueChange={handleUnitChange}>
             <SelectTrigger className="h-8 text-sm">
               <SelectValue placeholder="Unit" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Base unit</SelectItem>
+              <SelectItem value="base">Base unit</SelectItem>
               {productUnits.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id.toString()}>
                   {unit.unitLabel}
