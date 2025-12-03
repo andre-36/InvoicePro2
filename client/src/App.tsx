@@ -74,6 +74,9 @@ function App() {
             if (loginRes.ok) {
               const userData = await loginRes.json();
               setUser(userData);
+              
+              // Invalidate cached user data to ensure fresh data on settings page
+              queryClient.invalidateQueries({ queryKey: ['/api/user'] });
 
               // If we're at the root path, redirect to dashboard
               if (location === '/') {

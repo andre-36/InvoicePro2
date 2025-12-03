@@ -361,7 +361,14 @@ export default function SettingsPage() {
     }
   });
 
-  // Set form values when user data is loaded (only once)
+  // Reset hasInitialized when component unmounts (so it reinitializes when user navigates back)
+  useEffect(() => {
+    return () => {
+      hasInitialized.current = false;
+    };
+  }, []);
+
+  // Set form values when user data is loaded (only once per mount)
   useEffect(() => {
     if (userData && !hasInitialized.current) {
       profileForm.reset({
