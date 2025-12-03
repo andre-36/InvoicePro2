@@ -368,14 +368,14 @@ export default function ProductsPage() {
   };
   
   // Reset form for new product
-  const handleAddNew = () => {
+  const handleAddNew = (type: "standard" | "bundle" = "standard") => {
     setEditingProduct(null);
     form.reset({
       name: "",
       sku: "",
       description: "",
       currentSellingPrice: "",
-      productType: "standard",
+      productType: type,
       baseUnit: "",
     });
     setBundleComponents([]);
@@ -484,9 +484,14 @@ export default function ProductsPage() {
             Import
           </Button>
           
-          <Button onClick={handleAddNew}>
+          <Button onClick={() => handleAddNew("standard")}>
             <Plus className="mr-2 h-4 w-4" />
             Add Product
+          </Button>
+          
+          <Button variant="outline" onClick={() => handleAddNew("bundle")}>
+            <Layers className="mr-2 h-4 w-4" />
+            Add Bundle
           </Button>
         </div>
       </div>
@@ -525,10 +530,16 @@ export default function ProductsPage() {
                   : "You haven't added any products yet. Get started by adding your first product."}
               </p>
               {!searchQuery && (
-                <Button onClick={handleAddNew}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Product
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => handleAddNew("standard")}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Product
+                  </Button>
+                  <Button variant="outline" onClick={() => handleAddNew("bundle")}>
+                    <Layers className="mr-2 h-4 w-4" />
+                    Add Bundle
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
@@ -651,11 +662,19 @@ export default function ProductsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
+            <DialogTitle>
+              {editingProduct 
+                ? (editingProduct.productType === "bundle" ? "Edit Bundle" : "Edit Product")
+                : (productType === "bundle" ? "Add Bundle" : "Add Product")}
+            </DialogTitle>
             <DialogDescription>
               {editingProduct 
-                ? "Update the details of your product or service"
-                : "Enter the details of your product or service"}
+                ? (editingProduct.productType === "bundle" 
+                    ? "Update the details of your bundle product"
+                    : "Update the details of your product or service")
+                : (productType === "bundle"
+                    ? "Create a bundle product made from multiple component products"
+                    : "Enter the details of your product or service")}
             </DialogDescription>
           </DialogHeader>
           
@@ -788,26 +807,29 @@ export default function ProductsPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="productType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Product Type</FormLabel>
-                          <FormControl>
-                            <select
-                              {...field}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            >
-                              <option value="standard">Standard Product</option>
-                              <option value="bundle">Bundle (Composite)</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className={editingProduct ? "grid grid-cols-2 gap-4" : ""}>
+                    {/* Only show product type selector when editing an existing product */}
+                    {editingProduct && (
+                      <FormField
+                        control={form.control}
+                        name="productType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Product Type</FormLabel>
+                            <FormControl>
+                              <select
+                                {...field}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <option value="standard">Standard Product</option>
+                                <option value="bundle">Bundle (Composite)</option>
+                              </select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     
                     <FormField
                       control={form.control}
