@@ -136,6 +136,7 @@ export default function ProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       setIsDialogOpen(false);
       setEditingProduct(null);
       toast({
@@ -161,6 +162,7 @@ export default function ProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       toast({
         title: "Product deleted",
         description: "The product has been deleted successfully.",
@@ -222,6 +224,7 @@ export default function ProductsPage() {
     },
     onSuccess: (result: { message?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       toast({
         title: "Import completed",
         description: result.message || "Products imported successfully",
@@ -421,6 +424,7 @@ export default function ProductsPage() {
       }
       
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       setIsDialogOpen(false);
       setEditingProduct(null);
       setBundleComponents([]);
