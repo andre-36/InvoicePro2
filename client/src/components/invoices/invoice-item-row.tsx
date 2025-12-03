@@ -320,7 +320,9 @@ export function InvoiceItemRow({
               <SelectValue placeholder="Unit" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="base">Base unit</SelectItem>
+              <SelectItem value="base">
+                {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+              </SelectItem>
               {productUnits.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id.toString()}>
                   {unit.unitLabel}
