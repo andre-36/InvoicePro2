@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Check, Plus, Trash2 } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ChevronsUpDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertQuotationSchema } from "@shared/schema";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format } from "date-fns";
@@ -71,6 +73,9 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
       productId: null
     }
   ]);
+  
+  // Client combobox state
+  const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
 
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
@@ -316,25 +321,54 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                   control={form.control}
                   name="quotation.clientId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Client</FormLabel>
-                      <Select 
-                        value={field.value?.toString() || ""} 
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-client">
-                            <SelectValue placeholder="Select a client" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Array.isArray(clients) && clients.map((client: any) => (
-                            <SelectItem key={client.id} value={client.id.toString()}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={clientComboboxOpen} onOpenChange={setClientComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={clientComboboxOpen}
+                              className="w-full justify-between font-normal"
+                              data-testid="button-select-client"
+                            >
+                              {field.value && field.value !== 0
+                                ? (Array.isArray(clients) ? clients.find((client: any) => client.id === field.value)?.name : null)
+                                : "Select a client"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search clients..." data-testid="input-search-client" />
+                            <CommandList>
+                              <CommandEmpty>No client found.</CommandEmpty>
+                              <CommandGroup>
+                                {Array.isArray(clients) && clients.map((client: any) => (
+                                  <CommandItem
+                                    key={client.id}
+                                    value={client.name}
+                                    onSelect={() => {
+                                      field.onChange(client.id);
+                                      setClientComboboxOpen(false);
+                                    }}
+                                    data-testid={`client-option-${client.id}`}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        field.value === client.id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {client.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
