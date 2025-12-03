@@ -97,6 +97,7 @@ export function InvoiceItemRow({
   const handleUnitChange = (unitId: string) => {
     setProductUnitId(unitId === "base" ? "" : unitId);
     const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
+    const selectedProduct = products.find(p => p.id.toString() === productId);
     
     if (unitId && unitId !== "base") {
       const selectedUnit = productUnits.find(u => u.id.toString() === unitId);
@@ -126,11 +127,27 @@ export function InvoiceItemRow({
         onProductSelect(index, currentProductId, parseInt(unitId));
       }
     } else {
+      // Switching back to base unit - reset price to product's original selling price
+      const basePrice = selectedProduct?.currentSellingPrice || price;
+      setPrice(basePrice);
+      
+      // Recalculate totals with base price
+      const qty = parseFloat(quantity) || 0;
+      const prc = parseFloat(basePrice) || 0;
+      const rate = parseFloat(taxRate) || 0;
+      const newSubtotal = (qty * prc).toString();
+      const newTax = (parseFloat(newSubtotal) * rate / 100).toString();
+      const newTotal = (parseFloat(newSubtotal) + parseFloat(newTax)).toString();
+      
       const updatedItem: InvoiceItem = {
         ...item,
         productId: currentProductId,
         productUnitId: null,
         selectedUnit: null,
+        price: basePrice,
+        subtotal: newSubtotal,
+        tax: newTax,
+        total: newTotal,
       };
       updateItem(index, updatedItem);
       onProductSelect(index, currentProductId, null);
