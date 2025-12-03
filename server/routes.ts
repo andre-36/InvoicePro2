@@ -791,6 +791,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertProductSchema, req, res);
       if (!validatedData) return;
       
+      // Check for duplicate SKU
+      if (validatedData.sku) {
+        const existingProduct = await storage.getProductBySku(validatedData.sku);
+        if (existingProduct) {
+          res.status(409).json({ error: "A product with this SKU/Code already exists" });
+          return;
+        }
+      }
+      
       const newProduct = await storage.createProduct(validatedData);
       res.status(201).json(newProduct);
     } catch (error) {
@@ -804,6 +813,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productId = parseInt(req.params.id);
       const validatedData = validateRequestBody(insertProductSchema.partial(), req, res);
       if (!validatedData) return;
+      
+      // Check for duplicate SKU (excluding current product)
+      if (validatedData.sku) {
+        const existingProduct = await storage.getProductBySku(validatedData.sku);
+        if (existingProduct && existingProduct.id !== productId) {
+          res.status(409).json({ error: "A product with this SKU/Code already exists" });
+          return;
+        }
+      }
       
       const updatedProduct = await storage.updateProduct(productId, validatedData);
       res.json(updatedProduct);

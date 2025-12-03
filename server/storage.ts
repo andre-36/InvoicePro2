@@ -69,6 +69,7 @@ export interface IStorage {
 
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
+  getProductBySku(sku: string): Promise<Product | undefined>;
   getProducts(storeId?: number): Promise<Product[]>;
   getProductsWithLowStock(storeId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;

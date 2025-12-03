@@ -117,7 +117,7 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
   return {
-    skuIdx: index("products_sku_idx").on(table.sku),
+    skuIdx: uniqueIndex("products_sku_unique_idx").on(table.sku),
     categoryIdIdx: index("products_category_id_idx").on(table.categoryId),
     nameIdx: index("products_name_idx").on(table.name),
     productTypeIdx: index("products_product_type_idx").on(table.productType)

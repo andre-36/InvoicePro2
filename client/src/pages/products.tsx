@@ -118,6 +118,7 @@ export default function ProductsPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [bundleComponents, setBundleComponents] = useState<BundleComponent[]>([]);
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -388,6 +389,10 @@ export default function ProductsPage() {
   
   // Submit form handler
   const onSubmit = async (data: ProductFormValues) => {
+    // Prevent double submission
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    
     try {
       // First save the product
       let productId = editingProduct?.id;
@@ -435,13 +440,34 @@ export default function ProductsPage() {
           ? "The product has been updated successfully." 
           : "The product has been created successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving product:", error);
+      // Parse error message - format is "409: {\"error\": \"...\"}" or similar
+      let displayMessage = "Failed to save product. Please try again.";
+      const errorMsg = error?.message || "";
+      
+      if (errorMsg.includes("409")) {
+        // Try to extract JSON error message
+        const jsonMatch = errorMsg.match(/\{.*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            displayMessage = parsed.error || displayMessage;
+          } catch {
+            displayMessage = "A product with this SKU/Code already exists";
+          }
+        } else {
+          displayMessage = "A product with this SKU/Code already exists";
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to save product. Please try again.",
+        description: displayMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -1076,9 +1102,9 @@ export default function ProductsPage() {
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={productMutation.isPending}
+                  disabled={isSubmitting}
                 >
-                  {editingProduct ? "Update" : "Create"}
+                  {isSubmitting ? "Saving..." : (editingProduct ? "Update" : "Create")}
                 </Button>
               </DialogFooter>
             </form>
