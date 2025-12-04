@@ -286,9 +286,8 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Client #</TableHead>
+                  <TableHead className="w-[140px] whitespace-nowrap">Client #</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
@@ -297,9 +296,8 @@ export default function ClientsPage() {
               <TableBody>
                 {Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-8" /></TableCell>
@@ -331,9 +329,8 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Client #</TableHead>
+                  <TableHead className="w-[140px] whitespace-nowrap">Client #</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
@@ -347,17 +344,8 @@ export default function ClientsPage() {
                     onDoubleClick={() => handleViewDetails(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
-                    <TableCell className="text-gray-500 dark:text-gray-400 font-mono text-sm" data-testid={`text-client-number-${client.id}`}>{client.clientNumber}</TableCell>
+                    <TableCell className="text-gray-500 dark:text-gray-400 font-mono text-sm whitespace-nowrap" data-testid={`text-client-number-${client.id}`}>{client.clientNumber}</TableCell>
                     <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>
-                      {client.email ? (
-                        <a href={`mailto:${client.email}`} className="text-blue-600 dark:text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>
-                          {client.email}
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </TableCell>
                     <TableCell>
                       {client.phone ? (
                         <a href={`tel:${client.phone}`} className="text-blue-600 dark:text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>
