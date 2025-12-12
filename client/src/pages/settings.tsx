@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { UploadResult } from "@uppy/core";
 
 // Profile settings schema
@@ -78,6 +89,15 @@ const paymentTermSchema = z.object({
   storeId: z.number().default(1)
 });
 
+// Category schema
+const categorySchema = z.object({
+  name: z.string().min(1, "Category name is required"),
+  description: z.string().optional(),
+});
+
+type CategoryFormData = z.infer<typeof categorySchema>;
+type Category = { id: number; name: string; description: string | null };
+
 type ProfileFormValues = z.infer<typeof profileSchema>;
 type CompanyFormValues = z.infer<typeof companySchema>;
 type PaymentFormValues = z.infer<typeof paymentSchema>;
@@ -94,6 +114,9 @@ export default function SettingsPage() {
   const [editingTermId, setEditingTermId] = useState<number | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
@@ -110,6 +133,11 @@ export default function SettingsPage() {
 
   const { data: paymentTerms } = useQuery({
     queryKey: ['/api/stores/1/payment-terms'],
+  });
+
+  // Fetch categories
+  const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
   });
 
   // Profile form setup
@@ -182,6 +210,15 @@ export default function SettingsPage() {
       description: "",
       isActive: true,
       storeId: 1
+    }
+  });
+
+  // Category form setup
+  const categoryForm = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
     }
   });
 
@@ -361,6 +398,57 @@ export default function SettingsPage() {
     }
   });
 
+  // Category mutations
+  const categoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id?: number, data: CategoryFormData }) => {
+      if (id) {
+        return apiRequest('PUT', `/api/categories/${id}`, data);
+      } else {
+        return apiRequest('POST', '/api/categories', data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setIsCategoryDialogOpen(false);
+      setEditingCategory(null);
+      categoryForm.reset();
+      toast({
+        title: editingCategory ? "Category updated" : "Category created",
+        description: editingCategory 
+          ? "The category has been updated successfully." 
+          : "The category has been created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      setDeletingCategory(null);
+      toast({
+        title: "Category deleted",
+        description: "The category has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Reset hasInitialized when component unmounts (so it reinitializes when user navigates back)
   useEffect(() => {
     return () => {
@@ -483,6 +571,38 @@ export default function SettingsPage() {
       updateTermMutation.mutate({ id: editingTermId, data });
     } else {
       createTermMutation.mutate(data);
+    }
+  };
+
+  // Category handlers
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    categoryForm.reset({
+      name: category.name,
+      description: category.description || "",
+    });
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleAddCategory = () => {
+    setEditingCategory(null);
+    categoryForm.reset({
+      name: "",
+      description: "",
+    });
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleSubmitCategory = (data: CategoryFormData) => {
+    categoryMutation.mutate({
+      id: editingCategory?.id,
+      data,
+    });
+  };
+
+  const handleDeleteCategory = () => {
+    if (deletingCategory) {
+      deleteCategoryMutation.mutate(deletingCategory.id);
     }
   };
 
@@ -623,6 +743,10 @@ export default function SettingsPage() {
             <TabsTrigger value="backup" className="gap-2">
               <Database className="h-4 w-4" />
               <span>Backup</span>
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2">
+              <FolderOpen className="h-4 w-4" />
+              <span>Categories</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1291,7 +1415,177 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="categories" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Product Categories</CardTitle>
+                <CardDescription>Manage product categories for better organization</CardDescription>
+              </div>
+              <Button 
+                onClick={handleAddCategory}
+                data-testid="button-add-category"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {categoriesLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !categories || categories.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No categories</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Get started by creating a new category.
+                  </p>
+                  <div className="mt-6">
+                    <Button onClick={handleAddCategory}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Category
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categories.map((category) => (
+                      <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
+                          {category.name}
+                        </TableCell>
+                        <TableCell className="text-gray-500 dark:text-gray-400" data-testid={`text-category-description-${category.id}`}>
+                          {category.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditCategory(category)}
+                              data-testid={`button-edit-category-${category.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingCategory(category)}
+                              data-testid={`button-delete-category-${category.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Category Add/Edit Dialog */}
+      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+          </DialogHeader>
+          <Form {...categoryForm}>
+            <form onSubmit={categoryForm.handleSubmit(handleSubmitCategory)} className="space-y-4">
+              <FormField
+                control={categoryForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., Aluminum Profiles" 
+                        {...field} 
+                        data-testid="input-category-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={categoryForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter category description..." 
+                        {...field} 
+                        value={field.value || ""}
+                        data-testid="input-category-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsCategoryDialogOpen(false)}
+                  data-testid="button-cancel-category"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={categoryMutation.isPending}
+                  data-testid="button-submit-category"
+                >
+                  {categoryMutation.isPending ? "Saving..." : (editingCategory ? "Update" : "Create")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the category "{deletingCategory?.name}". 
+              Products in this category will not be deleted but will have no category assigned.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-category">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCategory}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteCategoryMutation.isPending}
+              data-testid="button-confirm-delete-category"
+            >
+              {deleteCategoryMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Payment Type Dialog */}
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>

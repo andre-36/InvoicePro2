@@ -22,7 +22,6 @@ import CreateClientPage from "@/pages/clients/create";
 import ClientDetailPage from "@/pages/clients/client-detail";
 import ProductsPage from "@/pages/products";
 import ProductDashboard from "@/pages/products/dashboard";
-import CategoriesPage from "@/pages/categories";
 import SuppliersPage from "@/pages/suppliers";
 import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
@@ -162,7 +161,6 @@ function App() {
                 <Route path="/products/:id/dashboard">
                   {params => <ProductDashboard id={parseInt(params.id)} />}
                 </Route>
-                <Route path="/categories" component={CategoriesPage} />
                 <Route path="/suppliers" component={SuppliersPage} />
                 <Route path="/transactions" component={TransactionsPage} />
                 <Route path="/reports" component={ReportsPage} />
