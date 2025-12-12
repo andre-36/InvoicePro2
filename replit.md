@@ -10,6 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### December 12, 2025 - UI Simplification
+- **Navigation**: Moved Categories from sidebar into Settings page as a new "Categories" tab
+  - Removed standalone Categories page and route
+  - Categories management now accessible via Settings > Categories tab
+  - Full CRUD functionality preserved (add, edit, delete categories)
+- **Clients List**: Removed email column and widened Client # column for cleaner display
+
 ### November 23, 2025 - Invoice Payment Tracking
 - **Feature**: Implemented comprehensive invoice payment tracking system
   - Added invoice_payments database table with payment date, type, amount, notes, and reference fields
