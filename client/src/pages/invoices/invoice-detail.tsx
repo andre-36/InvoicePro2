@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -58,7 +58,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     queryKey: ['/api/invoices', id],
   });
 
-  const { data: paymentsData = [] } = useQuery({
+  const { data: paymentsData } = useQuery<any[]>({
     queryKey: ['/api/invoices', id, 'payments'],
   });
 
