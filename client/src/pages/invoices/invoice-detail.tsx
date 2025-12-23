@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PrintSettings } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +60,24 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   const { data: paymentsData } = useQuery<any[]>({
     queryKey: ['/api/invoices', id, 'payments'],
+  });
+
+  // Fetch print settings
+  const { data: printSettings } = useQuery<PrintSettings>({
+    queryKey: ['/api/stores/1/print-settings'],
+  });
+
+  // Fetch current user for company information
+  const { data: currentUser } = useQuery<{
+    companyName?: string;
+    companyTagline?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    companyEmail?: string;
+    taxNumber?: string;
+    logoUrl?: string;
+  }>({
+    queryKey: ['/api/user'],
   });
 
   const invoice = invoiceData?.invoice;
@@ -377,7 +395,131 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const isEditable = invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'void';
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Print-only template */}
+      <div className="print-only" style={{ display: 'none' }}>
+        <div className="print-invoice-template">
+          {/* Header */}
+          <div className="print-header">
+            <div className="print-header-left">
+              <div className="print-logo">
+                {currentUser?.logoUrl ? (
+                  <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
+                ) : (
+                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                    {currentUser?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                  </div>
+                )}
+              </div>
+              <div className="print-bill-to">
+                <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
+                <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
+                {client && (
+                  <div className="print-bill-to-details">
+                    {client.phone && <div>{client.phone}</div>}
+                    {client.address && <div>{client.address}</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="print-header-center">
+              <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
+              {currentUser?.companyTagline && (
+                <div className="print-company-tagline">{currentUser.companyTagline}</div>
+              )}
+              <div className="print-company-address">
+                {currentUser?.companyAddress || "Your Company Address"}
+                {(currentUser?.companyPhone || currentUser?.companyEmail) && (
+                  <>
+                    <br />
+                    {currentUser.companyPhone && `(Phone) ${currentUser.companyPhone}`}
+                    {currentUser.companyPhone && currentUser.companyEmail && ' '}
+                    {currentUser.companyEmail && `(Email) ${currentUser.companyEmail}`}
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div className="print-header-right">
+              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>Invoice</div>
+              <div className="print-doc-details">
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Invoice #</span>
+                  <span className="print-doc-value">{invoice.invoiceNumber}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Inv Date</span>
+                  <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Terms</span>
+                  <span className="print-doc-value">{(invoice as any).paymentTerms || ''}</span>
+                </div>
+                {printSettings?.showPONumber !== false && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">PO #</span>
+                    <span className="print-doc-value">{(invoice as any).poNumber || ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Page indicator */}
+          <div className="print-page-number">1/1</div>
+
+          {/* Items Table */}
+          <table className="print-items-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>QTY</th>
+                <th>Rate</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
+                  <td>{item.description}</td>
+                  <td className="print-text-right">{item.quantity}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Footer */}
+          <div className="print-footer">
+            <div className="print-footer-left">
+              <div className="print-notes-label">Notes:</div>
+              <div className="print-notes-text">
+                {invoice.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+              </div>
+            </div>
+            
+            <div className="print-footer-right">
+              {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Shipping</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
+                </div>
+              )}
+              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                <span className="print-total-label">Total</span>
+                <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen view */}
+      <div className="space-y-6 screen-only">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-4">
@@ -451,6 +593,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           >
             <FileDown className="h-4 w-4" />
             <span>Download PDF</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            className="gap-1"
+            onClick={() => window.print()}
+            data-testid="button-print-invoice"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print</span>
           </Button>
           
           {isEditable && (
@@ -811,6 +963,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           </TabsContent>
         </Tabs>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }
