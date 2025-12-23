@@ -100,38 +100,49 @@
   }
 }
 
-/* Print styles for Half Size Paper (24cm x 14cm) */
+/* Print styles for PRS Paper Landscape (24cm x 14cm) */
 @media print {
   @page {
-    size: 24cm 14cm;
-    margin: 0.4cm;
+    size: 24cm 14cm landscape;
+    margin: 0.5cm 0.4cm;
   }
 
   * {
     overflow: visible !important;
-    box-sizing: border-box;
   }
 
-  html, body {
+  html,
+  body {
     background: white !important;
     color: black !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
-    font-family: Arial, sans-serif;
-    font-size: 9pt;
+    overflow: visible !important;
   }
 
-  body > div, #root, main {
+  body > div,
+  #root,
+  main {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
   }
 
-  /* Hide all screen elements */
-  nav, header, .fixed.inset-y-0, .sidebar, button, .bg-gray-900, .screen-only {
+  /* Hide sidebar and navigation elements */
+  nav,
+  header,
+  .fixed.inset-y-0,
+  .sidebar,
+  button,
+  .bg-gray-900 {
+    display: none !important;
+  }
+
+  /* Hide screen-only content */
+  .screen-only {
     display: none !important;
   }
 
@@ -139,269 +150,283 @@
   .print-only {
     display: block !important;
     visibility: visible !important;
+    opacity: 1 !important;
     position: static !important;
-    width: 100% !important;
+    width: auto !important;
+    height: auto !important;
   }
 
-  /* Main print template - constrained to fit one page */
-  .print-template {
+  .print-invoice-template {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Print template layout */
+  .print-invoice-template {
     width: 100%;
-    max-width: 23.2cm;
-    max-height: 13.2cm;
-    padding: 0.2cm;
-    position: relative;
+    font-family: 'Times New Roman', serif;
     font-size: 9pt;
     line-height: 1.2;
-    overflow: hidden;
-    page-break-inside: avoid;
+    color: #000;
   }
 
-  /* Page number indicator */
-  .print-page-indicator {
-    position: absolute;
-    top: 0;
-    right: 0;
-    background: #666;
-    color: white;
-    padding: 0.1cm 0.2cm;
-    font-size: 8pt;
+  /* Header */
+  .print-header {
+    display: grid;
+    grid-template-columns: 6cm 8.5cm 4.5cm;
+    gap: 0.5cm;
+    margin-bottom: 0.4cm;
+    position: relative;
   }
 
-  /* Header row with 3 columns */
-  .print-header-row {
+  .print-header-left {
     display: flex;
-    gap: 0.4cm;
+    flex-direction: column;
+  }
+
+  .print-header-center {
+    text-align: center;
+    padding: 0 0.3cm;
+  }
+
+  .print-header-right {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Logo */
+  .print-logo {
     margin-bottom: 0.3cm;
-    align-items: flex-start;
   }
 
-  /* Logo section - strictly constrained */
-  .print-logo-section {
-    width: 2.5cm !important;
-    max-width: 2.5cm !important;
-    height: 2.5cm !important;
-    max-height: 2.5cm !important;
-    flex-shrink: 0;
-    overflow: hidden !important;
-  }
-
-  .print-company-logo {
-    display: block !important;
-    width: 2.5cm !important;
-    max-width: 2.5cm !important;
-    height: 2.5cm !important;
-    max-height: 2.5cm !important;
-    object-fit: contain !important;
-    border-radius: 50%;
-  }
-
-  .print-logo-placeholder {
-    width: 2.5cm !important;
-    height: 2.5cm !important;
-    max-width: 2.5cm !important;
-    max-height: 2.5cm !important;
-    border: 3px solid #333;
+  .print-logo-circle {
+    width: 2.2cm;
+    height: 2.2cm;
+    border: 3px solid #000;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14pt;
-    font-weight: bold;
-    background: #f0f0f0;
-  }
-
-  /* Company section */
-  .print-company-section {
-    flex: 1;
-    text-align: center;
-    padding-top: 0.2cm;
-  }
-
-  .print-company-name {
-    font-size: 14pt;
-    font-weight: bold;
-    margin-bottom: 0.15cm;
-  }
-
-  .print-company-details {
     font-size: 8pt;
-    color: #333;
-    line-height: 1.4;
-  }
-
-  /* Document section */
-  .print-document-section {
-    width: 5.5cm;
-    flex-shrink: 0;
-  }
-
-  .print-document-title {
-    font-size: 14pt;
     font-weight: bold;
-    margin-bottom: 0.2cm;
-    color: #333;
+    background: white;
   }
 
-  .print-document-info {
-    font-size: 9pt;
+  /* Bill To */
+  .print-bill-to {
+    flex: 1;
   }
 
-  .print-info-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.1cm;
-  }
-
-  .print-info-label {
-    color: #666;
-  }
-
-  .print-info-value {
-    font-weight: 500;
-  }
-
-  /* Bill To section */
-  .print-billto-section {
-    margin-bottom: 0.4cm;
-    max-width: 8cm;
-  }
-
-  .print-billto-title {
+  .print-bill-to-label {
     font-weight: bold;
     font-size: 10pt;
-    border-bottom: 1.5px solid #000;
-    display: inline-block;
+    border-bottom: 2px solid #000;
     padding-bottom: 0.05cm;
     margin-bottom: 0.15cm;
   }
 
-  .print-billto-content {
+  .print-bill-to-name {
     font-size: 9pt;
-    line-height: 1.4;
+    font-weight: normal;
   }
 
-  .print-billto-name {
-    font-weight: 500;
+  /* Company info */
+  .print-company-name {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 0.1cm;
+    letter-spacing: 0.5pt;
+  }
+
+  .print-company-tagline {
+    font-size: 9pt;
+    font-weight: bold;
+    margin-bottom: 0.15cm;
+    text-transform: uppercase;
+  }
+
+  .print-company-address {
+    font-size: 8pt;
+    line-height: 1.3;
+  }
+
+  /* Document type and details */
+  .print-doc-type {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: left;
+    margin-bottom: 0.3cm;
+    text-transform: uppercase;
+    color: #000;
+    border-bottom: 2px solid #000;
+    padding-bottom: 0.1cm;
+  }
+
+  .print-doc-details {
+    font-size: 9pt;
+    line-height: 1.6;
+  }
+
+  .print-doc-row {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    margin-bottom: 0.1cm;
+  }
+
+  .print-doc-label {
+    font-weight: bold;
+    color: #333;
+  }
+
+  .print-doc-value {
+    text-align: left;
+    font-weight: normal;
+  }
+
+  /* Page number */
+  .print-page-number {
+    position: absolute;
+    top: 0.5cm;
+    right: 0.5cm;
+    font-size: 8pt;
+    color: #999;
+    font-style: italic;
   }
 
   /* Items table */
   .print-items-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 0.3cm;
+    margin: 0.5cm 0;
     font-size: 9pt;
+  }
+
+  .print-items-table thead {
+    background-color: #e8e8e8;
   }
 
   .print-items-table th {
-    background: #e0e0e0;
-    border: 1px solid #999;
-    padding: 0.15cm 0.2cm;
-    text-align: left;
     font-weight: bold;
-    font-size: 8pt;
+    text-align: left;
+    padding: 0.25cm 0.2cm;
+    border: 1px solid #000;
+    background-color: #ddd;
   }
 
   .print-items-table td {
+    padding: 0.2cm;
     border: 1px solid #ccc;
-    padding: 0.15cm 0.2cm;
     vertical-align: top;
   }
 
-  .print-col-code { width: 2cm; }
-  .print-col-desc { width: auto; }
-  .print-col-qty { width: 1.5cm; text-align: right; }
-  .print-col-rate { width: 2cm; text-align: right; }
-  .print-col-total { width: 2cm; text-align: right; }
-
-  .print-items-table th.print-col-qty,
-  .print-items-table th.print-col-rate,
-  .print-items-table th.print-col-total {
+  .print-items-table th:nth-child(3),
+  .print-items-table th:nth-child(4),
+  .print-items-table th:nth-child(5),
+  .print-items-table td:nth-child(3),
+  .print-items-table td:nth-child(4),
+  .print-items-table td:nth-child(5) {
     text-align: right;
   }
 
-  .print-align-right {
+  .print-text-right {
     text-align: right;
   }
 
-  /* Footer row */
-  .print-footer-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 1cm;
-    margin-bottom: 0.3cm;
-  }
-
-  .print-notes-section {
-    flex: 1;
-    max-width: 12cm;
-  }
-
-  .print-notes-title {
-    font-weight: bold;
-    font-size: 9pt;
-    margin-bottom: 0.1cm;
-  }
-
-  .print-notes-content {
-    font-size: 8pt;
-    color: #444;
-    line-height: 1.4;
-  }
-
-  .print-totals-section {
-    width: 6cm;
-    flex-shrink: 0;
-  }
-
-  .print-subtotal-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.1cm 0;
-    border-bottom: 1px solid #ddd;
-    font-size: 9pt;
-  }
-
-  .print-grandtotal-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.15cm 0;
-    font-weight: bold;
-    font-size: 11pt;
-    border-top: 2px solid #000;
-    margin-top: 0.1cm;
-  }
-
-  .print-grandtotal-value {
-    font-weight: bold;
-  }
-
-  /* Signature row */
-  .print-signature-row {
-    display: flex;
-    justify-content: space-around;
-    margin-top: 0.3cm;
-    padding-top: 0.2cm;
-    border-top: 1px solid #ccc;
-  }
-
-  .print-signature-block {
+  .print-text-center {
     text-align: center;
-    width: 6cm;
   }
 
-  .print-signature-title {
+  /* Footer */
+  .print-footer {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 0.8cm;
+    margin-top: 0.4cm;
+    border-top: 2px solid #000;
+    padding-top: 0.3cm;
+  }
+
+  .print-footer-left {
+    padding-right: 0.5cm;
+  }
+
+  .print-footer-right {
+    border-left: 1px solid #ccc;
+    padding-left: 0.4cm;
+    background-color: #f9f9f9;
+  }
+
+  .print-notes-label {
     font-weight: bold;
-    font-size: 9pt;
-    margin-bottom: 0.5cm;
+    font-size: 10pt;
+    margin-bottom: 0.2cm;
+    color: #000;
+  }
+
+  .print-notes-text {
+    font-size: 8pt;
+    line-height: 1.5;
+    color: #333;
+  }
+
+  .print-total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2cm 0.3cm;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .print-total-row.print-total-final {
+    border-top: 2px solid #000;
+    border-bottom: none;
+    font-weight: bold;
+    font-size: 12pt;
+    padding: 0.3cm;
+    margin-top: 0.2cm;
+    background-color: #e8e8e8;
+  }
+
+  .print-total-label {
+    font-weight: bold;
+    color: #333;
+  }
+
+  .print-total-value {
+    text-align: right;
+    min-width: 3.5cm;
+    font-weight: normal;
+  }
+
+  .print-total-final .print-total-label,
+  .print-total-final .print-total-value {
+    font-weight: bold;
+    color: #000;
+  }
+
+  /* Signature area */
+  .print-signature-area {
+    margin-top: 1cm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1cm;
+    page-break-inside: avoid;
+  }
+
+  .print-signature-box {
+    text-align: center;
+    padding-top: 0.5cm;
   }
 
   .print-signature-line {
-    border-bottom: 1px solid #000;
-    margin-bottom: 0.15cm;
+    border-top: 1px solid #000;
+    margin-top: 1.5cm;
+    padding-top: 0.2cm;
+    font-size: 9pt;
   }
 
-  .print-signature-name {
-    font-size: 8pt;
-    color: #333;
+  .print-signature-label {
+    font-weight: bold;
+    font-size: 9pt;
+    margin-bottom: 0.2cm;
   }
 }

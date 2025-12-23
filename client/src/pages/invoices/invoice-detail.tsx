@@ -398,76 +398,86 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     <>
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
-        <div className="print-template">
-          {/* Page number indicator */}
-          <div className="print-page-indicator">1</div>
-
-          {/* Header Row: Logo | Company Info | Document Info */}
-          <div className="print-header-row">
-            {/* Logo */}
-            <div className="print-logo-section">
-              {currentUser?.logoUrl ? (
-                <img src={currentUser.logoUrl} alt="Company Logo" className="print-company-logo" />
-              ) : (
-                <div className="print-logo-placeholder">
-                  {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
-                </div>
+        <div className="print-invoice-template">
+          {/* Header */}
+          <div className="print-header">
+            <div className="print-header-left">
+              <div className="print-logo">
+                {currentUser?.logoUrl ? (
+                  <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
+                ) : (
+                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                    {currentUser?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                  </div>
+                )}
+              </div>
+              <div className="print-bill-to">
+                <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
+                <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
+                {client && (
+                  <div className="print-bill-to-details">
+                    {client.phone && <div>{client.phone}</div>}
+                    {client.address && <div>{client.address}</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="print-header-center">
+              <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
+              {currentUser?.companyTagline && (
+                <div className="print-company-tagline">{currentUser.companyTagline}</div>
               )}
-            </div>
-
-            {/* Company Info */}
-            <div className="print-company-section">
-              <div className="print-company-name">{currentUser?.companyName || "Company Name"}</div>
-              <div className="print-company-details">
-                {currentUser?.companyAddress || "Company Address"}
-                {currentUser?.companyPhone && <><br />Phone: {currentUser.companyPhone}</>}
+              <div className="print-company-address">
+                {currentUser?.companyAddress || "Your Company Address"}
+                {(currentUser?.companyPhone || currentUser?.companyEmail) && (
+                  <>
+                    <br />
+                    {currentUser.companyPhone && `(Phone) ${currentUser.companyPhone}`}
+                    {currentUser.companyPhone && currentUser.companyEmail && ' '}
+                    {currentUser.companyEmail && `(Email) ${currentUser.companyEmail}`}
+                  </>
+                )}
               </div>
             </div>
-
-            {/* Document Info */}
-            <div className="print-document-section">
-              <div className="print-document-title">INVOICE</div>
-              <div className="print-document-info">
-                <div className="print-info-row">
-                  <span className="print-info-label">No.</span>
-                  <span className="print-info-value">{invoice.invoiceNumber}</span>
+            
+            <div className="print-header-right">
+              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>Invoice</div>
+              <div className="print-doc-details">
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Invoice #</span>
+                  <span className="print-doc-value">{invoice.invoiceNumber}</span>
                 </div>
-                <div className="print-info-row">
-                  <span className="print-info-label">Date</span>
-                  <span className="print-info-value">{formatDate(invoice.issueDate)}</span>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Inv Date</span>
+                  <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
                 </div>
-                <div className="print-info-row">
-                  <span className="print-info-label">Due Date</span>
-                  <span className="print-info-value">{formatDate(invoice.dueDate)}</span>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Terms</span>
+                  <span className="print-doc-value">{(invoice as any).paymentTerms || ''}</span>
                 </div>
-                <div className="print-info-row">
-                  <span className="print-info-label">PO Number</span>
-                  <span className="print-info-value">_______________</span>
-                </div>
+                {printSettings?.showPONumber !== false && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">PO #</span>
+                    <span className="print-doc-value">{(invoice as any).poNumber || ''}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Bill To Section */}
-          <div className="print-billto-section">
-            <div className="print-billto-title">Bill To</div>
-            <div className="print-billto-content">
-              <div className="print-billto-name">{client?.name || 'Customer Name'}</div>
-              {client?.email && <div>{client.email}</div>}
-              {client?.phone && <div>{client.phone}</div>}
-              {client?.address && <div>{client.address}</div>}
-            </div>
-          </div>
+          {/* Page indicator */}
+          <div className="print-page-number">1/1</div>
 
           {/* Items Table */}
           <table className="print-items-table">
             <thead>
               <tr>
-                <th className="print-col-code">Code</th>
-                <th className="print-col-desc">Description</th>
-                <th className="print-col-qty">QTY</th>
-                <th className="print-col-rate">Rate</th>
-                <th className="print-col-total">Total</th>
+                <th>Code</th>
+                <th>Description</th>
+                <th>QTY</th>
+                <th>Rate</th>
+                <th>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -475,46 +485,34 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 <tr key={index}>
                   <td>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
                   <td>{item.description}</td>
-                  <td className="print-align-right">{item.quantity}</td>
-                  <td className="print-align-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td className="print-align-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td className="print-text-right">{item.quantity}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td className="print-text-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* Footer: Notes & Totals */}
-          <div className="print-footer-row">
-            <div className="print-notes-section">
-              <div className="print-notes-title">Notes / Terms & Conditions:</div>
-              <div className="print-notes-content">
+          {/* Footer */}
+          <div className="print-footer">
+            <div className="print-footer-left">
+              <div className="print-notes-label">Notes:</div>
+              <div className="print-notes-text">
                 {invoice.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
-
-            <div className="print-totals-section">
-              <div className="print-subtotal-row">
-                <span>Subtotal</span>
-                <span>{formatCurrency(parseFloat(invoice.subtotal))}</span>
+            
+            <div className="print-footer-right">
+              {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Shipping</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
+                </div>
+              )}
+              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                <span className="print-total-label">Total</span>
+                <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
               </div>
-              <div className="print-grandtotal-row">
-                <span>TOTAL</span>
-                <span className="print-grandtotal-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Signature Section */}
-          <div className="print-signature-row">
-            <div className="print-signature-block">
-              <div className="print-signature-title">Prepared By</div>
-              <div className="print-signature-line"></div>
-              <div className="print-signature-name">{currentUser?.companyName || 'Company Name'}</div>
-            </div>
-            <div className="print-signature-block">
-              <div className="print-signature-title">Approved By</div>
-              <div className="print-signature-line"></div>
-              <div className="print-signature-name">{client?.name || 'Customer Name'}</div>
             </div>
           </div>
         </div>
