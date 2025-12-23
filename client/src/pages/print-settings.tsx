@@ -31,7 +31,7 @@ import type { PrintSettings } from "@shared/schema";
 
 // Schema for print preferences only
 const printSettingsFormSchema = z.object({
-  paperSize: z.enum(["prs", "a4"]),
+  paperSize: z.enum(["prs", "a4", "halfsize"]),
   showTax: z.boolean(),
   showDiscount: z.boolean(),
   showPONumber: z.boolean(),
@@ -157,6 +157,7 @@ export default function PrintSettingsPage() {
                         <SelectContent>
                           <SelectItem value="prs">PRS (13.8cm x 21.7cm)</SelectItem>
                           <SelectItem value="a4">A4 (21cm x 29.7cm)</SelectItem>
+                          <SelectItem value="halfsize">Half Size (24cm x 14cm)</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

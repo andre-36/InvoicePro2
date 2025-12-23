@@ -7,7 +7,7 @@ export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'sent', 'pai
 export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 'accepted', 'rejected', 'expired']);
 export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['draft', 'sent', 'received', 'partial', 'cancelled']);
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
-export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs']);
+export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs', 'halfsize']);
 export const productTypeEnum = pgEnum('product_type', ['standard', 'bundle']);
 
 // Users table
