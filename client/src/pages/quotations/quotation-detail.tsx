@@ -217,7 +217,6 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                   <div className="print-bill-to-details">
                     {client.address && <div>{client.address}</div>}
                     {client.phone && <div>Phone: {client.phone}</div>}
-                    {client.email && <div>Email: {client.email}</div>}
                   </div>
                 )}
               </div>
@@ -281,23 +280,23 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           <table className="print-items-table">
             <thead>
               <tr>
-                <th className="w-12">No.</th>
-                <th>Code</th>
-                <th>Description</th>
-                <th>QTY</th>
-                <th>Rate</th>
-                <th>Total</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>No.</th>
+                <th style={{ width: '12%', textAlign: 'center' }}>Code</th>
+                <th style={{ width: '40%', textAlign: 'center' }}>Description</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '17%', textAlign: 'center' }}>Rate</th>
+                <th style={{ width: '17%', textAlign: 'center' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>ITEM{index + 1}</td>
+                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
+                  <td style={{ textAlign: 'center' }}>ITEM{index + 1}</td>
                   <td>{item.description}</td>
-                  <td className="print-text-right">{item.quantity}</td>
-                  <td className="print-text-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td className="print-text-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
                 </tr>
               ))}
             </tbody>

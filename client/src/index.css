@@ -257,13 +257,12 @@
     font-weight: bold;
     margin-bottom: 3px;
     letter-spacing: 0.3pt;
+    white-space: nowrap;
   }
 
   .print-company-tagline {
-    font-size: 11pt;
-    font-weight: bold;
+    font-size: 10pt;
     margin-bottom: 5px;
-    text-transform: uppercase;
   }
 
   .print-company-address {
