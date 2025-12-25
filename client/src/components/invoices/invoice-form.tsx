@@ -592,6 +592,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     onSuccess?.();
   };
 
+  // Fetch current user for default notes
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
   // Handle invoice PDF generation
   const handleGeneratePDF = async () => {
     if (!form.formState.isValid) {
@@ -642,7 +647,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         tax: values.invoice.tax || "0",
         discount: values.invoice.discount || "0",
         total: values.invoice.total || "0",
-        notes: values.invoice.notes,
+        notes: values.invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes,
       };
 
       console.log("Generating PDF with:", { 

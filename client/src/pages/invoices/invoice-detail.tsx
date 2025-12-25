@@ -76,6 +76,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     companyEmail?: string;
     taxNumber?: string;
     logoUrl?: string;
+    quotationNotes?: string;
+    invoiceNotes?: string;
+    deliveryNoteNotes?: string;
+    defaultNotes?: string;
   }>({
     queryKey: ['/api/user'],
   });
@@ -503,7 +507,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <div className="print-footer-left">
               <div className="print-notes-label">Notes:</div>
               <div className="print-notes-text">
-                {invoice.notes || printSettings?.invoiceNotes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             

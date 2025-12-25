@@ -89,6 +89,10 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     companyEmail?: string;
     taxNumber?: string;
     logoUrl?: string;
+    quotationNotes?: string;
+    invoiceNotes?: string;
+    deliveryNoteNotes?: string;
+    defaultNotes?: string;
   }>({
     queryKey: ['/api/user'],
   });
@@ -299,7 +303,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             <div className="print-footer-left">
               <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
-                {quotation.notes || printSettings?.quotationNotes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {quotation.notes || currentUser?.quotationNotes || currentUser?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             

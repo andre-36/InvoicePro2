@@ -2477,8 +2477,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/stores/:storeId/print-settings", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
-      const validatedData = validateRequestBody(insertPrintSettingsSchema.partial(), req, res);
-      if (!validatedData) return;
+      const schema = z.object({
+        showTax: z.boolean(),
+        showDiscount: z.boolean(),
+        showPONumber: z.boolean(),
+        accentColor: z.string(),
+        paperSize: z.enum(["a4", "prs", "halfsize"]),
+      });
+      
+      const validatedData = schema.parse(req.body);
       
       // Check if settings exist, if not create them first
       let printSettings = await storage.getPrintSettings(storeId);
@@ -2494,6 +2501,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(printSettings);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
       console.error("Error updating print settings:", error);
       res.status(500).json({ error: "Server error" });
     }
