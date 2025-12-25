@@ -399,23 +399,29 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
-          {/* Header */}
+          {/* Header - 4 column: logo | bill-to | company | doc-details */}
           <div className="print-header">
-            <div className="print-header-left">
+            {/* Logo column */}
+            <div className="print-header-logo">
               <div className="print-logo">
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
                   <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
-                    {currentUser?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                    {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Bill To column */}
+            <div className="print-header-left">
               <div className="print-bill-to">
                 <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
                 <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
                 {client && (
                   <div className="print-bill-to-details">
+                    {client.email && <div>{client.email}</div>}
                     {client.phone && <div>{client.phone}</div>}
                     {client.address && <div>{client.address}</div>}
                   </div>
@@ -423,6 +429,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               </div>
             </div>
             
+            {/* Company info column */}
             <div className="print-header-center">
               <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
               {currentUser?.companyTagline && (
@@ -430,36 +437,30 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               )}
               <div className="print-company-address">
                 {currentUser?.companyAddress || "Your Company Address"}
-                {(currentUser?.companyPhone || currentUser?.companyEmail) && (
-                  <>
-                    <br />
-                    {currentUser.companyPhone && `(Phone) ${currentUser.companyPhone}`}
-                    {currentUser.companyPhone && currentUser.companyEmail && ' '}
-                    {currentUser.companyEmail && `(Email) ${currentUser.companyEmail}`}
-                  </>
-                )}
+                {currentUser?.companyPhone && <><br />Phone: {currentUser.companyPhone}</>}
               </div>
             </div>
             
+            {/* Document details column */}
             <div className="print-header-right">
               <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>Invoice</div>
               <div className="print-doc-details">
                 <div className="print-doc-row">
-                  <span className="print-doc-label">Invoice #</span>
+                  <span className="print-doc-label">No.</span>
                   <span className="print-doc-value">{invoice.invoiceNumber}</span>
                 </div>
                 <div className="print-doc-row">
-                  <span className="print-doc-label">Inv Date</span>
+                  <span className="print-doc-label">Date</span>
                   <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
                 </div>
                 <div className="print-doc-row">
-                  <span className="print-doc-label">Terms</span>
-                  <span className="print-doc-value">{(invoice as any).paymentTerms || ''}</span>
+                  <span className="print-doc-label">Due</span>
+                  <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
                 </div>
                 {printSettings?.showPONumber !== false && (
                   <div className="print-doc-row">
                     <span className="print-doc-label">PO #</span>
-                    <span className="print-doc-value">{(invoice as any).poNumber || ''}</span>
+                    <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
                   </div>
                 )}
               </div>
