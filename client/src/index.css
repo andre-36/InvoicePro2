@@ -326,17 +326,17 @@
   .print-items-table th {
     background: transparent;
     border: 2px solid #000;
-    padding: 6px 10px;
-    text-align: left;
+    padding: 4px 6px;
+    text-align: center;
     font-weight: bold;
-    font-size: 12pt;
+    font-size: 11pt;
   }
 
   .print-items-table td {
     border: 1px solid #000;
-    padding: 5px 10px;
+    padding: 3px 6px;
     font-size: 11pt;
-    vertical-align: top;
+    vertical-align: middle;
   }
 
   .print-text-right {
