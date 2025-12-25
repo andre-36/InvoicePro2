@@ -132,15 +132,20 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const handleDownloadPDF = async () => {
     if (!invoice) return;
     
-    try {
+      try {
       await generatePDF({
         invoice: {
           ...invoice,
           issueDate: formatDate(invoice.issueDate),
-          dueDate: formatDate(invoice.dueDate)
+          dueDate: formatDate(invoice.dueDate),
+          tax: invoice.taxAmount || '0',
+          total: invoice.totalAmount
         },
-        items: items,
-        client: client
+        items: items.map(item => ({
+          ...item,
+          price: item.unitPrice
+        })) as any,
+        client: client as any
       });
       
       toast({
@@ -407,7 +412,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
-                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                  <div className="print-logo-circle">
                     {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                   </div>
                 )}
@@ -441,31 +446,31 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               </div>
             </div>
             
-            {/* Document details column */}
-            <div className="print-header-right">
-              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>Invoice</div>
-              <div className="print-doc-details">
-                <div className="print-doc-row">
-                  <span className="print-doc-label">No.</span>
-                  <span className="print-doc-value">{invoice.invoiceNumber}</span>
-                </div>
-                <div className="print-doc-row">
-                  <span className="print-doc-label">Date</span>
-                  <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
-                </div>
-                <div className="print-doc-row">
-                  <span className="print-doc-label">Due</span>
-                  <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
-                </div>
-                {printSettings?.showPONumber !== false && (
-                  <div className="print-doc-row">
-                    <span className="print-doc-label">PO #</span>
-                    <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
-                  </div>
-                )}
+          {/* Document details column */}
+          <div className="print-header-right">
+            <div className="print-doc-type">Invoice</div>
+            <div className="print-doc-details">
+              <div className="print-doc-row">
+                <span className="print-doc-label">No.</span>
+                <span className="print-doc-value">{invoice.invoiceNumber}</span>
               </div>
+              <div className="print-doc-row">
+                <span className="print-doc-label">Date</span>
+                <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
+              </div>
+              <div className="print-doc-row">
+                <span className="print-doc-label">Due</span>
+                <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
+              </div>
+              {printSettings?.showPONumber !== false && (
+                <div className="print-doc-row">
+                  <span className="print-doc-label">PO #</span>
+                  <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
           {/* Page indicator */}
           <div className="print-page-number">1/1</div>
@@ -510,7 +515,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
                 </div>
               )}
-              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+              <div className="print-total-row print-total-final">
                 <span className="print-total-label">Total</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
               </div>

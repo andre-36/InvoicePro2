@@ -21,8 +21,8 @@ import { formatCurrency } from "@/lib/utils";
 
 // Extend the schema for client-side validation
 const extendedQuotationSchema = insertQuotationSchema.extend({
-  issueDate: z.coerce.date(),
-  expiryDate: z.coerce.date(),
+  issueDate: z.date(),
+  expiryDate: z.date().nullable(),
   // Using string representation for numeric fields to work with form inputs
   subtotal: z.string().optional(),
   taxAmount: z.string().optional(),
@@ -118,7 +118,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         clientId: 0,
         storeId: 1, // Default store
         issueDate: new Date(),
-        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        expiryDate: null,
         status: "draft",
         subtotal: "0",
         taxRate: "0",
@@ -140,7 +140,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         quotation: {
           ...values.quotation,
           issueDate: values.quotation.issueDate.toISOString(),
-          expiryDate: values.quotation.expiryDate.toISOString(),
+          expiryDate: values.quotation.expiryDate ? values.quotation.expiryDate.toISOString() : null,
         }
       };
 
@@ -385,7 +385,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                       <FormControl>
                         <Input
                           type="date"
-                          value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                          value={field.value ? format(new Date(field.value), 'yyyy-MM-dd') : ''}
                           onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
                           data-testid="input-issue-date"
                         />
@@ -404,7 +404,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                       <FormControl>
                         <Input
                           type="date"
-                          value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                          value={field.value ? format(new Date(field.value), 'yyyy-MM-dd') : ''}
                           onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
                           data-testid="input-expiry-date"
                         />
