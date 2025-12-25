@@ -193,15 +193,16 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
-          {/* Header */}
+          {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">
+            {/* Left column: Logo + Bill To */}
             <div className="print-header-left">
               <div className="print-logo">
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
                   <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
-                    {currentUser?.companyName?.substring(0, 4).toUpperCase() || 'LOGO'}
+                    {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                   </div>
                 )}
               </div>
@@ -210,14 +211,15 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                 <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
                 {client && (
                   <div className="print-bill-to-details">
-                    {client.email && <div>{client.email}</div>}
-                    {client.phone && <div>{client.phone}</div>}
                     {client.address && <div>{client.address}</div>}
+                    {client.phone && <div>Phone: {client.phone}</div>}
+                    {client.email && <div>Email: {client.email}</div>}
                   </div>
                 )}
               </div>
             </div>
             
+            {/* Center column: Company Info */}
             <div className="print-header-center">
               <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
               {currentUser?.companyTagline && (
@@ -225,17 +227,22 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               )}
               <div className="print-company-address">
                 {currentUser?.companyAddress || "Your Company Address"}
-                {(currentUser?.companyPhone || currentUser?.companyEmail) && (
+                {currentUser?.companyPhone && (
                   <>
                     <br />
-                    {currentUser.companyPhone && `Phone: ${currentUser.companyPhone}`}
-                    {currentUser.companyPhone && currentUser.companyEmail && ' / '}
-                    {currentUser.companyEmail && `Email: ${currentUser.companyEmail}`}
+                    Phone: {currentUser.companyPhone}
+                  </>
+                )}
+                {currentUser?.companyEmail && (
+                  <>
+                    {currentUser?.companyPhone ? ' / ' : <br />}
+                    Email: {currentUser.companyEmail}
                   </>
                 )}
               </div>
             </div>
             
+            {/* Right column: Document Details */}
             <div className="print-header-right">
               <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>QUOTATION</div>
               <div className="print-doc-details">
@@ -254,7 +261,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                 {printSettings?.showPONumber !== false && (
                   <div className="print-doc-row">
                     <span className="print-doc-label">PO Number</span>
-                    <span className="print-doc-value">_____________</span>
+                    <span className="print-doc-value">_______</span>
                   </div>
                 )}
               </div>
