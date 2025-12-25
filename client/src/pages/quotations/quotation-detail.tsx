@@ -200,7 +200,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">
             {/* Left column: Logo + Bill To */}
-            <div className="print-header-left">
+            <div className="print-header-left" style={{ flexDirection: 'column' }}>
               <div className="print-logo">
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
@@ -268,17 +268,20 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                     <span className="print-doc-value">_______</span>
                   </div>
                 )}
+                {/* Page indicator moved here */}
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Page</span>
+                  <span className="print-doc-value">1/1</span>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Page indicator */}
-          <div className="print-page-number">1/1</div>
 
           {/* Items Table */}
           <table className="print-items-table">
             <thead>
               <tr>
+                <th className="w-12">No.</th>
                 <th>Code</th>
                 <th>Description</th>
                 <th>QTY</th>
@@ -289,6 +292,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
+                  <td>{index + 1}</td>
                   <td>ITEM{index + 1}</td>
                   <td>{item.description}</td>
                   <td className="print-text-right">{item.quantity}</td>

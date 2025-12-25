@@ -104,7 +104,7 @@
 @media print {
   @page {
     size: 21.7cm 13.8cm landscape;
-    margin: 0.5cm 0.4cm;
+    margin: 0;
   }
 
   * {
@@ -117,8 +117,8 @@
     color: black !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
+    width: 21.7cm !important;
+    height: 13.8cm !important;
     overflow: visible !important;
   }
 
@@ -127,8 +127,8 @@
   main {
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 21.7cm !important;
+    max-width: 21.7cm !important;
   }
 
   /* Hide sidebar and navigation elements */
@@ -152,8 +152,8 @@
     visibility: visible !important;
     opacity: 1 !important;
     position: static !important;
-    width: auto !important;
-    height: auto !important;
+    width: 21.7cm !important;
+    height: 13.8cm !important;
   }
 
   /* Print template layout */
@@ -165,10 +165,11 @@
     line-height: 1.1;
     color: #000;
     margin: 0;
-    padding: 0 0 0 0.5cm;
+    padding: 0.4cm 0.6cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    background: white;
   }
 
   /* Header - Optimized Layout */
