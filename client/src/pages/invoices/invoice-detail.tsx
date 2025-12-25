@@ -499,12 +499,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </tbody>
           </table>
 
-          {/* Footer */}
           <div className="print-footer">
             <div className="print-footer-left">
               <div className="print-notes-label">Notes:</div>
               <div className="print-notes-text">
-                {invoice.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {invoice.notes || printSettings?.invoiceNotes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             

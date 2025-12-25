@@ -295,12 +295,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </tbody>
           </table>
 
-          {/* Footer */}
           <div className="print-footer">
             <div className="print-footer-left">
               <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
-                {quotation.notes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {quotation.notes || printSettings?.quotationNotes || printSettings?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             
