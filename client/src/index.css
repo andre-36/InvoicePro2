@@ -161,23 +161,24 @@
     width: 21.7cm;
     height: 13.8cm;
     font-family: 'Times New Roman', serif;
-    font-size: 12pt;
-    line-height: 1.2;
+    font-size: 13pt;
+    line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.3cm 0.4cm;
+    padding: 0.2cm 0.25cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     background: white;
+    transform-origin: top left;
   }
 
   /* Header - Optimized Layout */
   .print-header {
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: 0.6cm;
-    margin-bottom: 0.3cm;
+    gap: 0.4cm;
+    margin-bottom: 0.2cm;
     position: relative;
     align-items: start;
     width: 100%;
@@ -208,14 +209,14 @@
   }
 
   .print-logo-image {
-    max-width: 2.5cm;
-    max-height: 2.5cm;
+    max-width: 2.2cm;
+    max-height: 2.2cm;
     object-fit: contain;
   }
 
   .print-logo-circle {
-    width: 2.5cm;
-    height: 2.5cm;
+    width: 2.2cm;
+    height: 2.2cm;
     border: 2px solid #000;
     border-radius: 50%;
     display: flex;
@@ -235,39 +236,39 @@
     font-weight: bold;
     font-size: 12pt;
     border-bottom: 2px solid #000;
-    padding-bottom: 2px;
-    margin-bottom: 5px;
+    padding-bottom: 1px;
+    margin-bottom: 3px;
     display: inline-block;
   }
 
   .print-bill-to-name {
     font-size: 12pt;
     font-weight: bold;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
   
   .print-bill-to-details {
     font-size: 11pt;
-    line-height: 1.3;
+    line-height: 1.25;
   }
 
   /* Company info */
   .print-company-name {
-    font-size: 18pt;
+    font-size: 19pt;
     font-weight: bold;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     letter-spacing: 0.3pt;
     white-space: nowrap;
   }
 
   .print-company-tagline {
     font-size: 10pt;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
   }
 
   .print-company-address {
     font-size: 11pt;
-    line-height: 1.3;
+    line-height: 1.25;
   }
 
   /* Document type and details */
@@ -275,24 +276,24 @@
     font-size: 18pt;
     font-weight: bold;
     text-align: right;
-    margin-bottom: 0.2cm;
+    margin-bottom: 0.15cm;
     text-transform: uppercase;
     color: #000;
     border-bottom: 2px solid #000;
-    padding-bottom: 2px;
+    padding-bottom: 1px;
     width: 100%;
   }
 
   .print-doc-details {
     font-size: 12pt;
-    line-height: 1.5;
+    line-height: 1.4;
     width: 100%;
   }
 
   .print-doc-row {
     display: grid;
     grid-template-columns: 1.5fr 2fr;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
 
   .print-doc-label {
@@ -318,14 +319,14 @@
   .print-items-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 0.35cm;
+    margin-bottom: 0.25cm;
     flex-grow: 1;
   }
 
   .print-items-table th {
     background: transparent;
     border: 2px solid #000;
-    padding: 8px 12px;
+    padding: 6px 10px;
     text-align: left;
     font-weight: bold;
     font-size: 12pt;
@@ -333,7 +334,7 @@
 
   .print-items-table td {
     border: 1px solid #000;
-    padding: 6px 12px;
+    padding: 5px 10px;
     font-size: 11pt;
     vertical-align: top;
   }
@@ -346,9 +347,9 @@
   .print-footer {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 1.5cm;
+    gap: 1.2cm;
     border-top: 2px solid #000;
-    padding-top: 0.3cm;
+    padding-top: 0.2cm;
     align-items: start;
     margin-top: auto;
   }
@@ -361,12 +362,12 @@
   .print-notes-label {
     font-weight: bold;
     font-size: 11pt;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
 
   .print-notes-text {
     font-size: 11pt;
-    line-height: 1.4;
+    line-height: 1.35;
     font-style: normal;
     white-space: pre-wrap;
   }
@@ -374,13 +375,13 @@
   .print-footer-right {
     display: flex;
     flex-direction: column;
-    min-width: 7cm;
+    min-width: 6.5cm;
   }
 
   .print-total-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    padding: 4px 0;
+    padding: 3px 0;
     font-size: 12pt;
     border-bottom: 1px solid #ddd;
   }
@@ -402,8 +403,8 @@
     font-weight: bold;
     border-top: 2.5px solid #000;
     border-bottom: 4px double #000;
-    margin-top: 6px;
-    padding: 10px 0;
+    margin-top: 4px;
+    padding: 8px 0;
   }
 
   /* Signatures */
