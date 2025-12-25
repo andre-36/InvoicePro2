@@ -100,10 +100,10 @@
   }
 }
 
-/* Print styles for PRS Paper Landscape (24cm x 14cm) */
+/* Print styles for Half Size PRS Paper (13.8cm x 21.7cm) */
 @media print {
   @page {
-    size: 24cm 14cm landscape;
+    size: 21.7cm 13.8cm landscape;
     margin: 0.5cm 0.4cm;
   }
 
@@ -173,9 +173,9 @@
   /* Header */
   .print-header {
     display: grid;
-    grid-template-columns: 1.5cm 5cm 8cm 4.5cm;
-    gap: 0.2cm;
-    margin-bottom: 0.3cm;
+    grid-template-columns: 1cm 4.5cm 9cm 4.5cm;
+    gap: 0.15cm;
+    margin-bottom: 0.2cm;
     position: relative;
     align-items: start;
   }
@@ -183,6 +183,7 @@
   .print-header-logo {
     display: flex;
     align-items: flex-start;
+    justify-content: center;
   }
 
   .print-header-left {
@@ -206,20 +207,20 @@
   }
 
   .print-logo-image {
-    max-width: 1.3cm;
-    max-height: 1.3cm;
+    max-width: 0.9cm;
+    max-height: 0.9cm;
     object-fit: contain;
   }
 
   .print-logo-circle {
-    width: 1.3cm;
-    height: 1.3cm;
-    border: 2px solid #000;
+    width: 0.9cm;
+    height: 0.9cm;
+    border: 1px solid #000;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 6pt;
+    font-size: 5pt;
     font-weight: bold;
     background: white;
   }
