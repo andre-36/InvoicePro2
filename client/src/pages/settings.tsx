@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2 } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,6 +50,10 @@ const companySchema = z.object({
   companyEmail: z.string().email("Please enter a valid email").optional().or(z.literal("")),
   taxNumber: z.string().optional(),
   logoUrl: z.string().optional(),
+  quotationNotes: z.string().optional(),
+  invoiceNotes: z.string().optional(),
+  deliveryNoteNotes: z.string().optional(),
+  defaultNotes: z.string().optional(),
 });
 
 // Payment settings schema
@@ -476,6 +480,10 @@ export default function SettingsPage() {
         companyEmail: userData.companyEmail || "",
         taxNumber: userData.taxNumber || "",
         logoUrl: userData.logoUrl || "",
+        quotationNotes: userData.quotationNotes || "",
+        invoiceNotes: userData.invoiceNotes || "",
+        deliveryNoteNotes: userData.deliveryNoteNotes || "",
+        defaultNotes: userData.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
       });
 
       hasInitialized.current = true;
@@ -731,6 +739,10 @@ export default function SettingsPage() {
             <TabsTrigger value="company" className="gap-2">
               <Building className="h-4 w-4" />
               <span>Company</span>
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="gap-2">
+              <FileText className="h-4 w-4" />
+              <span>Notes</span>
             </TabsTrigger>
             <TabsTrigger value="payment" className="gap-2">
               <CreditCard className="h-4 w-4" />
@@ -1115,6 +1127,104 @@ export default function SettingsPage() {
               </Form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="notes" className="space-y-6">
+          <Form {...companyForm}>
+            <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Document Notes</CardTitle>
+                  <CardDescription>Configure default notes for your business documents</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={companyForm.control}
+                      name="quotationNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quotation Notes</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Default notes for quotations" 
+                              className="min-h-[100px]" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Standard terms for quotations</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
+                      name="invoiceNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Invoice Notes</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Default notes for invoices" 
+                              className="min-h-[100px]" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Standard terms for invoices</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
+                      name="deliveryNoteNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Delivery Note Notes</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Default notes for delivery notes" 
+                              className="min-h-[100px]" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Standard terms for delivery notes</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
+                      name="defaultNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>General Fallback Notes</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="General fallback notes" 
+                              className="min-h-[100px]" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Used if document-specific notes are empty</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end border-t p-6">
+                  <Button type="submit" disabled={companyMutation.isPending || !companyForm.formState.isDirty} className="gap-2">
+                    <Save className="h-4 w-4" />
+                    <span>{companyMutation.isPending ? "Saving..." : "Save Notes"}</span>
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
+          </Form>
         </TabsContent>
 
         <TabsContent value="payment" className="space-y-6">

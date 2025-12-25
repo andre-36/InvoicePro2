@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   logoUrl: varchar("logo_url", { length: 500 }),
+  quotationNotes: text("quotation_notes"),
+  invoiceNotes: text("invoice_notes"),
+  deliveryNoteNotes: text("delivery_note_notes"),
+  defaultNotes: text("default_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
@@ -424,10 +428,10 @@ export const printSettings = pgTable("print_settings", {
   showTax: boolean("show_tax").default(true).notNull(),
   showDiscount: boolean("show_discount").default(true).notNull(),
   showPONumber: boolean("show_po_number").default(true).notNull(),
+  defaultNotes: text("default_notes").default("Items checked and verified upon delivery. Items cannot be returned."),
   quotationNotes: text("quotation_notes"),
   invoiceNotes: text("invoice_notes"),
   deliveryNoteNotes: text("delivery_note_notes"),
-  defaultNotes: text("default_notes").default("Items checked and verified upon delivery. Items cannot be returned."),
   accentColor: varchar("accent_color", { length: 20 }).default("#000000"),
   paperSize: paperSizeEnum("paper_size").default("prs").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -498,6 +502,10 @@ export const updateUserCompanySchema = z.object({
   companyEmail: z.string().email().max(100).optional().or(z.literal("")),
   taxNumber: z.string().max(50).optional(),
   logoUrl: z.string().max(500).optional(),
+  quotationNotes: z.string().optional(),
+  invoiceNotes: z.string().optional(),
+  deliveryNoteNotes: z.string().optional(),
+  defaultNotes: z.string().optional(),
 });
 
 export const updateUserPaymentSchema = z.object({

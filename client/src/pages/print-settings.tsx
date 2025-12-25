@@ -35,10 +35,6 @@ const printSettingsFormSchema = z.object({
   showTax: z.boolean(),
   showDiscount: z.boolean(),
   showPONumber: z.boolean(),
-  defaultNotes: z.string(),
-  quotationNotes: z.string().optional(),
-  invoiceNotes: z.string().optional(),
-  deliveryNoteNotes: z.string().optional(),
   accentColor: z.string(),
 });
 
@@ -60,7 +56,6 @@ export default function PrintSettingsPage() {
       showTax: true,
       showDiscount: true,
       showPONumber: true,
-      defaultNotes: "Items checked and verified upon delivery. Items cannot be returned.",
       accentColor: "#000000",
     },
   });
@@ -72,10 +67,6 @@ export default function PrintSettingsPage() {
         showTax: printSettings.showTax ?? true,
         showDiscount: printSettings.showDiscount ?? true,
         showPONumber: printSettings.showPONumber ?? true,
-        defaultNotes: printSettings.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
-        quotationNotes: printSettings.quotationNotes || "",
-        invoiceNotes: printSettings.invoiceNotes || "",
-        deliveryNoteNotes: printSettings.deliveryNoteNotes || "",
         accentColor: printSettings.accentColor || "#000000",
       });
     }
@@ -276,96 +267,6 @@ export default function PrintSettingsPage() {
                         data-testid="switch-show-po-number"
                       />
                     </FormControl>
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Default Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Default Document Notes</CardTitle>
-              <CardDescription>
-                Standard terms and conditions for each document type
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="quotationNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quotation Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        rows={3}
-                        placeholder="Standard notes for quotations..."
-                        data-testid="textarea-quotation-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="invoiceNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        rows={3}
-                        placeholder="Standard notes for invoices..."
-                        data-testid="textarea-invoice-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="deliveryNoteNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Delivery Note Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        rows={3}
-                        placeholder="Standard notes for delivery notes..."
-                        data-testid="textarea-delivery-note-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="defaultNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>General Default Notes (Fallback)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        rows={3}
-                        placeholder="Items checked and verified upon delivery. Items cannot be returned."
-                        data-testid="textarea-default-notes"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      This will be used if no specific document note is set
-                    </FormDescription>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
