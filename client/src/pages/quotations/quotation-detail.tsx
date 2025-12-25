@@ -343,6 +343,18 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               </div>
             </div>
           </div>
+
+          {/* Signature area */}
+          <div className="print-signatures">
+            <div className="print-signature-box">
+              <div className="print-signature-label">Prepared By:</div>
+              <div className="print-signature-line">Authorized Signature</div>
+            </div>
+            <div className="print-signature-box">
+              <div className="print-signature-label">Received By:</div>
+              <div className="print-signature-line">Customer Signature</div>
+            </div>
+          </div>
         </div>
       </div>
 

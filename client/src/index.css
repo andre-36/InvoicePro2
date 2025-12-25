@@ -156,40 +156,37 @@
     height: auto !important;
   }
 
-  .print-invoice-template {
-    display: block !important;
-    visibility: visible !important;
-  }
-
   /* Print template layout */
   .print-invoice-template {
-    width: 100%;
+    width: 21.7cm;
+    height: 13.8cm;
     font-family: 'Times New Roman', serif;
-    font-size: 9pt;
-    line-height: 1.2;
+    font-size: 10.5pt;
+    line-height: 1.1;
     color: #000;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
 
-  /* Header - Optimized 3-column layout */
+  /* Header - Optimized Layout */
   .print-header {
     display: grid;
-    grid-template-columns: 7.5cm 8.5cm 4.7cm;
-    gap: 0.3cm;
-    margin-bottom: 0.3cm;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.5cm;
+    margin-bottom: 0.25cm;
     position: relative;
     align-items: start;
-  }
-
-  .print-header-logo {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    width: 100%;
   }
 
   .print-header-left {
     display: flex;
     flex-direction: row;
     gap: 0.3cm;
+    align-items: flex-start;
   }
 
   .print-header-center {
@@ -200,30 +197,30 @@
   .print-header-right {
     display: flex;
     flex-direction: column;
+    align-items: flex-end;
   }
 
   /* Logo */
   .print-logo {
     margin: 0;
-    margin-right: 0.2cm;
     flex-shrink: 0;
   }
 
   .print-logo-image {
-    max-width: 1.2cm;
-    max-height: 1.2cm;
+    max-width: 2.2cm;
+    max-height: 2.2cm;
     object-fit: contain;
   }
 
   .print-logo-circle {
-    width: 1.2cm;
-    height: 1.2cm;
-    border: 2px solid #000;
+    width: 2.2cm;
+    height: 2.2cm;
+    border: 1.5px solid #000;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 6pt;
+    font-size: 8pt;
     font-weight: bold;
     background: white;
   }
@@ -235,221 +232,207 @@
 
   .print-bill-to-label {
     font-weight: bold;
-    font-size: 9pt;
+    font-size: 10.5pt;
     border-bottom: 2px solid #000;
-    padding-bottom: 0.05cm;
-    margin-bottom: 0.15cm;
+    padding-bottom: 1px;
+    margin-bottom: 4px;
     display: inline-block;
   }
 
   .print-bill-to-name {
-    font-size: 8.5pt;
+    font-size: 10.5pt;
     font-weight: bold;
-    margin-bottom: 0.1cm;
+    margin-bottom: 2px;
   }
   
   .print-bill-to-details {
-    font-size: 7.5pt;
-    line-height: 1.3;
+    font-size: 9.5pt;
+    line-height: 1.2;
   }
 
   /* Company info */
   .print-company-name {
-    font-size: 13pt;
+    font-size: 16pt;
     font-weight: bold;
-    margin-bottom: 0.05cm;
-    letter-spacing: 0.3pt;
+    margin-bottom: 2px;
+    letter-spacing: 0.2pt;
   }
 
   .print-company-tagline {
-    font-size: 8.5pt;
+    font-size: 10.5pt;
     font-weight: bold;
-    margin-bottom: 0.1cm;
+    margin-bottom: 4px;
     text-transform: uppercase;
   }
 
   .print-company-address {
-    font-size: 7.5pt;
-    line-height: 1.3;
+    font-size: 9.5pt;
+    line-height: 1.2;
   }
 
   /* Document type and details */
   .print-doc-type {
-    font-size: 13pt;
+    font-size: 16pt;
     font-weight: bold;
-    text-align: center;
-    margin-bottom: 0.2cm;
+    text-align: right;
+    margin-bottom: 0.15cm;
     text-transform: uppercase;
     color: #000;
     border-bottom: 2px solid #000;
-    padding-bottom: 0.08cm;
+    padding-bottom: 1px;
+    width: 100%;
   }
 
   .print-doc-details {
-    font-size: 8.5pt;
-    line-height: 1.5;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    width: 100%;
   }
 
   .print-doc-row {
     display: grid;
-    grid-template-columns: 1.3fr 1.7fr;
-    margin-bottom: 0.08cm;
+    grid-template-columns: 1.5fr 2fr;
+    margin-bottom: 2px;
   }
 
   .print-doc-label {
     font-weight: bold;
-    color: #333;
+    color: #000;
   }
 
   .print-doc-value {
-    text-align: left;
+    text-align: right;
     font-weight: normal;
   }
 
   /* Page number */
   .print-page-number {
     position: absolute;
-    top: 0.5cm;
-    right: 0.5cm;
+    top: 2px;
+    right: 2px;
     font-size: 8pt;
-    color: #999;
-    font-style: italic;
+    color: #666;
   }
 
   /* Items table */
   .print-items-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0.5cm 0;
-    font-size: 9pt;
-  }
-
-  .print-items-table thead {
-    background-color: #e8e8e8;
+    margin-bottom: 0.3cm;
+    flex-grow: 1;
   }
 
   .print-items-table th {
-    font-weight: bold;
+    background: transparent;
+    border: 2px solid #000;
+    padding: 6px 10px;
     text-align: left;
-    padding: 0.25cm 0.2cm;
-    border: 1px solid #000;
-    background-color: #ddd;
+    font-weight: bold;
+    font-size: 10.5pt;
   }
 
   .print-items-table td {
-    padding: 0.2cm;
-    border: 1px solid #ccc;
+    border: 1px solid #000;
+    padding: 4px 10px;
+    font-size: 10pt;
     vertical-align: top;
-  }
-
-  .print-items-table th:nth-child(3),
-  .print-items-table th:nth-child(4),
-  .print-items-table th:nth-child(5),
-  .print-items-table td:nth-child(3),
-  .print-items-table td:nth-child(4),
-  .print-items-table td:nth-child(5) {
-    text-align: right;
   }
 
   .print-text-right {
     text-align: right;
   }
 
-  .print-text-center {
-    text-align: center;
-  }
-
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 0.8cm;
-    margin-top: 0.4cm;
+    grid-template-columns: 1fr auto;
+    gap: 1.2cm;
     border-top: 2px solid #000;
-    padding-top: 0.3cm;
+    padding-top: 0.25cm;
+    align-items: start;
+    margin-top: auto;
   }
 
   .print-footer-left {
-    padding-right: 0.5cm;
-  }
-
-  .print-footer-right {
-    border-left: 1px solid #ccc;
-    padding-left: 0.4cm;
-    background-color: #f9f9f9;
+    display: flex;
+    flex-direction: column;
   }
 
   .print-notes-label {
     font-weight: bold;
-    font-size: 10pt;
-    margin-bottom: 0.2cm;
-    color: #000;
+    font-size: 9.5pt;
+    margin-bottom: 2px;
   }
 
   .print-notes-text {
-    font-size: 8pt;
-    line-height: 1.5;
-    color: #333;
+    font-size: 9pt;
+    line-height: 1.2;
+    font-style: italic;
+  }
+
+  .print-footer-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 6.5cm;
   }
 
   .print-total-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.2cm 0.3cm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px 0;
+    font-size: 10.5pt;
     border-bottom: 1px solid #ddd;
   }
 
-  .print-total-row.print-total-final {
-    border-top: 2px solid #000;
+  .print-total-row:last-child {
     border-bottom: none;
-    font-weight: bold;
-    font-size: 12pt;
-    padding: 0.3cm;
-    margin-top: 0.2cm;
-    background-color: #e8e8e8;
   }
 
   .print-total-label {
     font-weight: bold;
-    color: #333;
   }
 
   .print-total-value {
     text-align: right;
-    min-width: 3.5cm;
-    font-weight: normal;
   }
 
-  .print-total-final .print-total-label,
-  .print-total-final .print-total-value {
+  .print-total-final {
+    font-size: 13pt;
     font-weight: bold;
-    color: #000;
+    border-top: 2.5px solid #000;
+    border-bottom: 4px double #000;
+    margin-top: 5px;
+    padding: 8px 0;
   }
 
-  /* Signature area */
-  .print-signature-area {
-    margin-top: 1cm;
+  /* Signatures */
+  .print-signatures {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1cm;
-    page-break-inside: avoid;
+    gap: 4cm;
+    margin-top: 1cm;
+    text-align: center;
+    padding-bottom: 0.5cm;
   }
 
   .print-signature-box {
-    text-align: center;
-    padding-top: 0.5cm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .print-signature-line {
-    border-top: 1px solid #000;
-    margin-top: 1.5cm;
-    padding-top: 0.2cm;
-    font-size: 9pt;
+    width: 100%;
+    border-top: 2px solid #000;
+    margin-top: 1.8cm;
+    padding-top: 4px;
+    font-size: 10.5pt;
+    font-weight: bold;
   }
 
   .print-signature-label {
     font-weight: bold;
-    font-size: 9pt;
-    margin-bottom: 0.2cm;
+    font-size: 10.5pt;
+    margin-bottom: 0.15cm;
   }
 }
