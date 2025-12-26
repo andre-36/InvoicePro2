@@ -209,8 +209,8 @@
   }
 
   .print-logo-image {
-    max-width: 2.2cm;
-    max-height: 2.2cm;
+    max-width: 2.8cm;
+    max-height: 2.5cm;
     object-fit: contain;
   }
 
@@ -265,6 +265,7 @@
     font-size: 18pt;
     font-weight: bold;
     margin-bottom: 3px;
+    white-space: nowrap;
   }
 
   .print-company-address {

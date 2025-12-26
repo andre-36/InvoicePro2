@@ -280,11 +280,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           <table className="print-items-table">
             <thead>
               <tr>
-                <th style={{ width: '5%', textAlign: 'center' }}>No.</th>
-                <th style={{ width: '10%', textAlign: 'center' }}>Code</th>
-                <th style={{ width: '47%', textAlign: 'center' }}>Description</th>
-                <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
-                <th style={{ width: '16%', textAlign: 'center' }}>Rate</th>
+                <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>Code</th>
+                <th style={{ width: '52%', textAlign: 'center' }}>Description</th>
+                <th style={{ width: '5%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>Rate</th>
                 <th style={{ width: '16%', textAlign: 'center' }}>Total</th>
               </tr>
             </thead>
