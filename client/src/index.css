@@ -165,7 +165,7 @@
     line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.2cm 0.15cm;
+    padding: 0.2cm 0.1cm 0.2cm 0.1cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -177,8 +177,8 @@
   .print-header {
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: 0.4cm;
-    margin-bottom: 0.2cm;
+    gap: 0.3cm;
+    margin-bottom: 0.15cm;
     position: relative;
     align-items: start;
     width: 100%;
@@ -187,7 +187,7 @@
   .print-header-left {
     display: flex;
     flex-direction: row;
-    gap: 0.4cm;
+    gap: 0.3cm;
     align-items: flex-start;
   }
 
