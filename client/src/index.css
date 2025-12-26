@@ -165,7 +165,7 @@
     line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.2cm 0.25cm;
+    padding: 0.2cm 0.15cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -209,14 +209,14 @@
   }
 
   .print-logo-image {
-    max-width: 2.8cm;
-    max-height: 2.5cm;
+    max-width: 4cm;
+    max-height: 4cm;
     object-fit: contain;
   }
 
   .print-logo-circle {
-    width: 2.2cm;
-    height: 2.2cm;
+    width: 4cm;
+    height: 4cm;
     border: 2px solid #000;
     border-radius: 50%;
     display: flex;
@@ -294,7 +294,7 @@
 
   .print-doc-row {
     display: grid;
-    grid-template-columns: 1.5fr 2fr;
+    grid-template-columns: auto 1fr;
     margin-bottom: 2px;
   }
 
@@ -306,6 +306,7 @@
   .print-doc-value {
     text-align: right;
     font-weight: normal;
+    white-space: nowrap;
   }
 
   /* Page number */
