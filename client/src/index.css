@@ -124,11 +124,24 @@
 
   body > div,
   #root,
+  #root > *,
+  #root > * > *,
   main {
     margin: 0 !important;
     padding: 0 !important;
     width: 21.7cm !important;
     max-width: 21.7cm !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  /* Reset all layout padding for print */
+  .lg\\:pl-72,
+  .pl-72,
+  .ml-72,
+  .lg\\:ml-72 {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
   }
 
   /* Hide sidebar and navigation elements */
