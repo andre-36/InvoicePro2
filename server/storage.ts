@@ -1614,22 +1614,26 @@ export class DatabaseStorage implements IStorage {
         .where(eq(quotationItems.quotationId, id));
 
       // Generate a unique invoice number using the standard generation function
-      const today = new Date();
-      const year = today.getFullYear().toString().slice(-2);
-      const month = (today.getMonth() + 1).toString().padStart(2, '0');
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
 
       const invoiceNumber = await generateNextNumber("INV", yearMonth, invoices, invoices.invoiceNumber, tx);
 
       // Create a new invoice based on the quotation
+      const issueDate = new Date();
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
+      
       const [newInvoice] = await tx
         .insert(invoices)
         .values({
           storeId: quotation.storeId,
           invoiceNumber,
           clientId: quotation.clientId,
-          issueDate: new Date(),
-          dueDate: new Date(today.setDate(today.getDate() + 30)), // 30 days from now
+          issueDate: issueDate.toISOString().split('T')[0],
+          dueDate: dueDate.toISOString().split('T')[0],
           status: 'draft',
           subtotal: quotation.subtotal,
           taxRate: quotation.taxRate,
