@@ -213,6 +213,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    margin-right: 0.3cm;
   }
 
   /* Logo */
@@ -222,20 +223,20 @@
   }
 
   .print-logo-image {
-    max-width: 4cm;
-    max-height: 4cm;
+    max-width: 2.2cm;
+    max-height: 2.2cm;
     object-fit: contain;
   }
 
   .print-logo-circle {
-    width: 4cm;
-    height: 4cm;
+    width: 2.2cm;
+    height: 2.2cm;
     border: 2px solid #000;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10pt;
+    font-size: 9pt;
     font-weight: bold;
     background: white;
   }
@@ -258,16 +259,18 @@
     font-size: 12pt;
     font-weight: bold;
     margin-bottom: 2px;
+    white-space: nowrap;
   }
   
   .print-bill-to-details {
     font-size: 11pt;
     line-height: 1.25;
+    white-space: nowrap;
   }
 
   /* Company info */
   .print-company-name {
-    font-size: 19pt;
+    font-size: 15pt;
     font-weight: bold;
     margin-bottom: 2px;
     letter-spacing: 0.3pt;
@@ -275,7 +278,7 @@
   }
 
   .print-company-tagline {
-    font-size: 18pt;
+    font-size: 13pt;
     font-weight: bold;
     margin-bottom: 3px;
     white-space: nowrap;
@@ -288,10 +291,10 @@
 
   /* Document type and details */
   .print-doc-type {
-    font-size: 18pt;
+    font-size: 14pt;
     font-weight: bold;
     text-align: right;
-    margin-bottom: 0.15cm;
+    margin-bottom: 0.1cm;
     text-transform: uppercase;
     color: #000;
     border-bottom: 2px solid #000;
@@ -300,20 +303,22 @@
   }
 
   .print-doc-details {
-    font-size: 12pt;
-    line-height: 1.4;
+    font-size: 11pt;
+    line-height: 1.3;
     width: 100%;
   }
 
   .print-doc-row {
     display: grid;
-    grid-template-columns: auto 1fr;
-    margin-bottom: 2px;
+    grid-template-columns: auto auto;
+    gap: 0.2cm;
+    margin-bottom: 1px;
   }
 
   .print-doc-label {
     font-weight: bold;
     color: #000;
+    white-space: nowrap;
   }
 
   .print-doc-value {
@@ -333,10 +338,12 @@
 
   /* Items table */
   .print-items-table {
-    width: 100%;
+    width: 95%;
     border-collapse: collapse;
     margin-bottom: 0.25cm;
     flex-grow: 1;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .print-items-table th {
