@@ -1418,15 +1418,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const quotationId = parseInt(req.params.id);
-      const validatedData = validateRequestBody(insertQuotationSchema.partial(), req, res);
-      if (!validatedData) return;
+      const { quotation: quotationData, items } = req.body;
+      
+      // Validate quotation data
+      const validatedQuotation = insertQuotationSchema.partial().safeParse(quotationData);
+      if (!validatedQuotation.success) {
+        return res.status(400).json({ error: "Invalid quotation data", details: validatedQuotation.error });
+      }
       
       // Prevent modification of quotation number to prevent fraud
-      if (validatedData.quotationNumber !== undefined) {
+      if (validatedQuotation.data.quotationNumber !== undefined) {
         return res.status(400).json({ error: "Quotation number cannot be modified" });
       }
       
-      const updatedQuotation = await storage.updateQuotation(quotationId, validatedData);
+      const updatedQuotation = await storage.updateQuotation(quotationId, validatedQuotation.data, items);
       res.json(updatedQuotation);
     } catch (error) {
       console.error("Error updating quotation:", error);

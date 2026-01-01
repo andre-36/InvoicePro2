@@ -122,7 +122,7 @@ export interface IStorage {
   getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
   getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]>;
   createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
-  updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation>;
+  updateQuotation(id: number, quotation: Partial<InsertQuotation>, items?: InsertQuotationItem[]): Promise<Quotation>;
   convertQuotationToInvoice(id: number): Promise<Invoice>;
   deleteQuotation(id: number): Promise<void>;
 
@@ -1587,13 +1587,35 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateQuotation(id: number, quotationData: Partial<InsertQuotation>): Promise<Quotation> {
-    const [updatedQuotation] = await db
-      .update(quotations)
-      .set({ ...quotationData, updatedAt: new Date() })
-      .where(eq(quotations.id, id))
-      .returning();
-    return updatedQuotation;
+  async updateQuotation(id: number, quotationData: Partial<InsertQuotation>, items?: InsertQuotationItem[]): Promise<Quotation> {
+    return withTransaction(async (tx) => {
+      // Update quotation data
+      const [updatedQuotation] = await tx
+        .update(quotations)
+        .set({ ...quotationData, updatedAt: new Date() })
+        .where(eq(quotations.id, id))
+        .returning();
+      
+      // If items are provided, update them
+      if (items && items.length > 0) {
+        // Delete existing items
+        await tx
+          .delete(quotationItems)
+          .where(eq(quotationItems.quotationId, id));
+        
+        // Insert new items
+        for (const item of items) {
+          await tx
+            .insert(quotationItems)
+            .values({
+              ...item,
+              quotationId: id
+            });
+        }
+      }
+      
+      return updatedQuotation;
+    });
   }
 
   async convertQuotationToInvoice(id: number): Promise<Invoice> {
