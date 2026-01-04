@@ -197,6 +197,10 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
+          {/* Watermark */}
+          <div className="print-watermark">
+            {currentUser?.companyName || "MITRA INDO ALUMINIUM"}
+          </div>
           {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">
             {/* Left column: Logo + Bill To */}

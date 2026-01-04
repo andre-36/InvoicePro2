@@ -184,6 +184,24 @@
     flex-direction: column;
     background: white;
     transform-origin: top left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Watermark */
+  .print-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    font-size: 48pt;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.06);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+    letter-spacing: 8pt;
+    text-transform: uppercase;
   }
 
   /* Header - Optimized Layout */
