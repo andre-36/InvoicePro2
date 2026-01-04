@@ -184,36 +184,6 @@
     flex-direction: column;
     background: white;
     transform-origin: top left;
-    position: relative;
-    overflow: hidden;
-  }
-
-  /* Watermark - repeating pattern */
-  .print-watermark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 21.7cm;
-    height: 13.8cm;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    justify-content: center;
-    gap: 0.6cm 1.2cm;
-    transform: rotate(-35deg);
-    transform-origin: center center;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-
-  .print-watermark span {
-    font-size: 10pt;
-    font-weight: bold;
-    color: rgba(0, 0, 0, 0.07);
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 1pt;
   }
 
   /* Header - Optimized Layout */
