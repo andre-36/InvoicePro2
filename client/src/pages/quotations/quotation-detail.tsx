@@ -197,9 +197,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
-          {/* Watermark */}
+          {/* Watermark - repeating pattern */}
           <div className="print-watermark">
-            {currentUser?.companyName || "MITRA INDO ALUMINIUM"}
+            {Array.from({ length: 50 }).map((_, i) => (
+              <span key={i}>{currentUser?.companyName || "MITRA INDO ALUMINIUM"}</span>
+            ))}
           </div>
           {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">

@@ -188,20 +188,29 @@
     overflow: hidden;
   }
 
-  /* Watermark */
+  /* Watermark - repeating pattern */
   .print-watermark {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-35deg);
-    font-size: 48pt;
-    font-weight: bold;
-    color: rgba(0, 0, 0, 0.06);
-    white-space: nowrap;
+    top: -2cm;
+    left: -2cm;
+    right: -2cm;
+    bottom: -2cm;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.8cm 1.5cm;
+    transform: rotate(-35deg);
     pointer-events: none;
     z-index: 0;
-    letter-spacing: 8pt;
+  }
+
+  .print-watermark span {
+    font-size: 11pt;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.08);
+    white-space: nowrap;
     text-transform: uppercase;
+    letter-spacing: 1pt;
   }
 
   /* Header - Optimized Layout */
