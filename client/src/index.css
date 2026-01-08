@@ -185,6 +185,7 @@
     background: white;
     transform-origin: top left;
     position: relative;
+    overflow: hidden;
   }
 
   /* Watermark - repeating pattern */
@@ -192,11 +193,12 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    right: 0;
+    bottom: 0;
     overflow: hidden;
     pointer-events: none;
     z-index: 0;
+    clip: rect(0, 21.7cm, 13.8cm, 0);
   }
 
   .print-watermark-inner {
@@ -206,23 +208,22 @@
     transform: translate(-50%, -50%) rotate(-25deg);
     display: flex;
     flex-direction: column;
-    gap: 0.8cm;
-    width: 200%;
+    gap: 0.6cm;
   }
 
   .print-watermark-row {
     display: flex;
-    gap: 1.2cm;
+    gap: 0.8cm;
     white-space: nowrap;
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: 600;
     color: #888;
     opacity: 0.2;
-    letter-spacing: 2pt;
+    letter-spacing: 1pt;
   }
 
   .print-watermark-row:nth-child(even) {
-    margin-left: 2cm;
+    margin-left: 1.5cm;
   }
 
   /* Header - Optimized Layout */
