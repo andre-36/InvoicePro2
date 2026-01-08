@@ -200,9 +200,9 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
           {/* Watermark - repeating pattern */}
           <div className="print-watermark">
             <div className="print-watermark-inner">
-              {[...Array(12)].map((_, rowIndex) => (
+              {[...Array(8)].map((_, rowIndex) => (
                 <div key={rowIndex} className="print-watermark-row">
-                  {[...Array(6)].map((_, colIndex) => (
+                  {[...Array(5)].map((_, colIndex) => (
                     <span key={colIndex}>{currentUser?.companyName || ''}</span>
                   ))}
                 </div>

@@ -193,37 +193,38 @@
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    width: 21.7cm;
+    height: 13.8cm;
     overflow: hidden;
     pointer-events: none;
     z-index: 0;
-    clip: rect(0, 21.7cm, 13.8cm, 0);
   }
 
   .print-watermark-inner {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-25deg);
+    top: 3cm;
+    left: -2cm;
+    width: 26cm;
+    height: 10cm;
+    transform: rotate(-25deg);
     display: flex;
     flex-direction: column;
-    gap: 0.6cm;
+    gap: 1cm;
   }
 
   .print-watermark-row {
     display: flex;
-    gap: 0.8cm;
+    gap: 1.5cm;
     white-space: nowrap;
-    font-size: 12pt;
+    font-size: 11pt;
     font-weight: 600;
-    color: #888;
-    opacity: 0.2;
+    color: #999;
+    opacity: 0.15;
     letter-spacing: 1pt;
   }
 
   .print-watermark-row:nth-child(even) {
-    margin-left: 1.5cm;
+    margin-left: 2cm;
   }
 
   /* Header - Optimized Layout */
