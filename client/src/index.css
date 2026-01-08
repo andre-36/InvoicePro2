@@ -184,6 +184,23 @@
     flex-direction: column;
     background: white;
     transform-origin: top left;
+    position: relative;
+  }
+
+  /* Watermark */
+  .print-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 48pt;
+    font-weight: 700;
+    letter-spacing: 4pt;
+    color: #888;
+    opacity: 0.18;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
   }
 
   /* Header - Optimized Layout */
