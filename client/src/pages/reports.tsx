@@ -8,8 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Download, FileDown } from "lucide-react";
+import { Download, FileDown, Calendar as CalendarIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
+import { DateRange as DayPickerDateRange } from "react-day-picker";
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
@@ -72,12 +77,25 @@ type Transaction = {
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState("profit-loss");
   const [dateRange, setDateRange] = useState<DateRange>("this_month");
+  const [customDateRange, setCustomDateRange] = useState<DayPickerDateRange | undefined>(undefined);
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
+  
+  const getApiDateRange = () => {
+    if (dateRange === "custom" && customDateRange?.from && customDateRange?.to) {
+      const fromStr = format(customDateRange.from, "yyyy-MM-dd");
+      const toStr = format(customDateRange.to, "yyyy-MM-dd");
+      return `custom:${fromStr}:${toStr}`;
+    }
+    return dateRange;
+  };
+
+  const apiDateRange = getApiDateRange();
   
   // Financial Report data
   const { data: financialReport, isLoading: isLoadingFinancial } = useQuery<FinancialReport>({
-    queryKey: ['/api/stores/1/reports/financial', dateRange],
+    queryKey: ['/api/stores/1/reports/financial', apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/financial?dateRange=${dateRange}`, {
+      const response = await fetch(`/api/stores/1/reports/financial?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch financial report');
@@ -87,9 +105,9 @@ export default function ReportsPage() {
   
   // Cash Flow Report data
   const { data: cashFlowReport, isLoading: isLoadingCashFlow } = useQuery<CashFlowReport>({
-    queryKey: ['/api/stores/1/reports/cashflow', dateRange],
+    queryKey: ['/api/stores/1/reports/cashflow', apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/cashflow?dateRange=${dateRange}`, {
+      const response = await fetch(`/api/stores/1/reports/cashflow?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch cashflow report');
@@ -139,13 +157,18 @@ export default function ReportsPage() {
           <p className="text-sm text-gray-500 mt-1">Laporan keuangan lengkap sesuai standar akuntansi</p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Select
             value={dateRange}
-            onValueChange={(value) => setDateRange(value as DateRange)}
+            onValueChange={(value) => {
+              setDateRange(value as DateRange);
+              if (value === "custom") {
+                setIsCustomOpen(true);
+              }
+            }}
           >
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="This Month" />
+              <SelectValue placeholder="Bulan Ini" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="this_month">Bulan Ini</SelectItem>
@@ -155,6 +178,37 @@ export default function ReportsPage() {
               <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
+          
+          {dateRange === "custom" && (
+            <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customDateRange?.from ? (
+                    customDateRange.to ? (
+                      <>
+                        {format(customDateRange.from, "dd MMM yyyy", { locale: id })} - {format(customDateRange.to, "dd MMM yyyy", { locale: id })}
+                      </>
+                    ) : (
+                      format(customDateRange.from, "dd MMM yyyy", { locale: id })
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">Pilih tanggal...</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={customDateRange?.from}
+                  selected={customDateRange}
+                  onSelect={setCustomDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
           
           <Button variant="outline" onClick={() => downloadReport(activeTab)}>
             <Download className="h-4 w-4 mr-2" />

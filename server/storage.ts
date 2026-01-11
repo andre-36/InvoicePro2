@@ -2778,8 +2778,18 @@ export class DatabaseStorage implements IStorage {
 
   private getDateRangeFromString(dateRange: string): { startDate: Date; endDate: Date } {
     const today = new Date();
-    const endDate = new Date(today);
+    let endDate = new Date(today);
     let startDate = new Date(today);
+
+    // Handle custom date range format: "custom:YYYY-MM-DD:YYYY-MM-DD"
+    if (dateRange.startsWith('custom:')) {
+      const parts = dateRange.split(':');
+      if (parts.length === 3) {
+        startDate = new Date(parts[1]);
+        endDate = new Date(parts[2]);
+        return { startDate, endDate };
+      }
+    }
 
     switch (dateRange) {
       case 'this_month':
