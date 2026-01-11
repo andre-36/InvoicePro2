@@ -48,10 +48,10 @@ type Invoice = {
   issueDate: string;
   dueDate: string;
   totalAmount: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'void';
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
 };
 
-type InvoiceStatus = 'all' | 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'void';
+type InvoiceStatus = 'all' | 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
 
 export default function InvoicesPage() {
   const [, navigate] = useLocation();
@@ -179,8 +179,6 @@ export default function InvoicesPage() {
         return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
       case 'overdue':
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
-      case 'cancelled':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
       case 'void':
         return <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>;
       default:
@@ -234,7 +232,6 @@ export default function InvoicesPage() {
                   <SelectItem value="sent">Pending</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="void">Void</SelectItem>
                 </SelectContent>
               </Select>
@@ -342,7 +339,7 @@ export default function InvoicesPage() {
                                   <SelectItem value="sent">Pending</SelectItem>
                                   <SelectItem value="paid">Paid</SelectItem>
                                   <SelectItem value="overdue">Overdue</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                  <SelectItem value="void">Void</SelectItem>
                                 </SelectContent>
                               </Select>
                             </DropdownMenuItem>

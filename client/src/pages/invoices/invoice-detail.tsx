@@ -180,9 +180,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     updateStatusMutation.mutate('overdue');
   };
 
-  // Cancel invoice
-  const handleCancelInvoice = () => {
-    updateStatusMutation.mutate('cancelled');
+  // Void invoice
+  const handleVoidInvoice = () => {
+    updateStatusMutation.mutate('void');
   };
 
   // Create payment mutation
@@ -343,8 +343,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
       case 'overdue':
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
-      case 'cancelled':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
       case 'void':
         return <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>;
       default:
@@ -401,7 +399,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     );
   }
 
-  const isEditable = invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'void';
+  const isEditable = invoice.status !== 'paid' && invoice.status !== 'void';
 
   return (
     <>
@@ -588,10 +586,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <Button
               variant="outline"
               className="gap-1 text-gray-600"
-              onClick={handleCancelInvoice}
+              onClick={handleVoidInvoice}
             >
               <X className="h-4 w-4" />
-              <span>Cancel</span>
+              <span>Void</span>
             </Button>
           )}
           

@@ -11,7 +11,7 @@ interface Invoice {
   clientName: string;
   issueDate: string;
   total: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
 }
 
 export function RecentInvoicesTable() {
@@ -29,8 +29,8 @@ export function RecentInvoicesTable() {
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">Overdue</Badge>;
       case 'draft':
         return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200">Draft</Badge>;
-      case 'cancelled':
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200">Cancelled</Badge>;
+      case 'void':
+        return <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
