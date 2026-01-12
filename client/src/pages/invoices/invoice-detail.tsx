@@ -414,6 +414,195 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     createDeliveryNoteMutation.mutate(data);
   };
 
+  const handlePrintDeliveryNote = async (deliveryNote: DeliveryNote) => {
+    // Fetch the delivery note with items
+    try {
+      const response = await fetch(`/api/delivery-notes/${deliveryNote.id}`, {
+        credentials: 'include'
+      });
+      const dnData = await response.json();
+      
+      // Open print window with delivery note content
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description: "Could not open print window. Please allow popups.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Delivery Note - ${deliveryNote.deliveryNumber}</title>
+          <style>
+            @page {
+              size: 21.7cm 13.8cm landscape;
+              margin: 0.5cm;
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              font-size: 11pt;
+              margin: 0;
+              padding: 10px;
+              width: 21.7cm;
+              height: 13.8cm;
+              box-sizing: border-box;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 10px;
+              border-bottom: 1px solid #333;
+              padding-bottom: 8px;
+            }
+            .company-info h1 {
+              font-size: 15pt;
+              margin: 0 0 3px 0;
+            }
+            .company-info p {
+              margin: 2px 0;
+              font-size: 10pt;
+            }
+            .doc-info {
+              text-align: right;
+            }
+            .doc-info h2 {
+              font-size: 14pt;
+              margin: 0 0 5px 0;
+            }
+            .doc-info p {
+              margin: 2px 0;
+              font-size: 10pt;
+            }
+            .client-section {
+              margin-bottom: 10px;
+            }
+            .client-section h3 {
+              font-size: 11pt;
+              margin: 0 0 5px 0;
+            }
+            table {
+              width: 95%;
+              margin: 0 auto;
+              border-collapse: collapse;
+              font-size: 10pt;
+            }
+            th, td {
+              border: 1px solid #333;
+              padding: 4px 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f0f0f0;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .footer {
+              margin-top: 15px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .signature-box {
+              width: 45%;
+              text-align: center;
+            }
+            .signature-line {
+              border-top: 1px solid #333;
+              margin-top: 40px;
+              padding-top: 5px;
+            }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-info">
+              <h1>${currentUser?.companyName || 'Company Name'}</h1>
+              ${currentUser?.companyTagline ? `<p><em>${currentUser.companyTagline}</em></p>` : ''}
+              ${currentUser?.companyAddress ? `<p>${currentUser.companyAddress}</p>` : ''}
+              ${currentUser?.companyPhone ? `<p>Tel: ${currentUser.companyPhone}</p>` : ''}
+            </div>
+            <div class="doc-info">
+              <h2>SURAT JALAN</h2>
+              <p><strong>No: ${deliveryNote.deliveryNumber}</strong></p>
+              <p>Tanggal: ${formatDate(deliveryNote.deliveryDate)}</p>
+            </div>
+          </div>
+          
+          <div class="client-section">
+            <h3>Kepada:</h3>
+            <p><strong>${client?.name || ''}</strong></p>
+            ${client?.address ? `<p>${client.address}</p>` : ''}
+          </div>
+
+          <p><strong>Invoice: ${invoice?.invoiceNumber || ''}</strong></p>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px">No</th>
+                <th>Keterangan</th>
+                <th style="width: 100px" class="text-right">Jumlah</th>
+                <th style="width: 150px">Catatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(dnData.items || []).map((item: any, idx: number) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>${item.invoiceItemDescription || item.description || ''}</td>
+                  <td class="text-right">${item.deliveredQuantity}</td>
+                  <td>${item.remarks || ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          ${deliveryNote.notes ? `<p style="margin-top: 10px;"><strong>Catatan:</strong> ${deliveryNote.notes}</p>` : ''}
+          
+          ${deliveryNote.vehicleInfo || deliveryNote.driverName ? `
+            <p style="margin-top: 10px;">
+              ${deliveryNote.vehicleInfo ? `Kendaraan: ${deliveryNote.vehicleInfo}` : ''}
+              ${deliveryNote.vehicleInfo && deliveryNote.driverName ? ' | ' : ''}
+              ${deliveryNote.driverName ? `Pengirim: ${deliveryNote.driverName}` : ''}
+            </p>
+          ` : ''}
+
+          <div class="footer">
+            <div class="signature-box">
+              <p>Pengirim</p>
+              <div class="signature-line">${deliveryNote.driverName || '_______________'}</div>
+            </div>
+            <div class="signature-box">
+              <p>Penerima</p>
+              <div class="signature-line">${deliveryNote.recipientName || '_______________'}</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load delivery note for printing",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddPayment = () => {
     setEditingPayment(null);
     setPaymentForm({
@@ -1182,8 +1371,17 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handlePrintDeliveryNote(dn)}
+                                title="Print Delivery Note"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => deleteDeliveryNoteMutation.mutate(dn.id)}
                                 className="text-red-600 hover:text-red-700"
+                                title="Delete Delivery Note"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
