@@ -980,18 +980,57 @@ export class DatabaseStorage implements IStorage {
     await db.delete(productUnits).where(eq(productUnits.id, id));
   }
 
-  // Invoice methods
-  async getInvoice(id: number): Promise<Invoice | undefined> {
-    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  // Helper method to check and update overdue status automatically
+  private async checkAndUpdateOverdueStatus(invoice: Invoice): Promise<Invoice> {
+    // Only check for invoices that are not already paid, void, overdue, or draft
+    if (invoice.status === 'paid' || invoice.status === 'void' || invoice.status === 'overdue' || invoice.status === 'draft') {
+      return invoice;
+    }
+    
+    // Skip if no due date is set
+    if (!invoice.dueDate) {
+      return invoice;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = new Date(invoice.dueDate);
+    // Skip if invalid date
+    if (isNaN(dueDate.getTime())) {
+      return invoice;
+    }
+    dueDate.setHours(0, 0, 0, 0);
+    
+    // If due date has passed, update to overdue
+    if (dueDate < today) {
+      const [updatedInvoice] = await db
+        .update(invoices)
+        .set({ status: 'overdue', updatedAt: new Date() })
+        .where(eq(invoices.id, invoice.id))
+        .returning();
+      return updatedInvoice;
+    }
+    
     return invoice;
   }
 
-  async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: InvoiceItem[]; client?: Client } | undefined> {
+  // Invoice methods
+  async getInvoice(id: number): Promise<Invoice | undefined> {
     const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    if (!invoice) return undefined;
+    return this.checkAndUpdateOverdueStatus(invoice);
+  }
+
+  async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: InvoiceItem[]; client?: Client } | undefined> {
+    let [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
 
     if (!invoice) {
       return undefined;
     }
+
+    // Check and update overdue status
+    invoice = await this.checkAndUpdateOverdueStatus(invoice);
 
     const items = await db
       .select()
@@ -1036,29 +1075,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invoices.storeId, storeId))
       .orderBy(desc(invoices.issueDate));
 
-    return results;
+    // Check and update overdue status for applicable invoices
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const updatedResults = await Promise.all(
+      results.map(async (invoice) => {
+        // Only check for invoices that are sent or pending (not paid, void, overdue, or draft)
+        if (invoice.status === 'sent' || invoice.status === 'pending') {
+          // Skip if no due date is set
+          if (!invoice.dueDate) {
+            return invoice;
+          }
+          
+          const dueDate = new Date(invoice.dueDate);
+          // Skip if invalid date
+          if (isNaN(dueDate.getTime())) {
+            return invoice;
+          }
+          dueDate.setHours(0, 0, 0, 0);
+          
+          if (dueDate < today) {
+            // Update status to overdue
+            await db
+              .update(invoices)
+              .set({ status: 'overdue', updatedAt: new Date() })
+              .where(eq(invoices.id, invoice.id));
+            return { ...invoice, status: 'overdue' as const };
+          }
+        }
+        return invoice;
+      })
+    );
+
+    return updatedResults;
   }
 
   async getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]> {
-    return db
+    const results = await db
       .select()
       .from(invoices)
       .where(eq(invoices.storeId, storeId))
       .orderBy(desc(invoices.issueDate))
       .limit(limit);
+    
+    // Apply overdue check
+    return Promise.all(results.map(inv => this.checkAndUpdateOverdueStatus(inv)));
   }
 
   async getOpenInvoices(storeId: number): Promise<Invoice[]> {
-    return db
+    // Include 'pending' in the query since those could become overdue
+    const results = await db
       .select()
       .from(invoices)
       .where(
         and(
           eq(invoices.storeId, storeId),
-          inArray(invoices.status, ["draft", "sent", "overdue"])
+          inArray(invoices.status, ["draft", "sent", "pending", "overdue"])
         )
       )
       .orderBy(desc(invoices.issueDate));
+    
+    // Apply overdue check
+    return Promise.all(results.map(inv => this.checkAndUpdateOverdueStatus(inv)));
   }
 
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, Clock, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -185,11 +185,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   // Mark as paid
   const handleMarkAsPaid = () => {
     updateStatusMutation.mutate('paid');
-  };
-
-  // Mark as overdue
-  const handleMarkAsOverdue = () => {
-    updateStatusMutation.mutate('overdue');
   };
 
   // Void invoice
@@ -580,17 +575,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             >
               <CreditCard className="h-4 w-4" />
               <span>Mark as Paid</span>
-            </Button>
-          )}
-          
-          {invoice.status === 'sent' && (
-            <Button
-              variant="outline"
-              className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
-              onClick={handleMarkAsOverdue}
-            >
-              <Clock className="h-4 w-4" />
-              <span>Mark as Overdue</span>
             </Button>
           )}
           
