@@ -108,11 +108,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [deliveryForm, setDeliveryForm] = useState({
     deliveryDate: format(new Date(), 'yyyy-MM-dd'),
+    deliveryType: 'delivered' as 'delivered' | 'self_pickup',
     vehicleInfo: '',
     driverName: '',
     recipientName: '',
     notes: '',
-    items: [] as { invoiceItemId: number; deliveredQuantity: string; deliveryType: string; remarks: string }[]
+    items: [] as { invoiceItemId: number; deliveredQuantity: string; remarks: string }[]
   });
 
   const invoice = invoiceData?.invoice;
@@ -355,6 +356,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const resetDeliveryForm = () => {
     setDeliveryForm({
       deliveryDate: format(new Date(), 'yyyy-MM-dd'),
+      deliveryType: 'delivered',
       vehicleInfo: '',
       driverName: '',
       recipientName: '',
@@ -370,11 +372,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         .map(item => ({
           invoiceItemId: item.invoiceItemId,
           deliveredQuantity: item.remaining.toString(),
-          deliveryType: 'delivered',
           remarks: ''
         }));
       setDeliveryForm(prev => ({
         ...prev,
+        deliveryType: 'delivered',
         items: itemsWithRemaining
       }));
     }
@@ -400,6 +402,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         storeId: invoice?.storeId || 1,
         invoiceId: id,
         deliveryDate: deliveryForm.deliveryDate,
+        deliveryType: deliveryForm.deliveryType,
         vehicleInfo: deliveryForm.vehicleInfo || null,
         driverName: deliveryForm.driverName || null,
         recipientName: deliveryForm.recipientName || null,
@@ -408,7 +411,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       items: itemsToDeliver.map(item => ({
         invoiceItemId: item.invoiceItemId,
         deliveredQuantity: item.deliveredQuantity,
-        deliveryType: item.deliveryType || 'delivered',
         remarks: item.remarks || null
       }))
     };
@@ -1448,6 +1450,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Pengiriman</label>
+                    <select
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={deliveryForm.deliveryType}
+                      onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryType: e.target.value as 'delivered' | 'self_pickup' })}
+                    >
+                      <option value="delivered">Dikirim</option>
+                      <option value="self_pickup">Diambil Sendiri</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Items to Deliver</label>
                     <div className="border rounded-lg overflow-hidden">
                       <Table>
@@ -1456,7 +1470,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                             <TableHead>Description</TableHead>
                             <TableHead className="text-right w-24">Remaining</TableHead>
                             <TableHead className="text-right w-24">Qty</TableHead>
-                            <TableHead className="w-36">Type</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1485,35 +1498,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                                         ).concat(
                                           prev.items.find(fi => fi.invoiceItemId === item.invoiceItemId)
                                             ? []
-                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: value, deliveryType: 'delivered', remarks: '' }]
+                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: value, remarks: '' }]
                                         )
                                       }));
                                     }}
                                   />
-                                </TableCell>
-                                <TableCell>
-                                  <select
-                                    className="w-full px-2 py-1 border rounded text-sm"
-                                    value={formItem?.deliveryType || 'delivered'}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      setDeliveryForm(prev => ({
-                                        ...prev,
-                                        items: prev.items.map(fi =>
-                                          fi.invoiceItemId === item.invoiceItemId
-                                            ? { ...fi, deliveryType: value }
-                                            : fi
-                                        ).concat(
-                                          prev.items.find(fi => fi.invoiceItemId === item.invoiceItemId)
-                                            ? []
-                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: '0', deliveryType: value, remarks: '' }]
-                                        )
-                                      }));
-                                    }}
-                                  >
-                                    <option value="delivered">Dikirim</option>
-                                    <option value="self_pickup">Diambil Sendiri</option>
-                                  </select>
                                 </TableCell>
                               </TableRow>
                             );
