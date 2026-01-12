@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { Server } from "http";
 import { env } from "./env";
 import * as XLSX from "xlsx";
-import createCsvWriter from "csv-writer";
+import * as csvWriter from "csv-writer";
 import {
   insertUserSchema,
   insertStoreSchema,
@@ -1148,7 +1148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validatedData) return;
       
       // Prevent modification of invoice number to prevent fraud
-      if (validatedData.invoiceNumber !== undefined) {
+      if ((validatedData as any).invoiceNumber !== undefined) {
         return res.status(400).json({ error: "Invoice number cannot be modified" });
       }
       
@@ -1246,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           storeId: invoice.storeId,
           type: 'income' as const,
           category: 'invoice_payment',
-          amount: parseFloat(validatedData.amount),
+          amount: validatedData.amount,
           date: validatedData.paymentDate,
           description: `Payment received for invoice ${invoice.invoiceNumber}`,
           referenceNumber: `Invoice #${invoice.invoiceNumber}`,
@@ -1427,7 +1427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Prevent modification of quotation number to prevent fraud
-      if (validatedQuotation.data.quotationNumber !== undefined) {
+      if ((validatedQuotation.data as any).quotationNumber !== undefined) {
         return res.status(400).json({ error: "Quotation number cannot be modified" });
       }
       
@@ -1466,12 +1466,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const storeId = parseInt(req.params.storeId);
       const type = req.query.type as string | undefined;
+      const dateRange = req.query.dateRange as string | undefined;
       
       let transactions;
       if (type) {
         transactions = await storage.getTransactionsByType(storeId, type);
       } else {
         transactions = await storage.getTransactions(storeId);
+      }
+      
+      // Filter by date range if specified
+      if (dateRange && transactions.length > 0) {
+        const now = new Date();
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+        
+        if (dateRange === 'this_month') {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else if (dateRange === 'last_month') {
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        } else if (dateRange === 'this_quarter') {
+          const quarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), quarter * 3, 1);
+          endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999);
+        } else if (dateRange === 'this_year') {
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        } else if (dateRange.startsWith('custom:')) {
+          const [, from, to] = dateRange.split(':');
+          if (from && to) {
+            startDate = new Date(from);
+            endDate = new Date(to);
+            endDate.setHours(23, 59, 59, 999);
+          }
+        }
+        
+        if (startDate && endDate) {
+          transactions = transactions.filter(t => {
+            const txDate = new Date(t.date);
+            return txDate >= startDate! && txDate <= endDate!;
+          });
+        }
       }
       
       res.json(transactions);
@@ -1783,7 +1820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Transform to match frontend interface
       const transformedInvoices = await Promise.all(invoices.map(async (invoice) => {
-        const client = await storage.getClient(invoice.clientId);
+        const client = invoice.clientId ? await storage.getClient(invoice.clientId) : null;
         return {
           id: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
@@ -1972,7 +2009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCategories(),
         storage.getInvoices(storeId),
         storage.getQuotations(storeId),
-        storage.getTransactions()
+        storage.getTransactions(storeId)
       ]);
 
       const backupData = {
@@ -2065,7 +2102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       if (format === 'csv') {
-        const csvWriter = createCsvWriter.createObjectCsvStringifier({
+        const csvWriterInstance = csvWriter.createObjectCsvStringifier({
           header: [
             { id: 'ID', title: 'ID' },
             { id: 'Name', title: 'Name' },
@@ -2080,7 +2117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ]
         });
 
-        const csvString = csvWriter.getHeaderString() + csvWriter.stringifyRecords(productData);
+        const csvString = csvWriterInstance.getHeaderString() + csvWriterInstance.stringifyRecords(productData);
         
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.csv"`);
@@ -2121,7 +2158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       if (format === 'csv') {
-        const csvWriter = createCsvWriter.createObjectCsvStringifier({
+        const csvWriterInstance = csvWriter.createObjectCsvStringifier({
           header: [
             { id: 'ID', title: 'ID' },
             { id: 'Name', title: 'Name' },
@@ -2133,7 +2170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ]
         });
 
-        const csvString = csvWriter.getHeaderString() + csvWriter.stringifyRecords(clientData);
+        const csvString = csvWriterInstance.getHeaderString() + csvWriterInstance.stringifyRecords(clientData);
         
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="clients-${new Date().toISOString().split('T')[0]}.csv"`);
@@ -2316,9 +2353,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createProduct(newProductData);
             successCount++;
           }
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
-          errors.push(`Row ${data.indexOf(row) + 1}: ${error.message}`);
+          errors.push(`Row ${data.indexOf(row) + 1}: ${error?.message || 'Unknown error'}`);
         }
       }
 
@@ -2363,9 +2400,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.createClient(clientData);
           successCount++;
-        } catch (error) {
+        } catch (error: any) {
           errorCount++;
-          errors.push(`Row ${data.indexOf(row) + 1}: ${error.message}`);
+          errors.push(`Row ${data.indexOf(row) + 1}: ${error?.message || 'Unknown error'}`);
         }
       }
 
@@ -2429,7 +2466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "logoURL is required" });
     }
 
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     if (!userId) {
       return res.status(401).json({ error: "Not authenticated" });
     }

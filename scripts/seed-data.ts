@@ -341,7 +341,7 @@ async function seedData() {
 
     // Create invoices with varying statuses
     // For demonstration purposes, create 20 invoices across different statuses and dates
-    const statuses = ["paid", "pending", "overdue", "draft", "cancelled"];
+    const statuses = ["paid", "pending", "overdue", "draft", "void"];
     const today = new Date();
 
     for (let i = 1; i <= 20; i++) {
@@ -360,7 +360,7 @@ async function seedData() {
       } else if (i > 8 && i <= 10) {
         status = "overdue";
       } else if (i === 15) {
-        status = "cancelled";
+        status = "void";
       } else {
         status = "paid";
       }

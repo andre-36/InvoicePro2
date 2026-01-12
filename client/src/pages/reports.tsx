@@ -117,7 +117,14 @@ export default function ReportsPage() {
   
   // Transactions for detailed breakdown
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/stores/1/transactions'],
+    queryKey: ['/api/stores/1/transactions', apiDateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/transactions?dateRange=${encodeURIComponent(apiDateRange)}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
   
   // Process transaction data for charts

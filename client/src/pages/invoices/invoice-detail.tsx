@@ -143,7 +143,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           issueDate: formatDate(invoice.issueDate),
           dueDate: formatDate(invoice.dueDate),
           tax: invoice.taxAmount || '0',
-          total: invoice.totalAmount
+          total: invoice.totalAmount,
+          discount: invoice.discount || '0'
         },
         items: items.map(item => ({
           ...item,
@@ -755,7 +756,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                           {formatCurrency(item.unitPrice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {parseFloat(item.taxRate) > 0 ? `${item.taxRate}%` : '—'}
+                          {parseFloat(item.taxRate || '0') > 0 ? `${item.taxRate}%` : '—'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                           {formatCurrency(item.totalAmount)}
@@ -771,16 +772,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               <div className="w-full sm:w-80 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium text-gray-700">Subtotal:</span>
-                  <span className="text-gray-900">{formatCurrency(invoice.subtotal)}</span>
+                  <span className="text-gray-900">{formatCurrency(invoice.subtotal || '0')}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="font-medium text-gray-700">Tax:</span>
-                  <span className="text-gray-900">{formatCurrency(invoice.taxAmount)}</span>
+                  <span className="text-gray-900">{formatCurrency(invoice.taxAmount || '0')}</span>
                 </div>
-                {parseFloat(invoice.discount) > 0 && (
+                {parseFloat(invoice.discount || '0') > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-gray-700">Discount:</span>
-                    <span className="text-gray-900">-{formatCurrency(invoice.discount)}</span>
+                    <span className="text-gray-900">-{formatCurrency(invoice.discount || '0')}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t border-gray-200">
