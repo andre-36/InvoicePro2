@@ -274,6 +274,48 @@ export const invoicePayments = pgTable("invoice_payments", {
   };
 });
 
+// Delivery status enum
+export const deliveryStatusEnum = pgEnum('delivery_status', ['pending', 'delivered', 'cancelled']);
+
+// Delivery Notes table (Surat Jalan)
+export const deliveryNotes = pgTable("delivery_notes", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
+  deliveryNumber: varchar("delivery_number", { length: 50 }).notNull().unique(),
+  deliveryDate: date("delivery_date").notNull(),
+  status: deliveryStatusEnum("status").default("pending").notNull(),
+  vehicleInfo: varchar("vehicle_info", { length: 100 }),
+  driverName: varchar("driver_name", { length: 100 }),
+  recipientName: varchar("recipient_name", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("delivery_notes_store_id_idx").on(table.storeId),
+    invoiceIdIdx: index("delivery_notes_invoice_id_idx").on(table.invoiceId),
+    deliveryDateIdx: index("delivery_notes_delivery_date_idx").on(table.deliveryDate),
+    statusIdx: index("delivery_notes_status_idx").on(table.status)
+  };
+});
+
+// Delivery Note Items table
+export const deliveryNoteItems = pgTable("delivery_note_items", {
+  id: serial("id").primaryKey(),
+  deliveryNoteId: integer("delivery_note_id").references(() => deliveryNotes.id, { onDelete: 'cascade' }).notNull(),
+  invoiceItemId: integer("invoice_item_id").references(() => invoiceItems.id, { onDelete: 'cascade' }).notNull(),
+  deliveredQuantity: numeric("delivered_quantity", { precision: 15, scale: 2 }).notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    deliveryNoteIdIdx: index("delivery_note_items_delivery_note_id_idx").on(table.deliveryNoteId),
+    invoiceItemIdIdx: index("delivery_note_items_invoice_item_id_idx").on(table.invoiceItemId)
+  };
+});
+
 // Quotations table
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
@@ -534,6 +576,8 @@ export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit(
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
 export const insertPaymentTypeSchema = createInsertSchema(paymentTypes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPaymentTermSchema = createInsertSchema(paymentTerms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDeliveryNoteSchema = createInsertSchema(deliveryNotes).omit({ id: true, deliveryNumber: true, createdAt: true, updatedAt: true });
+export const insertDeliveryNoteItemSchema = createInsertSchema(deliveryNoteItems).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Define types for TypeScript
 export type User = typeof users.$inferSelect;
@@ -602,6 +646,12 @@ export type InsertPaymentType = z.infer<typeof insertPaymentTypeSchema>;
 export type PaymentTerm = typeof paymentTerms.$inferSelect;
 export type InsertPaymentTerm = z.infer<typeof insertPaymentTermSchema>;
 
+export type DeliveryNote = typeof deliveryNotes.$inferSelect;
+export type InsertDeliveryNote = z.infer<typeof insertDeliveryNoteSchema>;
+
+export type DeliveryNoteItem = typeof deliveryNoteItems.$inferSelect;
+export type InsertDeliveryNoteItem = z.infer<typeof insertDeliveryNoteItemSchema>;
+
 export type ImportExportLog = typeof importExportLogs.$inferSelect;
 export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
 
@@ -618,6 +668,8 @@ export type PurchaseOrderWithItems = PurchaseOrder & { items: PurchaseOrderItem[
 export type InvoiceItemWithProduct = InvoiceItem & { product: Product; productUnit?: ProductUnit };
 export type QuotationItemWithProduct = QuotationItem & { product: Product; productUnit?: ProductUnit };
 export type PurchaseOrderItemWithProduct = PurchaseOrderItem & { product: Product };
+export type DeliveryNoteWithItems = DeliveryNote & { items: (DeliveryNoteItem & { invoiceItem: InvoiceItem })[] };
+export type DeliveryNoteItemWithDetails = DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } };
 
 // Auth schemas
 export const loginSchema = z.object({
@@ -667,15 +719,28 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
   items: many(invoiceItems),
   payments: many(invoicePayments),
-  transactions: many(transactions)
+  transactions: many(transactions),
+  deliveryNotes: many(deliveryNotes)
 }));
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one, many }) => ({
   invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
   product: one(products, { fields: [invoiceItems.productId], references: [products.id] }),
-  batches: many(invoiceItemBatches)
+  batches: many(invoiceItemBatches),
+  deliveryNoteItems: many(deliveryNoteItems)
 }));
 
 export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
   invoice: one(invoices, { fields: [invoicePayments.invoiceId], references: [invoices.id] })
+}));
+
+export const deliveryNotesRelations = relations(deliveryNotes, ({ one, many }) => ({
+  store: one(stores, { fields: [deliveryNotes.storeId], references: [stores.id] }),
+  invoice: one(invoices, { fields: [deliveryNotes.invoiceId], references: [invoices.id] }),
+  items: many(deliveryNoteItems)
+}));
+
+export const deliveryNoteItemsRelations = relations(deliveryNoteItems, ({ one }) => ({
+  deliveryNote: one(deliveryNotes, { fields: [deliveryNoteItems.deliveryNoteId], references: [deliveryNotes.id] }),
+  invoiceItem: one(invoiceItems, { fields: [deliveryNoteItems.invoiceItemId], references: [invoiceItems.id] })
 }));
