@@ -1399,13 +1399,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const invoiceId = parseInt(req.params.invoiceId);
       
+      // Use a flexible schema that accepts string dates
       const schema = z.object({
-        deliveryNote: insertDeliveryNoteSchema,
+        deliveryNote: z.object({
+          storeId: z.number(),
+          invoiceId: z.number().optional(),
+          deliveryDate: z.string(),
+          status: z.enum(['pending', 'delivered', 'cancelled']).optional(),
+          vehicleInfo: z.string().nullable().optional(),
+          driverName: z.string().nullable().optional(),
+          recipientName: z.string().nullable().optional(),
+          notes: z.string().nullable().optional()
+        }),
         items: z.array(
           z.object({
             invoiceItemId: z.number(),
             deliveredQuantity: z.union([z.string(), z.number()]),
-            remarks: z.string().optional()
+            remarks: z.string().nullable().optional()
           })
         )
       });
