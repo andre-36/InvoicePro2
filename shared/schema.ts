@@ -284,6 +284,7 @@ export const deliveryNotes = pgTable("delivery_notes", {
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
   deliveryNumber: varchar("delivery_number", { length: 50 }).notNull().unique(),
   deliveryDate: date("delivery_date").notNull(),
+  deliveryType: text("delivery_type").default('delivered').notNull(), // 'delivered' or 'self_pickup'
   status: deliveryStatusEnum("status").default("pending").notNull(),
   vehicleInfo: varchar("vehicle_info", { length: 100 }),
   driverName: varchar("driver_name", { length: 100 }),
