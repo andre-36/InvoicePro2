@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -17,7 +17,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,6 +89,30 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   // Fetch payment types from settings
   const { data: paymentTypes } = useQuery<PaymentType[]>({
     queryKey: ['/api/stores/1/payment-types'],
+  });
+
+  // Fetch delivery notes for this invoice
+  const { data: deliveryNotes } = useQuery<DeliveryNote[]>({
+    queryKey: ['/api/invoices', id, 'delivery-notes'],
+  });
+
+  // Fetch delivery status for this invoice
+  const { data: deliveryStatus } = useQuery<{
+    orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[];
+    fullyDelivered: boolean;
+  }>({
+    queryKey: ['/api/invoices', id, 'delivery-status'],
+  });
+
+  // State for delivery note dialog
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [deliveryForm, setDeliveryForm] = useState({
+    deliveryDate: format(new Date(), 'yyyy-MM-dd'),
+    vehicleInfo: '',
+    driverName: '',
+    recipientName: '',
+    notes: '',
+    items: [] as { invoiceItemId: number; deliveredQuantity: string; remarks: string }[]
   });
 
   const invoice = invoiceData?.invoice;
@@ -279,6 +305,114 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       });
     }
   });
+
+  // Create delivery note mutation
+  const createDeliveryNoteMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('POST', `/api/invoices/${id}/delivery-notes`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      setDeliveryDialogOpen(false);
+      resetDeliveryForm();
+      toast({
+        title: "Success",
+        description: "Delivery note created successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete delivery note mutation
+  const deleteDeliveryNoteMutation = useMutation({
+    mutationFn: async (deliveryNoteId: number) => {
+      return apiRequest('DELETE', `/api/delivery-notes/${deliveryNoteId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      toast({
+        title: "Success",
+        description: "Delivery note deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const resetDeliveryForm = () => {
+    setDeliveryForm({
+      deliveryDate: format(new Date(), 'yyyy-MM-dd'),
+      vehicleInfo: '',
+      driverName: '',
+      recipientName: '',
+      notes: '',
+      items: []
+    });
+  };
+
+  const initializeDeliveryForm = () => {
+    if (deliveryStatus?.orderedItems) {
+      const itemsWithRemaining = deliveryStatus.orderedItems
+        .filter(item => item.remaining > 0)
+        .map(item => ({
+          invoiceItemId: item.invoiceItemId,
+          deliveredQuantity: item.remaining.toString(),
+          remarks: ''
+        }));
+      setDeliveryForm(prev => ({
+        ...prev,
+        items: itemsWithRemaining
+      }));
+    }
+    setDeliveryDialogOpen(true);
+  };
+
+  const handleDeliverySubmit = () => {
+    const itemsToDeliver = deliveryForm.items.filter(
+      item => parseFloat(item.deliveredQuantity) > 0
+    );
+
+    if (itemsToDeliver.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one item to deliver",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const data = {
+      deliveryNote: {
+        storeId: invoice?.storeId || 1,
+        invoiceId: id,
+        deliveryDate: deliveryForm.deliveryDate,
+        vehicleInfo: deliveryForm.vehicleInfo || null,
+        driverName: deliveryForm.driverName || null,
+        recipientName: deliveryForm.recipientName || null,
+        notes: deliveryForm.notes || null,
+      },
+      items: itemsToDeliver.map(item => ({
+        invoiceItemId: item.invoiceItemId,
+        deliveredQuantity: item.deliveredQuantity,
+        remarks: item.remarks || null
+      }))
+    };
+
+    createDeliveryNoteMutation.mutate(data);
+  };
 
   const handleAddPayment = () => {
     setEditingPayment(null);
@@ -661,10 +795,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       <Card>
         <Tabs defaultValue="details" className="w-full">
           <div className="border-b px-6 pt-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details">Invoice Details</TabsTrigger>
               <TabsTrigger value="payments">
                 Payments {invoicePayments.length > 0 && `(${invoicePayments.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="delivery">
+                Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -956,6 +1093,222 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     data-testid="button-save-payment"
                   >
                     {editingPayment ? 'Update Payment' : 'Add Payment'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          <TabsContent value="delivery" className="m-0 p-6">
+            <div className="space-y-6">
+              {/* Delivery Summary */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-medium mb-4">Delivery Summary</h3>
+                <div className="space-y-3">
+                  {deliveryStatus?.orderedItems.map((item) => {
+                    const progress = item.quantity > 0 ? (item.delivered / item.quantity) * 100 : 0;
+                    return (
+                      <div key={item.invoiceItemId} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium truncate flex-1 mr-4">{item.description}</span>
+                          <span className="text-gray-600 whitespace-nowrap">
+                            {item.delivered} / {item.quantity}
+                            {item.remaining > 0 && (
+                              <span className="text-orange-600 ml-2">
+                                ({item.remaining} remaining)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                      </div>
+                    );
+                  })}
+                </div>
+                {deliveryStatus?.fullyDelivered ? (
+                  <div className="mt-4 p-2 bg-green-100 text-green-800 rounded text-sm text-center">
+                    <Package className="h-4 w-4 inline mr-2" />
+                    All items have been delivered
+                  </div>
+                ) : (
+                  <div className="mt-4 p-2 bg-orange-100 text-orange-800 rounded text-sm text-center">
+                    <Truck className="h-4 w-4 inline mr-2" />
+                    Pending delivery
+                  </div>
+                )}
+              </div>
+
+              {/* Delivery Notes List */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium">Delivery Notes</h3>
+                  {!deliveryStatus?.fullyDelivered && (
+                    <Button size="sm" onClick={initializeDeliveryForm}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Delivery Note
+                    </Button>
+                  )}
+                </div>
+
+                {(deliveryNotes?.length || 0) === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Truck className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No delivery notes yet</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Delivery #</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Driver</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-center">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {deliveryNotes?.map((dn) => (
+                          <TableRow key={dn.id}>
+                            <TableCell className="font-medium">{dn.deliveryNumber}</TableCell>
+                            <TableCell>{formatDate(dn.deliveryDate)}</TableCell>
+                            <TableCell>{dn.driverName || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant={dn.status === 'delivered' ? 'default' : dn.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                                {dn.status === 'pending' ? 'Pending' : dn.status === 'delivered' ? 'Delivered' : 'Cancelled'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteDeliveryNoteMutation.mutate(dn.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Create Delivery Note Dialog */}
+            <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Delivery Note</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date</label>
+                      <Input
+                        type="date"
+                        value={deliveryForm.deliveryDate}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
+                      <Input
+                        value={deliveryForm.driverName}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, driverName: e.target.value })}
+                        placeholder="Driver name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Info</label>
+                      <Input
+                        value={deliveryForm.vehicleInfo}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, vehicleInfo: e.target.value })}
+                        placeholder="Vehicle number/info"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Name</label>
+                      <Input
+                        value={deliveryForm.recipientName}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, recipientName: e.target.value })}
+                        placeholder="Recipient name"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Items to Deliver</label>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right w-24">Remaining</TableHead>
+                            <TableHead className="text-right w-32">Deliver</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {deliveryStatus?.orderedItems.filter(item => item.remaining > 0).map((item) => {
+                            const formItem = deliveryForm.items.find(fi => fi.invoiceItemId === item.invoiceItemId);
+                            return (
+                              <TableRow key={item.invoiceItemId}>
+                                <TableCell className="font-medium">{item.description}</TableCell>
+                                <TableCell className="text-right">{item.remaining}</TableCell>
+                                <TableCell className="text-right">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={item.remaining}
+                                    step="0.01"
+                                    className="w-24 text-right"
+                                    value={formItem?.deliveredQuantity || '0'}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDeliveryForm(prev => ({
+                                        ...prev,
+                                        items: prev.items.map(fi =>
+                                          fi.invoiceItemId === item.invoiceItemId
+                                            ? { ...fi, deliveredQuantity: value }
+                                            : fi
+                                        ).concat(
+                                          prev.items.find(fi => fi.invoiceItemId === item.invoiceItemId)
+                                            ? []
+                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: value, remarks: '' }]
+                                        )
+                                      }));
+                                    }}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <Textarea
+                      value={deliveryForm.notes}
+                      onChange={(e) => setDeliveryForm({ ...deliveryForm, notes: e.target.value })}
+                      rows={2}
+                      placeholder="Optional notes..."
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleDeliverySubmit}
+                    disabled={createDeliveryNoteMutation.isPending}
+                  >
+                    Create Delivery Note
                   </Button>
                 </DialogFooter>
               </DialogContent>

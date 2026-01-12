@@ -20,6 +20,8 @@ import {
   insertInvoiceSchema,
   insertInvoiceItemSchema,
   insertInvoicePaymentSchema,
+  insertDeliveryNoteSchema,
+  insertDeliveryNoteItemSchema,
   insertQuotationSchema,
   insertQuotationItemSchema,
   insertTransactionSchema,
@@ -1338,6 +1340,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting invoice payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Delivery note routes
+  app.get("/api/invoices/:invoiceId/delivery-notes", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const deliveryNotes = await storage.getDeliveryNotesByInvoice(invoiceId);
+      res.json(deliveryNotes);
+    } catch (error) {
+      console.error("Error getting delivery notes:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/invoices/:invoiceId/delivery-status", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const deliveryStatus = await storage.getInvoiceDeliveryStatus(invoiceId);
+      res.json(deliveryStatus);
+    } catch (error) {
+      console.error("Error getting delivery status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/delivery-notes/next-number", requireAuth, async (req, res) => {
+    try {
+      const dateStr = req.query.date as string | undefined;
+      const date = dateStr ? new Date(dateStr) : undefined;
+      const nextNumber = await storage.getNextDeliveryNoteNumber(date);
+      res.json({ deliveryNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next delivery note number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/delivery-notes/:id", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      const deliveryNote = await storage.getDeliveryNoteWithItems(deliveryNoteId);
+      
+      if (!deliveryNote) {
+        return res.status(404).json({ error: "Delivery note not found" });
+      }
+      
+      res.json(deliveryNote);
+    } catch (error) {
+      console.error("Error getting delivery note:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/delivery-notes", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      
+      const schema = z.object({
+        deliveryNote: insertDeliveryNoteSchema,
+        items: z.array(
+          z.object({
+            invoiceItemId: z.number(),
+            deliveredQuantity: z.union([z.string(), z.number()]),
+            remarks: z.string().optional()
+          })
+        )
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      // Ensure invoiceId matches
+      const deliveryNoteData = {
+        ...validatedData.deliveryNote,
+        invoiceId
+      };
+      
+      // Convert items to proper format
+      const items = validatedData.items.map(item => ({
+        ...item,
+        deliveredQuantity: item.deliveredQuantity.toString(),
+        deliveryNoteId: 0 // Will be set by storage
+      }));
+      
+      const newDeliveryNote = await storage.createDeliveryNote(deliveryNoteData, items);
+      res.status(201).json(newDeliveryNote);
+    } catch (error) {
+      console.error("Error creating delivery note:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/delivery-notes/:id", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      
+      const validatedData = validateRequestBody(insertDeliveryNoteSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedDeliveryNote = await storage.updateDeliveryNote(deliveryNoteId, validatedData);
+      res.json(updatedDeliveryNote);
+    } catch (error) {
+      console.error("Error updating delivery note:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/delivery-notes/:id", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      await storage.deleteDeliveryNote(deliveryNoteId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting delivery note:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

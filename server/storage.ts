@@ -4,7 +4,7 @@ import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
-  printSettings, paymentTypes, paymentTerms,
+  printSettings, paymentTypes, paymentTerms, deliveryNotes, deliveryNoteItems,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -14,6 +14,7 @@ import {
   type ProductBatch, type InsertProductBatch, type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem, type InvoiceItemBatch, type InsertInvoiceItemBatch,
   type InvoicePayment, type InsertInvoicePayment,
+  type DeliveryNote, type InsertDeliveryNote, type DeliveryNoteItem, type InsertDeliveryNoteItem,
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
@@ -116,6 +117,17 @@ export interface IStorage {
   createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   updateInvoicePayment(id: number, payment: Partial<InsertInvoicePayment>): Promise<InvoicePayment>;
   deleteInvoicePayment(id: number): Promise<void>;
+
+  // Delivery note methods
+  getDeliveryNote(id: number): Promise<DeliveryNote | undefined>;
+  getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[] } | undefined>;
+  getDeliveryNotesByInvoice(invoiceId: number): Promise<DeliveryNote[]>;
+  getDeliveryNotes(storeId: number): Promise<DeliveryNote[]>;
+  getInvoiceDeliveryStatus(invoiceId: number): Promise<{ orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[]; fullyDelivered: boolean }>;
+  createDeliveryNote(deliveryNote: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote>;
+  updateDeliveryNote(id: number, deliveryNote: Partial<InsertDeliveryNote>): Promise<DeliveryNote>;
+  deleteDeliveryNote(id: number): Promise<void>;
+  getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string>;
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
@@ -1573,6 +1585,145 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(invoicePayments)
       .where(eq(invoicePayments.id, id));
+  }
+
+  // Delivery note methods
+  async getDeliveryNote(id: number): Promise<DeliveryNote | undefined> {
+    const [deliveryNote] = await db.select().from(deliveryNotes).where(eq(deliveryNotes.id, id));
+    return deliveryNote;
+  }
+
+  async getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[] } | undefined> {
+    const [deliveryNote] = await db.select().from(deliveryNotes).where(eq(deliveryNotes.id, id));
+    if (!deliveryNote) {
+      return undefined;
+    }
+
+    const rawItems = await db
+      .select()
+      .from(deliveryNoteItems)
+      .innerJoin(invoiceItems, eq(deliveryNoteItems.invoiceItemId, invoiceItems.id))
+      .innerJoin(products, eq(invoiceItems.productId, products.id))
+      .where(eq(deliveryNoteItems.deliveryNoteId, id));
+
+    const items = rawItems.map(row => ({
+      ...row.delivery_note_items,
+      invoiceItem: {
+        ...row.invoice_items,
+        product: row.products
+      }
+    })) as (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[];
+
+    return { deliveryNote, items };
+  }
+
+  async getDeliveryNotesByInvoice(invoiceId: number): Promise<DeliveryNote[]> {
+    return db
+      .select()
+      .from(deliveryNotes)
+      .where(eq(deliveryNotes.invoiceId, invoiceId))
+      .orderBy(desc(deliveryNotes.deliveryDate));
+  }
+
+  async getDeliveryNotes(storeId: number): Promise<DeliveryNote[]> {
+    return db
+      .select()
+      .from(deliveryNotes)
+      .where(eq(deliveryNotes.storeId, storeId))
+      .orderBy(desc(deliveryNotes.deliveryDate));
+  }
+
+  async getInvoiceDeliveryStatus(invoiceId: number): Promise<{ orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[]; fullyDelivered: boolean }> {
+    const items = await db
+      .select()
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, invoiceId));
+
+    const deliveredAmounts = await db
+      .select({
+        invoiceItemId: deliveryNoteItems.invoiceItemId,
+        totalDelivered: sql<string>`SUM(${deliveryNoteItems.deliveredQuantity})`
+      })
+      .from(deliveryNoteItems)
+      .innerJoin(deliveryNotes, eq(deliveryNoteItems.deliveryNoteId, deliveryNotes.id))
+      .where(and(
+        eq(deliveryNotes.invoiceId, invoiceId),
+        inArray(deliveryNotes.status, ['pending', 'delivered'])
+      ))
+      .groupBy(deliveryNoteItems.invoiceItemId);
+
+    const deliveredMap = new Map(deliveredAmounts.map(d => [d.invoiceItemId, parseFloat(d.totalDelivered || '0')]));
+
+    const orderedItems = items.map(item => {
+      const quantity = parseFloat(item.quantity);
+      const delivered = deliveredMap.get(item.id) || 0;
+      return {
+        invoiceItemId: item.id,
+        description: item.description,
+        quantity,
+        delivered,
+        remaining: quantity - delivered
+      };
+    });
+
+    const fullyDelivered = orderedItems.every(item => item.remaining <= 0);
+
+    return { orderedItems, fullyDelivered };
+  }
+
+  async createDeliveryNote(deliveryNoteData: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote> {
+    return withTransaction(async (tx) => {
+      const deliveryDate = deliveryNoteData.deliveryDate ? new Date(deliveryNoteData.deliveryDate) : new Date();
+      const year = deliveryDate.getFullYear().toString().slice(-2);
+      const month = (deliveryDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+      const deliveryNumber = await generateNextNumber("DN", yearMonth, deliveryNotes, deliveryNotes.deliveryNumber, tx);
+
+      const [newDeliveryNote] = await tx
+        .insert(deliveryNotes)
+        .values({
+          ...deliveryNoteData,
+          deliveryNumber
+        })
+        .returning();
+
+      if (items.length > 0) {
+        await tx
+          .insert(deliveryNoteItems)
+          .values(items.map(item => ({
+            ...item,
+            deliveryNoteId: newDeliveryNote.id
+          })));
+      }
+
+      return newDeliveryNote;
+    });
+  }
+
+  async updateDeliveryNote(id: number, deliveryNoteData: Partial<InsertDeliveryNote>): Promise<DeliveryNote> {
+    const [updatedDeliveryNote] = await db
+      .update(deliveryNotes)
+      .set({ ...deliveryNoteData, updatedAt: new Date() })
+      .where(eq(deliveryNotes.id, id))
+      .returning();
+
+    if (!updatedDeliveryNote) {
+      throw new Error(`Delivery note with ID ${id} not found`);
+    }
+
+    return updatedDeliveryNote;
+  }
+
+  async deleteDeliveryNote(id: number): Promise<void> {
+    await db.delete(deliveryNotes).where(eq(deliveryNotes.id, id));
+  }
+
+  async getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string> {
+    const date = deliveryDate || new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const yearMonth = year + month;
+    return generateNextNumber("DN", yearMonth, deliveryNotes, deliveryNotes.deliveryNumber, db);
   }
 
   // Quotation methods
