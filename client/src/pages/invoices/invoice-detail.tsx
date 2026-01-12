@@ -546,10 +546,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           <table>
             <thead>
               <tr>
-                <th style="width: 40px">No</th>
+                <th style="width: 30px">No</th>
                 <th>Keterangan</th>
-                <th style="width: 100px" class="text-right">Jumlah</th>
-                <th style="width: 150px">Catatan</th>
+                <th style="width: 60px" class="text-right">Jumlah</th>
+                <th style="width: 80px">Tipe</th>
+                <th style="width: 100px">Catatan</th>
               </tr>
             </thead>
             <tbody>
@@ -558,6 +559,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <td>${idx + 1}</td>
                   <td>${item.invoiceItemDescription || item.description || ''}</td>
                   <td class="text-right">${item.deliveredQuantity}</td>
+                  <td>${item.deliveryType === 'self_pickup' ? 'Diambil' : 'Dikirim'}</td>
                   <td>${item.remarks || ''}</td>
                 </tr>
               `).join('')}

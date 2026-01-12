@@ -1415,6 +1415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           z.object({
             invoiceItemId: z.number(),
             deliveredQuantity: z.union([z.string(), z.number()]),
+            deliveryType: z.enum(['delivered', 'self_pickup']).optional().default('delivered'),
             remarks: z.string().nullable().optional()
           })
         )
