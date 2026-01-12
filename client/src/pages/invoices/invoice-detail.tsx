@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client, PrintSettings } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,10 +84,21 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     queryKey: ['/api/user'],
   });
 
+  // Fetch payment types from settings
+  const { data: paymentTypes } = useQuery<PaymentType[]>({
+    queryKey: ['/api/stores/1/payment-types'],
+  });
+
   const invoice = invoiceData?.invoice;
   const items = invoiceData?.items || [];
   const client = invoiceData?.client;
   const invoicePayments = paymentsData || [];
+
+  // Helper function to get default payment type from settings
+  const getDefaultPaymentType = () => {
+    const activePaymentTypes = paymentTypes?.filter(pt => pt.isActive) || [];
+    return activePaymentTypes.length > 0 ? activePaymentTypes[0].name : 'Cash';
+  };
 
   // Void invoice mutation (replaces delete - invoices should never be deleted, only voided)
   const voidMutation = useMutation({
@@ -201,7 +212,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       setPaymentDialogOpen(false);
       setPaymentForm({
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
-        paymentType: 'Cash',
+        paymentType: getDefaultPaymentType(),
         amount: '',
         notes: '',
       });
@@ -230,7 +241,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       setEditingPayment(null);
       setPaymentForm({
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
-        paymentType: 'Cash',
+        paymentType: getDefaultPaymentType(),
         amount: '',
         notes: '',
       });
@@ -278,7 +289,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     setEditingPayment(null);
     setPaymentForm({
       paymentDate: format(new Date(), 'yyyy-MM-dd'),
-      paymentType: 'Cash',
+      paymentType: getDefaultPaymentType(),
       amount: '',
       notes: '',
     });
@@ -909,11 +920,19 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Check">Check</SelectItem>
-                        <SelectItem value="Card">Card</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
+                        {paymentTypes && paymentTypes.filter(pt => pt.isActive).length > 0 ? (
+                          paymentTypes.filter(pt => pt.isActive).map((pt) => (
+                            <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Check">Check</SelectItem>
+                            <SelectItem value="Card">Card</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
