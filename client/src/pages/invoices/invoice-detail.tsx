@@ -594,17 +594,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </Button>
           )}
           
-          {(invoice.status === 'sent' || invoice.status === 'overdue') && (
-            <Button
-              variant="outline"
-              className="gap-1 text-gray-600"
-              onClick={handleVoidInvoice}
-            >
-              <X className="h-4 w-4" />
-              <span>Void</span>
-            </Button>
-          )}
-          
           <Button
             variant="outline"
             className="gap-1"
