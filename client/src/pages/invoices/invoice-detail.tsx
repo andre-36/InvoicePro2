@@ -593,6 +593,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       printWindow.document.close();
       printWindow.onload = () => {
         printWindow.print();
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+        // Fallback: close after a short delay if onafterprint is not supported
+        setTimeout(() => {
+          if (!printWindow.closed) {
+            printWindow.close();
+          }
+        }, 1000);
       };
     } catch (error) {
       toast({
