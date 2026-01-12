@@ -545,14 +545,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
           <p><strong>Invoice: ${invoice?.invoiceNumber || ''}</strong></p>
 
+          <p style="margin-bottom: 8px;"><strong>Tipe Pengiriman:</strong> ${dnData.deliveryNote?.deliveryType === 'self_pickup' ? 'Diambil Sendiri' : 'Dikirim'}</p>
+
           <table>
             <thead>
               <tr>
                 <th style="width: 30px">No</th>
                 <th>Keterangan</th>
-                <th style="width: 60px" class="text-right">Jumlah</th>
-                <th style="width: 80px">Tipe</th>
-                <th style="width: 100px">Catatan</th>
+                <th style="width: 80px" class="text-right">Jumlah</th>
+                <th style="width: 120px">Catatan</th>
               </tr>
             </thead>
             <tbody>
@@ -561,7 +562,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <td>${idx + 1}</td>
                   <td>${item.invoiceItemDescription || item.description || ''}</td>
                   <td class="text-right">${item.deliveredQuantity}</td>
-                  <td>${item.deliveryType === 'self_pickup' ? 'Diambil' : 'Dikirim'}</td>
                   <td>${item.remarks || ''}</td>
                 </tr>
               `).join('')}
@@ -1363,6 +1363,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         <TableRow>
                           <TableHead>Delivery #</TableHead>
                           <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead>Driver</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-center">Actions</TableHead>
@@ -1373,6 +1374,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                           <TableRow key={dn.id}>
                             <TableCell className="font-medium">{dn.deliveryNumber}</TableCell>
                             <TableCell>{formatDate(dn.deliveryDate)}</TableCell>
+                            <TableCell>
+                              <Badge variant={dn.deliveryType === 'self_pickup' ? 'outline' : 'secondary'}>
+                                {dn.deliveryType === 'self_pickup' ? 'Diambil' : 'Dikirim'}
+                              </Badge>
+                            </TableCell>
                             <TableCell>{dn.driverName || '-'}</TableCell>
                             <TableCell>
                               <Badge variant={dn.status === 'delivered' ? 'default' : dn.status === 'cancelled' ? 'destructive' : 'secondary'}>

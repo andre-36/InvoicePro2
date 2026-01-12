@@ -307,7 +307,6 @@ export const deliveryNoteItems = pgTable("delivery_note_items", {
   deliveryNoteId: integer("delivery_note_id").references(() => deliveryNotes.id, { onDelete: 'cascade' }).notNull(),
   invoiceItemId: integer("invoice_item_id").references(() => invoiceItems.id, { onDelete: 'cascade' }).notNull(),
   deliveredQuantity: numeric("delivered_quantity", { precision: 15, scale: 2 }).notNull(),
-  deliveryType: text("delivery_type").default('delivered').notNull(), // 'delivered' or 'self_pickup'
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
