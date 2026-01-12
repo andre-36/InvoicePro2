@@ -415,23 +415,20 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   };
 
   const handlePrintDeliveryNote = async (deliveryNote: DeliveryNote) => {
-    // Fetch the delivery note with items
     try {
       const response = await fetch(`/api/delivery-notes/${deliveryNote.id}`, {
         credentials: 'include'
       });
       const dnData = await response.json();
       
-      // Open print window with delivery note content
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      if (!printWindow) {
-        toast({
-          title: "Error",
-          description: "Could not open print window. Please allow popups.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Create hidden iframe for printing
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'absolute';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = 'none';
+      printFrame.style.left = '-9999px';
+      document.body.appendChild(printFrame);
 
       const printContent = `
         <!DOCTYPE html>
@@ -589,20 +586,20 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         </html>
       `;
 
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.onafterprint = () => {
-          printWindow.close();
+      const frameDoc = printFrame.contentWindow?.document;
+      if (frameDoc) {
+        frameDoc.open();
+        frameDoc.write(printContent);
+        frameDoc.close();
+        
+        printFrame.onload = () => {
+          printFrame.contentWindow?.print();
+          // Remove iframe after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+          }, 1000);
         };
-        // Fallback: close after a short delay if onafterprint is not supported
-        setTimeout(() => {
-          if (!printWindow.closed) {
-            printWindow.close();
-          }
-        }, 1000);
-      };
+      }
     } catch (error) {
       toast({
         title: "Error",
