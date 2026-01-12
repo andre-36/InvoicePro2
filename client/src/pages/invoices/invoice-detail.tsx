@@ -112,7 +112,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     driverName: '',
     recipientName: '',
     notes: '',
-    items: [] as { invoiceItemId: number; deliveredQuantity: string; remarks: string }[]
+    items: [] as { invoiceItemId: number; deliveredQuantity: string; deliveryType: string; remarks: string }[]
   });
 
   const invoice = invoiceData?.invoice;
@@ -370,6 +370,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         .map(item => ({
           invoiceItemId: item.invoiceItemId,
           deliveredQuantity: item.remaining.toString(),
+          deliveryType: 'delivered',
           remarks: ''
         }));
       setDeliveryForm(prev => ({
@@ -407,6 +408,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       items: itemsToDeliver.map(item => ({
         invoiceItemId: item.invoiceItemId,
         deliveredQuantity: item.deliveredQuantity,
+        deliveryType: item.deliveryType || 'delivered',
         remarks: item.remarks || null
       }))
     };
@@ -1451,7 +1453,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                           <TableRow>
                             <TableHead>Description</TableHead>
                             <TableHead className="text-right w-24">Remaining</TableHead>
-                            <TableHead className="text-right w-32">Deliver</TableHead>
+                            <TableHead className="text-right w-24">Qty</TableHead>
+                            <TableHead className="w-36">Type</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1467,7 +1470,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                                     min="0"
                                     max={item.remaining}
                                     step="0.01"
-                                    className="w-24 text-right"
+                                    className="w-20 text-right"
                                     value={formItem?.deliveredQuantity || '0'}
                                     onChange={(e) => {
                                       const value = e.target.value;
@@ -1480,11 +1483,35 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                                         ).concat(
                                           prev.items.find(fi => fi.invoiceItemId === item.invoiceItemId)
                                             ? []
-                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: value, remarks: '' }]
+                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: value, deliveryType: 'delivered', remarks: '' }]
                                         )
                                       }));
                                     }}
                                   />
+                                </TableCell>
+                                <TableCell>
+                                  <select
+                                    className="w-full px-2 py-1 border rounded text-sm"
+                                    value={formItem?.deliveryType || 'delivered'}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDeliveryForm(prev => ({
+                                        ...prev,
+                                        items: prev.items.map(fi =>
+                                          fi.invoiceItemId === item.invoiceItemId
+                                            ? { ...fi, deliveryType: value }
+                                            : fi
+                                        ).concat(
+                                          prev.items.find(fi => fi.invoiceItemId === item.invoiceItemId)
+                                            ? []
+                                            : [{ invoiceItemId: item.invoiceItemId, deliveredQuantity: '0', deliveryType: value, remarks: '' }]
+                                        )
+                                      }));
+                                    }}
+                                  >
+                                    <option value="delivered">Dikirim</option>
+                                    <option value="self_pickup">Diambil Sendiri</option>
+                                  </select>
                                 </TableCell>
                               </TableRow>
                             );
