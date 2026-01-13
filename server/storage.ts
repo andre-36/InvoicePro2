@@ -1673,36 +1673,36 @@ export class DatabaseStorage implements IStorage {
 
   async createDeliveryNote(deliveryNoteData: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote> {
     return withTransaction(async (tx) => {
-      // Get the invoice to derive the DN number from invoice number
-      const [invoice] = await tx
-        .select()
-        .from(invoices)
-        .where(eq(invoices.id, deliveryNoteData.invoiceId));
+      // Lock the invoice row to prevent concurrent delivery note creation
+      const invoiceResult = await tx.execute(
+        sql`SELECT * FROM invoices WHERE id = ${deliveryNoteData.invoiceId} FOR UPDATE`
+      );
       
+      const invoice = (invoiceResult as any)[0];
       if (!invoice) {
         throw new Error(`Invoice with ID ${deliveryNoteData.invoiceId} not found`);
       }
 
-      // Get max sequence for this invoice using FOR UPDATE to prevent race conditions
-      const maxSequenceResult = await tx.execute(
-        sql`SELECT COALESCE(MAX(
-          CASE 
-            WHEN delivery_number ~ '-[0-9]+$' 
-            THEN CAST(SUBSTRING(delivery_number FROM '-([0-9]+)$') AS INTEGER)
-            ELSE 0 
-          END
-        ), 0) as max_seq 
-        FROM delivery_notes 
-        WHERE invoice_id = ${deliveryNoteData.invoiceId}
-        FOR UPDATE`
-      );
+      // Get all existing delivery numbers for this invoice
+      const existingDNs = await tx
+        .select({ deliveryNumber: deliveryNotes.deliveryNumber })
+        .from(deliveryNotes)
+        .where(eq(deliveryNotes.invoiceId, deliveryNoteData.invoiceId));
       
-      const maxSeq = parseInt(String((maxSequenceResult as any)[0]?.max_seq || 0), 10);
+      // Parse sequences and find max in JavaScript
+      let maxSeq = 0;
+      for (const dn of existingDNs) {
+        const match = dn.deliveryNumber.match(/-(\d+)$/);
+        if (match) {
+          const seq = parseInt(match[1], 10);
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
       const sequence = maxSeq + 1;
       
       // Generate DN number: DN-{invoice_number_without_prefix}-{sequence}
       // e.g., INV-2601-0003 -> DN-2601-0003-1
-      const invoiceNumberPart = invoice.invoiceNumber.replace(/^INV-/, '');
+      const invoiceNumberPart = invoice.invoice_number.replace(/^INV-/, '');
       const deliveryNumber = `DN-${invoiceNumberPart}-${sequence}`;
 
       const [newDeliveryNote] = await tx
