@@ -18,7 +18,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generatePDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -100,6 +101,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   
   // Client combobox state
   const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
+  
+  // Track if user has made changes (for back confirmation)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
+  const [savedInvoiceId, setSavedInvoiceId] = useState<number | null>(null);
 
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
@@ -210,7 +216,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   });
 
-  // Create/update invoice mutation
+  // Create/update invoice mutation (navigates away after success)
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
       // Format dates as ISO strings
@@ -220,30 +226,26 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         dueDate: values.invoice.dueDate.toISOString(),
       };
 
-      // For new invoices, don't send invoiceNumber - let server generate it
-      // The schema already excludes invoiceNumber for new invoices
-
       const formattedValues = {
         ...values,
         invoice: invoiceData
       };
 
-      if (invoiceId) {
-        // Update existing invoice
-        return apiRequest('PUT', `/api/invoices/${invoiceId}`, formattedValues);
+      const currentId = invoiceId || savedInvoiceId;
+      if (currentId) {
+        return apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
       } else {
-        // Create new invoice
         return apiRequest('POST', '/api/invoices', formattedValues);
       }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
+      setHasUnsavedChanges(false);
       toast({
         title: invoiceId ? "Invoice updated" : "Invoice created",
         description: invoiceId ? "Your invoice has been updated successfully." : "Your invoice has been created successfully.",
       });
-      // Small delay to ensure queries are refetched before navigation
       setTimeout(() => {
         if (onSuccess) onSuccess();
       }, 100);
@@ -252,6 +254,52 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       toast({
         title: "Error",
         description: `Failed to ${invoiceId ? "update" : "create"} invoice: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Save draft mutation (stays on page after success)
+  const saveDraftMutation = useMutation({
+    mutationFn: async (values: InvoiceFormValues) => {
+      let invoiceData = {
+        ...values.invoice,
+        issueDate: values.invoice.issueDate.toISOString(),
+        dueDate: values.invoice.dueDate.toISOString(),
+        status: 'draft'
+      };
+
+      const formattedValues = {
+        ...values,
+        invoice: invoiceData
+      };
+
+      const currentId = invoiceId || savedInvoiceId;
+      if (currentId) {
+        return apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
+      } else {
+        return apiRequest('POST', '/api/invoices', formattedValues);
+      }
+    },
+    onSuccess: async (response: any) => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
+      setHasUnsavedChanges(false);
+      
+      // If this was a new invoice, store the ID so subsequent saves update the same invoice
+      if (!invoiceId && !savedInvoiceId && response?.id) {
+        setSavedInvoiceId(response.id);
+      }
+      
+      toast({
+        title: "Invoice saved",
+        description: "Your invoice has been saved as draft.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to save invoice: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -332,6 +380,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     };
 
     setItems([...items, newItem]);
+    setHasUnsavedChanges(true);
   };
 
   // Remove an invoice item
@@ -340,6 +389,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const newItems = [...items];
       newItems.splice(index, 1);
       setItems(newItems);
+      setHasUnsavedChanges(true);
     } else {
       toast({
         title: "Error",
@@ -375,6 +425,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       return newItems;
     });
+    setHasUnsavedChanges(true);
   };
 
   // Handle product selection
@@ -587,9 +638,85 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const handleBackClick = () => {
-    // Just navigate back without auto-saving
-    // User should explicitly save if they want to keep changes
+    // Show confirmation if there are unsaved changes
+    if (hasUnsavedChanges) {
+      setShowBackConfirmDialog(true);
+    } else {
+      onSuccess?.();
+    }
+  };
+
+  // Save as draft without navigating away
+  const saveDraft = async () => {
+    try {
+      const values = form.getValues();
+      
+      // Check if client is selected
+      if (!values.invoice.clientId || values.invoice.clientId === 0) {
+        toast({
+          title: "Error",
+          description: "Please select a client before saving",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Transform items for API
+      const transformedItems = items.map((item, index) => ({
+        description: item.description || `Item ${index + 1}`,
+        productId: item.productId || null,
+        productUnitId: item.productUnitId || null,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        taxRate: item.taxRate,
+        taxAmount: item.tax,
+        discount: "0",
+        subtotal: item.subtotal,
+        totalAmount: item.total
+      }));
+
+      const formData = {
+        invoice: {
+          storeId: values.invoice.storeId || 1,
+          clientId: values.invoice.clientId,
+          issueDate: values.invoice.issueDate,
+          dueDate: values.invoice.dueDate,
+          status: 'draft',
+          subtotal: values.invoice.subtotal,
+          tax: values.invoice.tax,
+          discount: values.invoice.discount,
+          total: values.invoice.total,
+          notes: values.invoice.notes
+        },
+        items: transformedItems
+      };
+
+      saveDraftMutation.mutate(formData);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast({
+        title: "Error",
+        description: `An error occurred while saving: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Discard changes and go back
+  const discardAndGoBack = () => {
+    setShowBackConfirmDialog(false);
+    setHasUnsavedChanges(false);
     onSuccess?.();
+  };
+
+  // Save and go back
+  const saveAndGoBack = async () => {
+    setShowBackConfirmDialog(false);
+    await saveDraft();
+    // Wait a bit then navigate
+    setTimeout(() => {
+      onSuccess?.();
+    }, 500);
   };
 
   // Fetch current user for default notes
@@ -1147,10 +1274,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               type="button"
               variant="outline"
               onClick={handleGeneratePDF}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || saveDraftMutation.isPending}
             >
               <Printer className="mr-1.5 h-4 w-4" />
-              <span>Print Invoice</span>
+              <span>Print</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={(e) => {
+                e.preventDefault();
+                saveDraft();
+              }}
+              disabled={mutation.isPending || saveDraftMutation.isPending}
+            >
+              <Save className="mr-1.5 h-4 w-4" />
+              <span>Save Draft</span>
             </Button>
             <Button
               type="button"
@@ -1159,12 +1298,35 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 console.log('Create Invoice button clicked');
                 saveAndSend();
               }}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || saveDraftMutation.isPending}
             >
               <Check className="mr-1.5 h-4 w-4" />
-              <span>{invoiceId ? 'Update Invoice' : 'Create Invoice'}</span>
+              <span>{invoiceId || savedInvoiceId ? 'Update & Send' : 'Create & Send'}</span>
             </Button>
           </CardFooter>
+
+          {/* Back confirmation dialog */}
+          <AlertDialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Perubahan Belum Disimpan</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Anda memiliki perubahan yang belum disimpan. Apakah Anda ingin menyimpan sebelum keluar?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                <AlertDialogCancel onClick={() => setShowBackConfirmDialog(false)}>
+                  Batal
+                </AlertDialogCancel>
+                <Button variant="destructive" onClick={discardAndGoBack}>
+                  Buang Perubahan
+                </Button>
+                <AlertDialogAction onClick={saveAndGoBack}>
+                  Simpan & Keluar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </Card>
       </form>
     </Form>
