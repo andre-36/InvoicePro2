@@ -1085,7 +1085,7 @@ export class DatabaseStorage implements IStorage {
       .from(invoices)
       .leftJoin(clients, eq(invoices.clientId, clients.id))
       .where(eq(invoices.storeId, storeId))
-      .orderBy(desc(invoices.issueDate));
+      .orderBy(desc(invoices.id));
 
     // Check and update overdue status for applicable invoices
     const today = new Date();

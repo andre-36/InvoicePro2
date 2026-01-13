@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, Filter, ArrowUpDown, MoreHorizontal, FileDown, Eye, FilePenLine, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, FileDown, Eye, FilePenLine, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -53,10 +53,13 @@ type Invoice = {
 
 type InvoiceStatus = 'all' | 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
 
+type SortDirection = 'asc' | 'desc';
+
 export default function InvoicesPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus>("all");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -155,17 +158,28 @@ export default function InvoicesPage() {
     }
   };
 
-  // Filter invoices based on search query and status
+  // Toggle sort direction
+  const toggleSort = () => {
+    setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
+  };
+
+  // Filter and sort invoices based on search query, status, and sort direction
   const filteredInvoices = invoices
-    ? invoices.filter(invoice => {
-        const matchesSearch = 
-          invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (invoice.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-        
-        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-        
-        return matchesSearch && matchesStatus;
-      })
+    ? invoices
+        .filter(invoice => {
+          const matchesSearch = 
+            invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (invoice.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+          
+          const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+          
+          return matchesSearch && matchesStatus;
+        })
+        .sort((a, b) => {
+          // Sort by invoice number
+          const comparison = a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true });
+          return sortDirection === 'desc' ? -comparison : comparison;
+        })
     : [];
   
   // Render badge based on invoice status
@@ -274,10 +288,17 @@ export default function InvoicesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[150px]">
-                      <div className="flex items-center space-x-1">
+                      <button
+                        onClick={toggleSort}
+                        className="flex items-center space-x-1 hover:text-primary transition-colors cursor-pointer"
+                      >
                         <span>Invoice #</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
+                        {sortDirection === 'desc' ? (
+                          <ArrowDown className="h-3 w-3 text-primary" />
+                        ) : (
+                          <ArrowUp className="h-3 w-3 text-primary" />
+                        )}
+                      </button>
                     </TableHead>
                     <TableHead>Client</TableHead>
                     <TableHead>Date</TableHead>
