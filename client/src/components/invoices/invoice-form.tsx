@@ -726,15 +726,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Invoice Number field - auto-generated for new invoices, display for existing */}
-                  <div>
+                  <FormItem>
                     <FormLabel>Invoice Number</FormLabel>
-                    <Input 
-                      value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || generateFallbackInvoiceNumber())}
-                      readOnly 
-                      className="bg-gray-50 dark:bg-gray-800" 
-                      data-testid="input-invoice-number"
-                    />
-                  </div>
+                    <FormControl>
+                      <Input 
+                        value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || generateFallbackInvoiceNumber())}
+                        readOnly 
+                        className="bg-gray-50 dark:bg-gray-800" 
+                        data-testid="input-invoice-number"
+                      />
+                    </FormControl>
+                  </FormItem>
 
                   <FormField
                     control={form.control}
@@ -796,7 +798,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                                 data-testid="button-select-client"
                               >
                                 {field.value && field.value !== 0
-                                  ? clients?.find((client: any) => client.id === field.value)?.name
+                                  ? (() => {
+                                      const client = clients?.find((c: any) => c.id === field.value);
+                                      return client ? `${client.clientNumber ? `[${client.clientNumber}] ` : ''}${client.name}` : '';
+                                    })()
                                   : "-- Select Client --"}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -811,7 +816,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                                   {clients?.map((client: any) => (
                                     <CommandItem
                                       key={client.id}
-                                      value={client.name}
+                                      value={`${client.clientNumber || ''} ${client.name}`}
                                       onSelect={() => {
                                         field.onChange(client.id);
                                         setClientComboboxOpen(false);
@@ -823,6 +828,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                                           field.value === client.id ? "opacity-100" : "opacity-0"
                                         }`}
                                       />
+                                      {client.clientNumber && <span className="text-gray-500 mr-2">[{client.clientNumber}]</span>}
                                       {client.name}
                                     </CommandItem>
                                   ))}
