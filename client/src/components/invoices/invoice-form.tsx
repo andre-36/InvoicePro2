@@ -450,6 +450,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           newItems[index] = updatedItem;
           return newItems;
         });
+        setHasUnsavedChanges(true);
       }
       return;
     }
@@ -490,6 +491,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         newItems[index] = updatedItem;
         return newItems;
       });
+      setHasUnsavedChanges(true);
 
     } catch (error) {
       console.error("Error updating item:", error);
@@ -649,10 +651,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Save as draft without navigating away
   const saveDraft = async () => {
     try {
-      const values = form.getValues();
+      const invoiceData = form.getValues('invoice');
       
       // Check if client is selected
-      if (!values.invoice.clientId || values.invoice.clientId === 0) {
+      if (!invoiceData.clientId || invoiceData.clientId === 0) {
         toast({
           title: "Error",
           description: "Please select a client before saving",
@@ -661,11 +663,26 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         return;
       }
 
-      // Transform items for API
-      const transformedItems = items.map((item, index) => ({
-        description: item.description || `Item ${index + 1}`,
-        productId: item.productId || null,
+      // Filter out empty rows (rows with no description)
+      const nonEmptyItems = items.filter(item => {
+        return item.description && item.description.trim() !== '';
+      });
+
+      // Check if there's at least one item
+      if (nonEmptyItems.length === 0) {
+        toast({
+          title: "Please Add Items",
+          description: "Add at least one item to the invoice before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Transform items to match database schema (same as saveAndSend)
+      const transformedItems = nonEmptyItems.map(item => ({
+        productId: item.productId || 0,
         productUnitId: item.productUnitId || null,
+        description: item.description,
         quantity: item.quantity,
         unitPrice: item.price,
         taxRate: item.taxRate,
@@ -677,16 +694,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       const formData = {
         invoice: {
-          storeId: values.invoice.storeId || 1,
-          clientId: values.invoice.clientId,
-          issueDate: values.invoice.issueDate,
-          dueDate: values.invoice.dueDate,
-          status: 'draft',
-          subtotal: values.invoice.subtotal,
-          tax: values.invoice.tax,
-          discount: values.invoice.discount,
-          total: values.invoice.total,
-          notes: values.invoice.notes
+          ...invoiceData,
+          status: 'draft'
         },
         items: transformedItems
       };
@@ -1018,6 +1027,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                               newItems[idx] = updatedItem;
                               return newItems;
                             });
+                            setHasUnsavedChanges(true);
                           }}
                           removeItem={removeItem}
                           onProductSelect={handleProductSelect}
