@@ -1202,6 +1202,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete invoice endpoint
+  app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoice(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      await storage.deleteInvoice(invoiceId);
+      res.json({ success: true, message: "Invoice deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Invoice payment routes
   app.get("/api/invoices/:invoiceId/payments", requireAuth, async (req, res) => {
     try {

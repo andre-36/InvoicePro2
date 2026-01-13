@@ -652,27 +652,20 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const saveDraft = async () => {
     try {
       const invoiceData = form.getValues('invoice');
-      
-      // Check if client is selected
-      if (!invoiceData.clientId || invoiceData.clientId === 0) {
-        toast({
-          title: "Error",
-          description: "Please select a client before saving",
-          variant: "destructive",
-        });
-        return;
-      }
 
       // Filter out empty rows (rows with no description)
       const nonEmptyItems = items.filter(item => {
         return item.description && item.description.trim() !== '';
       });
 
-      // Check if there's at least one item
-      if (nonEmptyItems.length === 0) {
+      // For draft, allow saving if there's at least some content (client OR items)
+      const hasClient = invoiceData.clientId && invoiceData.clientId !== 0;
+      const hasItems = nonEmptyItems.length > 0;
+
+      if (!hasClient && !hasItems) {
         toast({
-          title: "Please Add Items",
-          description: "Add at least one item to the invoice before saving.",
+          title: "Nothing to Save",
+          description: "Please add a client or at least one item before saving.",
           variant: "destructive",
         });
         return;
@@ -695,6 +688,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const formData = {
         invoice: {
           ...invoiceData,
+          // Use null as clientId if not selected (database allows null for drafts)
+          clientId: hasClient ? invoiceData.clientId : null,
           status: 'draft'
         },
         items: transformedItems
