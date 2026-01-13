@@ -142,8 +142,15 @@ function App() {
                 <Route path="/dashboard" component={Dashboard} />
                 <Route path="/invoices" component={InvoicesPage} />
                 <Route path="/invoices/create" component={CreateInvoicePage} />
+                <Route path="/invoices/new" component={CreateInvoicePage} />
                 <Route path="/invoices/:id">
-                  {params => <InvoiceDetailPage id={parseInt(params.id)} />}
+                  {params => {
+                    const id = parseInt(params.id);
+                    if (isNaN(id)) {
+                      return <CreateInvoicePage />;
+                    }
+                    return <InvoiceDetailPage id={id} />;
+                  }}
                 </Route>
                 <Route path="/quotations" component={QuotationsPage} />
                 <Route path="/quotations/create" component={CreateQuotationPage} />
