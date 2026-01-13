@@ -1673,11 +1673,37 @@ export class DatabaseStorage implements IStorage {
 
   async createDeliveryNote(deliveryNoteData: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote> {
     return withTransaction(async (tx) => {
-      const deliveryDate = deliveryNoteData.deliveryDate ? new Date(deliveryNoteData.deliveryDate) : new Date();
-      const year = deliveryDate.getFullYear().toString().slice(-2);
-      const month = (deliveryDate.getMonth() + 1).toString().padStart(2, '0');
-      const yearMonth = year + month;
-      const deliveryNumber = await generateNextNumber("DN", yearMonth, deliveryNotes, deliveryNotes.deliveryNumber, tx);
+      // Get the invoice to derive the DN number from invoice number
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, deliveryNoteData.invoiceId));
+      
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${deliveryNoteData.invoiceId} not found`);
+      }
+
+      // Get max sequence for this invoice using FOR UPDATE to prevent race conditions
+      const maxSequenceResult = await tx.execute(
+        sql`SELECT COALESCE(MAX(
+          CASE 
+            WHEN delivery_number ~ '-[0-9]+$' 
+            THEN CAST(SUBSTRING(delivery_number FROM '-([0-9]+)$') AS INTEGER)
+            ELSE 0 
+          END
+        ), 0) as max_seq 
+        FROM delivery_notes 
+        WHERE invoice_id = ${deliveryNoteData.invoiceId}
+        FOR UPDATE`
+      );
+      
+      const maxSeq = parseInt(String((maxSequenceResult as any)[0]?.max_seq || 0), 10);
+      const sequence = maxSeq + 1;
+      
+      // Generate DN number: DN-{invoice_number_without_prefix}-{sequence}
+      // e.g., INV-2601-0003 -> DN-2601-0003-1
+      const invoiceNumberPart = invoice.invoiceNumber.replace(/^INV-/, '');
+      const deliveryNumber = `DN-${invoiceNumberPart}-${sequence}`;
 
       const [newDeliveryNote] = await tx
         .insert(deliveryNotes)

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -114,6 +114,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     recipientName: '',
     notes: '',
     items: [] as { invoiceItemId: number; deliveredQuantity: string; remarks: string }[]
+  });
+
+  // State for editing delivery note (metadata only)
+  const [editDeliveryDialogOpen, setEditDeliveryDialogOpen] = useState(false);
+  const [editingDeliveryNote, setEditingDeliveryNote] = useState<DeliveryNote | null>(null);
+  const [editDeliveryForm, setEditDeliveryForm] = useState({
+    deliveryDate: '',
+    deliveryType: 'delivered' as 'delivered' | 'self_pickup',
+    vehicleInfo: '',
+    driverName: '',
+    recipientName: '',
+    notes: ''
   });
 
   const invoice = invoiceData?.invoice;
@@ -353,6 +365,29 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     }
   });
 
+  // Update delivery note mutation (metadata only)
+  const updateDeliveryNoteMutation = useMutation({
+    mutationFn: async (data: { id: number; updates: Partial<typeof editDeliveryForm> }) => {
+      return apiRequest('PUT', `/api/delivery-notes/${data.id}`, data.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      setEditDeliveryDialogOpen(false);
+      setEditingDeliveryNote(null);
+      toast({
+        title: "Success",
+        description: "Delivery note updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
   const resetDeliveryForm = () => {
     setDeliveryForm({
       deliveryDate: format(new Date(), 'yyyy-MM-dd'),
@@ -416,6 +451,27 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     };
 
     createDeliveryNoteMutation.mutate(data);
+  };
+
+  const handleEditDeliveryNote = (dn: DeliveryNote) => {
+    setEditingDeliveryNote(dn);
+    setEditDeliveryForm({
+      deliveryDate: format(new Date(dn.deliveryDate), 'yyyy-MM-dd'),
+      deliveryType: (dn.deliveryType as 'delivered' | 'self_pickup') || 'delivered',
+      vehicleInfo: dn.vehicleInfo || '',
+      driverName: dn.driverName || '',
+      recipientName: dn.recipientName || '',
+      notes: dn.notes || ''
+    });
+    setEditDeliveryDialogOpen(true);
+  };
+
+  const handleUpdateDeliveryNote = () => {
+    if (!editingDeliveryNote) return;
+    updateDeliveryNoteMutation.mutate({
+      id: editingDeliveryNote.id,
+      updates: editDeliveryForm
+    });
   };
 
   const handlePrintDeliveryNote = async (deliveryNote: DeliveryNote) => {
@@ -1389,6 +1445,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleEditDeliveryNote(dn)}
+                                title="Edit Delivery Note"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handlePrintDeliveryNote(dn)}
                                 title="Print Delivery Note"
                               >
@@ -1537,6 +1601,88 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     disabled={createDeliveryNoteMutation.isPending}
                   >
                     Create Delivery Note
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Delivery Note Dialog (metadata only) */}
+            <Dialog open={editDeliveryDialogOpen} onOpenChange={setEditDeliveryDialogOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Edit Delivery Note</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date</label>
+                      <Input
+                        type="date"
+                        value={editDeliveryForm.deliveryDate}
+                        onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, deliveryDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
+                      <Input
+                        value={editDeliveryForm.driverName}
+                        onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, driverName: e.target.value })}
+                        placeholder="Driver name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Info</label>
+                      <Input
+                        value={editDeliveryForm.vehicleInfo}
+                        onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, vehicleInfo: e.target.value })}
+                        placeholder="Vehicle number/info"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Name</label>
+                      <Input
+                        value={editDeliveryForm.recipientName}
+                        onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, recipientName: e.target.value })}
+                        placeholder="Recipient name"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Pengiriman</label>
+                    <select
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={editDeliveryForm.deliveryType}
+                      onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, deliveryType: e.target.value as 'delivered' | 'self_pickup' })}
+                    >
+                      <option value="delivered">Dikirim</option>
+                      <option value="self_pickup">Diambil Sendiri</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <Textarea
+                      value={editDeliveryForm.notes}
+                      onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, notes: e.target.value })}
+                      rows={2}
+                      placeholder="Optional notes..."
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    Note: Item quantities cannot be edited. To change quantities, delete this delivery note and create a new one.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditDeliveryDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpdateDeliveryNote}
+                    disabled={updateDeliveryNoteMutation.isPending}
+                  >
+                    Save Changes
                   </Button>
                 </DialogFooter>
               </DialogContent>
