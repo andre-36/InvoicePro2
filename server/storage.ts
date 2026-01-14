@@ -4,7 +4,7 @@ import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
-  printSettings, paymentTypes, paymentTerms, deliveryNotes, deliveryNoteItems,
+  printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -2415,22 +2415,22 @@ export class DatabaseStorage implements IStorage {
   async getPaymentTerms(storeId: number): Promise<PaymentTerm[]> {
     return db
       .select()
-      .from(paymentTerms)
-      .where(eq(paymentTerms.storeId, storeId))
-      .orderBy(paymentTerms.days);
+      .from(paymentTermsConfig)
+      .where(eq(paymentTermsConfig.storeId, storeId))
+      .orderBy(paymentTermsConfig.days);
   }
 
   async getPaymentTerm(id: number): Promise<PaymentTerm | undefined> {
     const [paymentTerm] = await db
       .select()
-      .from(paymentTerms)
-      .where(eq(paymentTerms.id, id));
+      .from(paymentTermsConfig)
+      .where(eq(paymentTermsConfig.id, id));
     return paymentTerm;
   }
 
   async createPaymentTerm(paymentTermData: InsertPaymentTerm): Promise<PaymentTerm> {
     const [newPaymentTerm] = await db
-      .insert(paymentTerms)
+      .insert(paymentTermsConfig)
       .values(paymentTermData)
       .returning();
     return newPaymentTerm;
@@ -2438,15 +2438,15 @@ export class DatabaseStorage implements IStorage {
 
   async updatePaymentTerm(id: number, paymentTermData: Partial<InsertPaymentTerm>): Promise<PaymentTerm> {
     const [updatedPaymentTerm] = await db
-      .update(paymentTerms)
+      .update(paymentTermsConfig)
       .set({ ...paymentTermData, updatedAt: new Date() })
-      .where(eq(paymentTerms.id, id))
+      .where(eq(paymentTermsConfig.id, id))
       .returning();
     return updatedPaymentTerm;
   }
 
   async deletePaymentTerm(id: number): Promise<void> {
-    await db.delete(paymentTerms).where(eq(paymentTerms.id, id));
+    await db.delete(paymentTermsConfig).where(eq(paymentTermsConfig.id, id));
   }
 
   // Import/Export methods
