@@ -202,6 +202,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         ...(invoiceId && { invoiceNumber: "" }),
         storeId: 1,
         clientId: 0,
+        paymentTerms: "net_30",
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         status: "draft",
@@ -215,6 +216,39 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       items: items
     }
   });
+
+  // Helper function to calculate due date based on payment terms
+  const calculateDueDate = (issueDate: Date, paymentTerms: string): Date => {
+    const date = new Date(issueDate);
+    switch (paymentTerms) {
+      case 'cod':
+        return date; // Same day
+      case 'net_7':
+        date.setDate(date.getDate() + 7);
+        return date;
+      case 'net_14':
+        date.setDate(date.getDate() + 14);
+        return date;
+      case 'net_30':
+        date.setDate(date.getDate() + 30);
+        return date;
+      case 'custom':
+      default:
+        return date; // Don't change for custom
+    }
+  };
+
+  // Watch for changes to issueDate and paymentTerms to auto-update dueDate
+  const watchIssueDate = form.watch('invoice.issueDate');
+  const watchPaymentTerms = form.watch('invoice.paymentTerms');
+
+  useEffect(() => {
+    // Only auto-calculate if not custom payment terms
+    if (watchPaymentTerms && watchPaymentTerms !== 'custom' && watchIssueDate) {
+      const newDueDate = calculateDueDate(watchIssueDate, watchPaymentTerms);
+      form.setValue('invoice.dueDate', newDueDate);
+    }
+  }, [watchIssueDate, watchPaymentTerms]);
 
   // Create/update invoice mutation (navigates away after success)
   const mutation = useMutation({
@@ -311,6 +345,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       // Populate form with existing invoice data
       const invoice = {
         ...invoiceData,
+        paymentTerms: invoiceData.paymentTerms || 'custom', // Default to custom for existing invoices without paymentTerms
         issueDate: new Date(invoiceData.issueDate),
         dueDate: new Date(invoiceData.dueDate),
         subtotal: invoiceData.subtotal.toString(),
@@ -855,7 +890,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Details</h4>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Invoice Number field - auto-generated for new invoices, display for existing */}
                   <FormItem>
                     <FormLabel>Invoice Number</FormLabel>
@@ -889,6 +924,36 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
                   <FormField
                     control={form.control}
+                    name="invoice.paymentTerms"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Terms</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                          }} 
+                          value={field.value || "net_30"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select payment terms" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="cod">COD (Cash on Delivery)</SelectItem>
+                            <SelectItem value="net_7">Net 7 (7 Days)</SelectItem>
+                            <SelectItem value="net_14">Net 14 (14 Days)</SelectItem>
+                            <SelectItem value="net_30">Net 30 (30 Days)</SelectItem>
+                            <SelectItem value="custom">Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="invoice.dueDate"
                     render={({ field }) => (
                       <FormItem>
@@ -897,7 +962,15 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           <Input 
                             type="date" 
                             value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} 
-                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                            onChange={(e) => {
+                              field.onChange(new Date(e.target.value));
+                              // If user manually changes due date, switch to custom
+                              if (watchPaymentTerms !== 'custom') {
+                                form.setValue('invoice.paymentTerms', 'custom');
+                              }
+                            }}
+                            disabled={watchPaymentTerms !== 'custom'}
+                            className={watchPaymentTerms !== 'custom' ? 'bg-gray-50 dark:bg-gray-800' : ''}
                           />
                         </FormControl>
                         <FormMessage />

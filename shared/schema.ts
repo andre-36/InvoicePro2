@@ -186,12 +186,16 @@ export const productBatches = pgTable("product_batches", {
   };
 });
 
+// Payment terms enum
+export const paymentTermsEnum = pgEnum("payment_terms", ["cod", "net_7", "net_14", "net_30", "custom"]);
+
 // Invoices table
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
   clientId: integer("client_id").references(() => clients.id),
+  paymentTerms: paymentTermsEnum("payment_terms").default("net_30").notNull(),
   issueDate: date("issue_date").notNull(),
   dueDate: date("due_date").notNull(),
   status: invoiceStatusEnum("status").default("draft").notNull(),
