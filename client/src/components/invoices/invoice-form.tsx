@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Calendar, ChevronsUpDown } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
@@ -18,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generatePDF } from "@/lib/pdf-generator";
@@ -681,8 +682,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   };
 
   const handleBackClick = () => {
-    // Show confirmation if there are unsaved changes
-    if (hasUnsavedChanges) {
+    // Check if there are actual meaningful changes (not just empty form)
+    const invoiceData = form.getValues('invoice');
+    const hasClient = invoiceData.clientId && invoiceData.clientId !== 0;
+    const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+    const hasMeaningfulData = hasClient || hasNonEmptyItems;
+    
+    // Show confirmation only if there are unsaved changes AND meaningful data entered
+    if (hasUnsavedChanges && hasMeaningfulData) {
       setShowBackConfirmDialog(true);
     } else {
       onSuccess?.();
@@ -1202,6 +1209,54 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   </div>
                 ) : (
                   <>
+                    {/* Payment Summary Infographic */}
+                    {(() => {
+                      const invoiceTotal = parseFloat(form.watch('invoice.total') || '0');
+                      const totalPaid = invoicePayments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+                      const remaining = invoiceTotal - totalPaid;
+                      const paymentProgress = invoiceTotal > 0 ? (totalPaid / invoiceTotal) * 100 : 0;
+                      const isFullyPaid = remaining <= 0;
+                      
+                      return (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <h4 className="text-lg font-medium mb-3">Payment Summary</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Invoice Total</span>
+                              <span className="font-medium">{formatCurrency(invoiceTotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Total Paid</span>
+                              <span className="font-medium text-green-600">{formatCurrency(totalPaid)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Remaining</span>
+                              <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                {formatCurrency(Math.max(0, remaining))}
+                              </span>
+                            </div>
+                            <Progress value={Math.min(100, paymentProgress)} className="h-2 mt-2" />
+                          </div>
+                          {isFullyPaid ? (
+                            <div className="mt-3 p-2 bg-green-100 text-green-800 rounded text-sm text-center">
+                              <CheckCircle className="h-4 w-4 inline mr-2" />
+                              Fully Paid
+                            </div>
+                          ) : totalPaid > 0 ? (
+                            <div className="mt-3 p-2 bg-orange-100 text-orange-800 rounded text-sm text-center">
+                              <DollarSign className="h-4 w-4 inline mr-2" />
+                              Partially Paid ({Math.round(paymentProgress)}%)
+                            </div>
+                          ) : (
+                            <div className="mt-3 p-2 bg-red-100 text-red-800 rounded text-sm text-center">
+                              <DollarSign className="h-4 w-4 inline mr-2" />
+                              Unpaid
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="text-lg font-medium text-gray-900">Payment Records</h4>
                       <Button
