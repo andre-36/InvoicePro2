@@ -22,7 +22,7 @@ import { formatCurrency } from "@/lib/utils";
 // Extend the schema for client-side validation
 const extendedQuotationSchema = insertQuotationSchema.extend({
   issueDate: z.date(),
-  expiryDate: z.date(),
+  expiryDate: z.date().optional().nullable(),
   // Using string representation for numeric fields to work with form inputs
   subtotal: z.string().optional(),
   taxAmount: z.string().optional(),
@@ -110,10 +110,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   const nextQuotationNumber = nextQuotationNumberData?.quotationNumber || 
     (isNumberError ? generateFallbackQuotationNumber() : null);
 
-  // Form setup - default expiry date is 30 days from today
-  const defaultExpiryDate = new Date();
-  defaultExpiryDate.setDate(defaultExpiryDate.getDate() + 30);
-  
+  // Form setup - expiry date is empty by default (prices can change anytime)
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationFormSchema),
     defaultValues: {
@@ -121,7 +118,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         clientId: 0,
         storeId: 1, // Default store
         issueDate: new Date(),
-        expiryDate: defaultExpiryDate,
+        expiryDate: null,
         status: "draft",
         subtotal: "0",
         taxRate: "0",
@@ -137,13 +134,13 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   // Create/update quotation mutation
   const mutation = useMutation({
     mutationFn: async (values: QuotationFormValues) => {
-      // Format dates as ISO strings
+      // Format dates as ISO strings (expiryDate is optional)
       const formattedValues = {
         ...values,
         quotation: {
           ...values.quotation,
           issueDate: values.quotation.issueDate.toISOString(),
-          expiryDate: values.quotation.expiryDate.toISOString(),
+          expiryDate: values.quotation.expiryDate ? values.quotation.expiryDate.toISOString() : null,
         }
       };
 
@@ -185,7 +182,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         quotation: {
           ...quotation,
           issueDate: new Date(quotation.issueDate),
-          expiryDate: new Date(quotation.expiryDate),
+          expiryDate: quotation.expiryDate ? new Date(quotation.expiryDate) : null,
           subtotal: quotation.subtotal,
           taxAmount: quotation.taxAmount,
           discount: quotation.discount,
@@ -337,7 +334,10 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                               data-testid="button-select-client"
                             >
                               {field.value && field.value !== 0
-                                ? (Array.isArray(clients) ? clients.find((client: any) => client.id === field.value)?.name : null)
+                                ? (() => {
+                                    const client = Array.isArray(clients) ? clients.find((c: any) => c.id === field.value) : null;
+                                    return client ? `${client.clientNumber ? `[${client.clientNumber}] ` : ''}${client.name}` : '';
+                                  })()
                                 : "Select a client"}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -352,7 +352,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                                 {Array.isArray(clients) && clients.map((client: any) => (
                                   <CommandItem
                                     key={client.id}
-                                    value={client.name}
+                                    value={`${client.clientNumber || ''} ${client.name}`}
                                     onSelect={() => {
                                       field.onChange(client.id);
                                       setClientComboboxOpen(false);
@@ -364,6 +364,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                                         field.value === client.id ? "opacity-100" : "opacity-0"
                                       }`}
                                     />
+                                    {client.clientNumber && <span className="text-gray-500 mr-2">[{client.clientNumber}]</span>}
                                     {client.name}
                                   </CommandItem>
                                 ))}
@@ -440,12 +441,8 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
 
           {/* Items */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader>
               <CardTitle>Items</CardTitle>
-              <Button type="button" variant="outline" onClick={addItem} data-testid="button-add-item">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -460,6 +457,17 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                     canRemove={items.length > 1}
                   />
                 ))}
+                {/* Add Item button at the bottom */}
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={addItem} 
+                  className="w-full text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 border border-dashed border-gray-300"
+                  data-testid="button-add-item"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item
+                </Button>
               </div>
             </CardContent>
           </Card>
