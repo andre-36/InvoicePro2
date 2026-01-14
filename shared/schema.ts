@@ -504,6 +504,7 @@ export const paymentTypes = pgTable("payment_types", {
 export const paymentTermsConfig = pgTable("payment_terms_config", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  code: paymentTermsEnum("code").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   days: integer("days").notNull(),
   description: text("description"),

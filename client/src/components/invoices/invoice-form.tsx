@@ -117,6 +117,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     queryKey: ['/api/products'],
   });
 
+  // Fetch payment terms from settings
+  const { data: paymentTermsData = [] } = useQuery<{ id: number; code: string; name: string; days: number; description?: string; isActive: boolean }[]>({
+    queryKey: ['/api/payment-terms'],
+  });
+
   // Fetch invoice payments if editing an existing invoice
   const { data: invoicePayments = [] } = useQuery<InvoicePayment[]>({
     queryKey: ['/api/invoices', invoiceId, 'payments'],
@@ -204,7 +209,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         clientId: 0,
         paymentTerms: "net_30",
         issueDate: new Date(),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         status: "draft",
         totalAmount: "0",
         subtotal: "0",
@@ -218,24 +223,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   });
 
   // Helper function to calculate due date based on payment terms
-  const calculateDueDate = (issueDate: Date, paymentTerms: string): Date => {
+  const calculateDueDate = (issueDate: Date, paymentTermsCode: string): Date => {
     const date = new Date(issueDate);
-    switch (paymentTerms) {
-      case 'cod':
-        return date; // Same day
-      case 'net_7':
-        date.setDate(date.getDate() + 7);
-        return date;
-      case 'net_14':
-        date.setDate(date.getDate() + 14);
-        return date;
-      case 'net_30':
-        date.setDate(date.getDate() + 30);
-        return date;
-      case 'custom':
-      default:
-        return date; // Don't change for custom
+    
+    // Check if it's "custom" - don't auto-calculate
+    if (paymentTermsCode === 'custom') {
+      return date;
     }
+    
+    // Find the payment term from API data by code
+    const term = paymentTermsData.find(t => t.code === paymentTermsCode);
+    
+    if (term) {
+      date.setDate(date.getDate() + term.days);
+    }
+    
+    return date;
   };
 
   // Watch for changes to issueDate and paymentTerms to auto-update dueDate
@@ -243,12 +246,15 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const watchPaymentTerms = form.watch('invoice.paymentTerms');
 
   useEffect(() => {
-    // Only auto-calculate if not custom payment terms
-    if (watchPaymentTerms && watchPaymentTerms !== 'custom' && watchIssueDate) {
-      const newDueDate = calculateDueDate(watchIssueDate, watchPaymentTerms);
-      form.setValue('invoice.dueDate', newDueDate);
+    // Only auto-calculate if not custom payment terms AND payment terms data is loaded
+    if (watchPaymentTerms && watchPaymentTerms !== 'custom' && watchIssueDate && paymentTermsData.length > 0) {
+      const term = paymentTermsData.find(t => t.code === watchPaymentTerms);
+      if (term) {
+        const newDueDate = calculateDueDate(watchIssueDate, watchPaymentTerms);
+        form.setValue('invoice.dueDate', newDueDate);
+      }
     }
-  }, [watchIssueDate, watchPaymentTerms]);
+  }, [watchIssueDate, watchPaymentTerms, paymentTermsData]);
 
   // Create/update invoice mutation (navigates away after success)
   const mutation = useMutation({
@@ -940,10 +946,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="cod">COD (Cash on Delivery)</SelectItem>
-                            <SelectItem value="net_7">Net 7 (7 Days)</SelectItem>
-                            <SelectItem value="net_14">Net 14 (14 Days)</SelectItem>
-                            <SelectItem value="net_30">Net 30 (30 Days)</SelectItem>
+                            {paymentTermsData.filter(term => term.isActive && term.code !== 'custom').map((term) => (
+                              <SelectItem key={term.id} value={term.code}>
+                                {term.name}{term.days > 0 ? ` (${term.days} Days)` : ''}
+                              </SelectItem>
+                            ))}
                             <SelectItem value="custom">Custom</SelectItem>
                           </SelectContent>
                         </Select>
