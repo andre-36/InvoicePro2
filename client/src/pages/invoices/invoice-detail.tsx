@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil } from "lucide-react";
+import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -1178,12 +1178,55 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           </TabsContent>
 
           <TabsContent value="payments" className="m-0 p-6">
+            {/* Payment Summary Infographic */}
+            {(() => {
+              const remaining = invoiceTotal - totalPaymentsMade;
+              const paymentProgress = invoiceTotal > 0 ? (totalPaymentsMade / invoiceTotal) * 100 : 0;
+              const isFullyPaid = remaining <= 0;
+              
+              return (
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <h4 className="text-lg font-medium mb-3">Payment Summary</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Invoice Total</span>
+                      <span className="font-medium">{formatCurrency(invoiceTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Total Paid</span>
+                      <span className="font-medium text-green-600">{formatCurrency(totalPaymentsMade)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Remaining</span>
+                      <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {formatCurrency(Math.max(0, remaining))}
+                      </span>
+                    </div>
+                    <Progress value={Math.min(100, paymentProgress)} className="h-2 mt-2" />
+                  </div>
+                  {isFullyPaid ? (
+                    <div className="mt-3 p-2 bg-green-100 text-green-800 rounded text-sm text-center">
+                      <CheckCircle className="h-4 w-4 inline mr-2" />
+                      Fully Paid
+                    </div>
+                  ) : totalPaymentsMade > 0 ? (
+                    <div className="mt-3 p-2 bg-orange-100 text-orange-800 rounded text-sm text-center">
+                      <DollarSign className="h-4 w-4 inline mr-2" />
+                      Partially Paid ({Math.round(paymentProgress)}%)
+                    </div>
+                  ) : (
+                    <div className="mt-3 p-2 bg-red-100 text-red-800 rounded text-sm text-center">
+                      <DollarSign className="h-4 w-4 inline mr-2" />
+                      Unpaid
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-lg font-medium">Payment Records</h3>
-                {totalPaymentsMade >= invoiceTotal && (
-                  <p className="text-sm text-green-600 mt-1">Invoice is fully paid</p>
-                )}
               </div>
               <Button
                 size="sm"
