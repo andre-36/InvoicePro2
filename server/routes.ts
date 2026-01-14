@@ -2776,6 +2776,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all payment terms for current user's store (default storeId 1)
+  app.get("/api/payment-terms", requireAuth, async (req, res) => {
+    try {
+      const storeId = 1; // Default store
+      const paymentTerms = await storage.getPaymentTerms(storeId);
+      res.json(paymentTerms);
+    } catch (error) {
+      console.error("Error getting payment terms:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/payment-terms/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
