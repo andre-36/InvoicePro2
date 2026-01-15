@@ -348,7 +348,9 @@ export function InvoiceItemRow({
             </SelectContent>
           </Select>
         ) : (
-          <span className="text-xs text-gray-400 px-2">-</span>
+          <span className="text-xs text-gray-500 px-2">
+            {productId ? (products.find(p => p.id.toString() === productId)?.unit || "pcs") : "-"}
+          </span>
         )}
       </td>
 
