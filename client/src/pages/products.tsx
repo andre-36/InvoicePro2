@@ -66,7 +66,7 @@ type Product = {
   isLowStock?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
   productType?: 'standard' | 'bundle';
-  baseUnit?: string;
+  unit?: string; // Base unit from database (pcs, kg, meter, etc.)
 };
 
 type BundleComponent = {
@@ -335,7 +335,7 @@ export default function ProductsPage() {
       costPrice: product.costPrice || "",
       lowestPrice: product.lowestPrice || "",
       productType: product.productType || "standard",
-      baseUnit: product.baseUnit || "",
+      baseUnit: product.unit || "", // Map unit from database to baseUnit in form
     });
     
     // Load bundle components if product is a bundle
@@ -397,10 +397,22 @@ export default function ProductsPage() {
       // First save the product
       let productId = editingProduct?.id;
       
+      // Map baseUnit to unit for database storage
+      const productData = {
+        name: data.name,
+        sku: data.sku,
+        description: data.description,
+        currentSellingPrice: data.currentSellingPrice,
+        costPrice: data.costPrice,
+        lowestPrice: data.lowestPrice,
+        productType: data.productType,
+        unit: data.baseUnit || "pcs", // Map baseUnit to unit
+      };
+      
       if (productId) {
-        await apiRequest('PUT', `/api/products/${productId}`, data);
+        await apiRequest('PUT', `/api/products/${productId}`, productData);
       } else {
-        const response = await apiRequest('POST', '/api/products', data);
+        const response = await apiRequest('POST', '/api/products', productData);
         const newProduct = await response.json();
         productId = newProduct.id;
       }
@@ -869,30 +881,7 @@ export default function ProductsPage() {
                     />
                   )}
                   
-                  <div className={editingProduct ? "grid grid-cols-2 gap-4" : ""}>
-                    {/* Only show product type selector when editing an existing product */}
-                    {editingProduct && (
-                      <FormField
-                        control={form.control}
-                        name="productType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Product Type</FormLabel>
-                            <FormControl>
-                              <select
-                                {...field}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              >
-                                <option value="standard">Standard Product</option>
-                                <option value="bundle">Bundle (Composite)</option>
-                              </select>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                    
+                  <div>
                     <FormField
                       control={form.control}
                       name="baseUnit"
