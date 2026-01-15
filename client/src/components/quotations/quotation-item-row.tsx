@@ -6,12 +6,24 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface ProductUnit {
+  id: number;
+  productId: number;
+  unitCode: string;
+  unitLabel: string;
+  conversionFactor: string;
+  price: string | null;
+  isDefault: boolean;
+}
 
 interface Product {
   id: number;
   name: string;
   description: string;
   currentSellingPrice: string;
+  baseUnit?: string;
 }
 
 interface QuotationItem {
@@ -24,6 +36,7 @@ interface QuotationItem {
   taxAmount?: string;
   totalAmount?: string;
   productId: number | null;
+  productUnitId?: number | null;
 }
 
 interface QuotationItemRowProps {
@@ -48,8 +61,42 @@ export function QuotationItemRow({
   const [unitPrice, setUnitPrice] = useState(item.unitPrice || "0");
   const [taxRate, setTaxRate] = useState(item.taxRate || "0");
   const [productId, setProductId] = useState<string>(item.productId?.toString() || "");
+  const [productUnitId, setProductUnitId] = useState<string>(item.productUnitId?.toString() || "");
+  const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
+
+  // Fetch product units when product changes
+  useEffect(() => {
+    if (productId && productId !== "0") {
+      fetch(`/api/products/${productId}/units`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : [])
+        .then(units => setProductUnits(units || []))
+        .catch(() => setProductUnits([]));
+    } else {
+      setProductUnits([]);
+      setProductUnitId("");
+    }
+  }, [productId]);
   
+  // Handle unit selection
+  const handleUnitChange = (unitId: string) => {
+    setProductUnitId(unitId === "base" ? "" : unitId);
+    const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
+    const selectedProduct = products.find(p => p.id.toString() === productId);
+    
+    if (unitId && unitId !== "base") {
+      const selectedUnit = productUnits.find(u => u.id.toString() === unitId);
+      if (selectedUnit) {
+        const newPrice = selectedUnit.price || unitPrice;
+        setUnitPrice(newPrice);
+      }
+    } else {
+      // Switching back to base unit - reset price to product's original selling price
+      const basePrice = selectedProduct?.currentSellingPrice || unitPrice;
+      setUnitPrice(basePrice);
+    }
+  };
+
   // Calculate totals when inputs change
   useEffect(() => {
     const qty = parseFloat(quantity) || 0;
@@ -69,15 +116,17 @@ export function QuotationItemRow({
       subtotal: subtotal.toString(),
       taxAmount: taxAmount.toString(),
       totalAmount: totalAmount.toString(),
-      productId: productId && productId !== "0" ? parseInt(productId) : null
+      productId: productId && productId !== "0" ? parseInt(productId) : null,
+      productUnitId: productUnitId && productUnitId !== "" ? parseInt(productUnitId) : null
     };
     
     onUpdate(index, updatedItem);
-  }, [description, quantity, unitPrice, taxRate, productId, index, onUpdate, item]);
+  }, [description, quantity, unitPrice, taxRate, productId, productUnitId, index, onUpdate, item]);
   
   // Handle product selection
   const handleProductChange = (value: string) => {
     setProductId(value);
+    setProductUnitId(""); // Reset unit when product changes
     
     if (value && value !== "0") {
       const selectedProduct = products.find(p => p.id.toString() === value);
@@ -85,6 +134,10 @@ export function QuotationItemRow({
         setDescription(selectedProduct.name);
         setUnitPrice(selectedProduct.currentSellingPrice || "0");
       }
+    } else {
+      // Reset description when switching to manual entry
+      setDescription("");
+      setUnitPrice("0");
     }
   };
 
@@ -98,7 +151,7 @@ export function QuotationItemRow({
       index % 2 === 0 ? "bg-white" : "bg-gray-50"
     )} data-testid={`quotation-item-row-${index}`}>
       {/* Product Selection */}
-      <div className="col-span-12 md:col-span-3">
+      <div className="col-span-12 md:col-span-4">
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Product
         </label>
@@ -169,19 +222,34 @@ export function QuotationItemRow({
         </Popover>
       </div>
 
-      {/* Description */}
-      <div className="col-span-12 md:col-span-3">
+      {/* Unit Selection */}
+      <div className="col-span-6 md:col-span-2">
         <label className="text-sm font-medium text-gray-700 mb-1 block">
-          Description
+          Unit
         </label>
-        <Input
-          type="text"
-          placeholder="Item description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full"
-          data-testid={`input-description-${index}`}
-        />
+        {productUnits.length > 0 ? (
+          <Select value={productUnitId || "base"} onValueChange={handleUnitChange}>
+            <SelectTrigger className="h-10 text-sm">
+              <SelectValue placeholder="Unit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="base">
+                {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+              </SelectItem>
+              {productUnits.map((unit) => (
+                <SelectItem key={unit.id} value={unit.id.toString()}>
+                  {unit.unitLabel}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
+            <span className="text-sm text-gray-500">
+              {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Quantity */}
