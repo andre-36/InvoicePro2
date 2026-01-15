@@ -1586,6 +1586,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/quotations/:id", requireAuth, async (req, res) => {
+    try {
+      const quotationId = parseInt(req.params.id);
+      
+      const patchQuotationSchema = z.object({
+        status: z.enum(['draft', 'sent', 'accepted', 'rejected', 'expired']).optional(),
+        rejectionReason: z.string().optional()
+      }).refine((data) => {
+        if (data.status === 'rejected' && (!data.rejectionReason || !data.rejectionReason.trim())) {
+          return false;
+        }
+        return true;
+      }, {
+        message: "Rejection reason is required when rejecting a quotation"
+      });
+      
+      const validatedData = patchQuotationSchema.safeParse(req.body);
+      if (!validatedData.success) {
+        return res.status(400).json({ error: "Invalid request data", details: validatedData.error });
+      }
+      
+      const { status, rejectionReason } = validatedData.data;
+      
+      const updateData: { status?: string; rejectionReason?: string } = {};
+      if (status !== undefined) {
+        updateData.status = status;
+      }
+      if (rejectionReason !== undefined) {
+        updateData.rejectionReason = rejectionReason.trim();
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+      
+      const updatedQuotation = await storage.patchQuotation(quotationId, updateData);
+      res.json(updatedQuotation);
+    } catch (error) {
+      console.error("Error patching quotation:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.post("/api/quotations/:id/convert", requireAuth, async (req, res) => {
     try {
       const quotationId = parseInt(req.params.id);

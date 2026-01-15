@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Edit, FileDown, Trash2, FileEdit, Calendar, Building, Mail, Phone, Printer } from "lucide-react";
+import { ArrowLeft, Edit, FileDown, Trash2, FileEdit, Calendar, Building, Mail, Phone, Printer, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -42,6 +53,7 @@ type QuotationWithItems = {
     totalAmount: string;
     notes: string;
     convertedToInvoiceId?: number;
+    rejectionReason?: string;
   };
   items: Array<{
     id: number;
@@ -70,6 +82,8 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const { data: quotationData, isLoading, error } = useQuery<QuotationWithItems>({
     queryKey: ['/api/quotations', id],
@@ -142,6 +156,42 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return apiRequest('PATCH', `/api/quotations/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, rejectionReason }: { id: number; rejectionReason: string }) => {
+      return apiRequest('PATCH', `/api/quotations/${id}`, { 
+        status: 'rejected', 
+        rejectionReason 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      setRejectDialogOpen(false);
+      setRejectionReason("");
+      toast({
+        title: "Quotation rejected",
+        description: "The quotation has been marked as rejected.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to reject quotation. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'draft':
@@ -188,8 +238,31 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
 
   const { quotation, items, client } = quotationData;
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (quotation.status === 'draft') {
+      try {
+        await updateStatusMutation.mutateAsync({ id: quotation.id, status: 'sent' });
+      } catch (error) {
+        toast({
+          title: "Warning",
+          description: "Failed to update status to 'sent', but printing will continue.",
+          variant: "default",
+        });
+      }
+    }
     window.print();
+  };
+
+  const handleReject = () => {
+    if (!rejectionReason.trim()) {
+      toast({
+        title: "Rejection reason required",
+        description: "Please provide a reason for rejecting this quotation.",
+        variant: "destructive",
+      });
+      return;
+    }
+    rejectMutation.mutate({ id: quotation.id, rejectionReason: rejectionReason.trim() });
   };
 
   return (
@@ -368,6 +441,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               <Badge variant={getStatusBadgeVariant(quotation.status) as any}>
                 {quotation.status}
               </Badge>
+              {quotation.status === 'rejected' && quotation.rejectionReason && (
+                <span className="text-sm text-muted-foreground italic">
+                  Reason: {quotation.rejectionReason}
+                </span>
+              )}
               {quotation.convertedToInvoiceId && (
                 <Badge variant="outline">
                   Converted to Invoice
@@ -394,7 +472,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             Print
           </Button>
 
-          {quotation.status !== 'accepted' && !quotation.convertedToInvoiceId && (
+          {quotation.status !== 'accepted' && quotation.status !== 'rejected' && !quotation.convertedToInvoiceId && (
             <Button
               onClick={() => convertMutation.mutate(quotation.id)}
               disabled={convertMutation.isPending}
@@ -402,6 +480,19 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             >
               <FileEdit className="mr-2 h-4 w-4" />
               Convert to Invoice
+            </Button>
+          )}
+
+          {quotation.status !== 'rejected' && quotation.status !== 'accepted' && !quotation.convertedToInvoiceId && (
+            <Button
+              variant="outline"
+              onClick={() => setRejectDialogOpen(true)}
+              disabled={rejectMutation.isPending}
+              data-testid="button-reject-quotation"
+              className="text-destructive hover:text-destructive"
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              Reject
             </Button>
           )}
           
@@ -604,6 +695,42 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
         </div>
       </div>
       </div>
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Quotation</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this quotation. This will be recorded for future reference.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-reason">Rejection Reason</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Enter the reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleReject}
+              disabled={rejectMutation.isPending}
+            >
+              {rejectMutation.isPending ? "Rejecting..." : "Reject Quotation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

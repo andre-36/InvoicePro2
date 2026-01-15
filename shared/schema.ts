@@ -340,6 +340,7 @@ export const quotations = pgTable("quotations", {
   termsAndConditions: text("terms_and_conditions"),
   paperSize: paperSizeEnum("paper_size").default("a4"),
   notes: text("notes"),
+  rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {

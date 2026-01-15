@@ -135,6 +135,7 @@ export interface IStorage {
   getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]>;
   createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>, items?: InsertQuotationItem[]): Promise<Quotation>;
+  patchQuotation(id: number, data: { status?: string; rejectionReason?: string }): Promise<Quotation>;
   convertQuotationToInvoice(id: number): Promise<Invoice>;
   deleteQuotation(id: number): Promise<void>;
 
@@ -1872,6 +1873,20 @@ export class DatabaseStorage implements IStorage {
       
       return updatedQuotation;
     });
+  }
+
+  async patchQuotation(id: number, data: { status?: string; rejectionReason?: string }): Promise<Quotation> {
+    const [updatedQuotation] = await db
+      .update(quotations)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(quotations.id, id))
+      .returning();
+    
+    if (!updatedQuotation) {
+      throw new Error(`Quotation with ID ${id} not found`);
+    }
+    
+    return updatedQuotation;
   }
 
   async convertQuotationToInvoice(id: number): Promise<Invoice> {
