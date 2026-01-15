@@ -620,14 +620,13 @@ export default function ProductsPage() {
                             }`}>
                               {product.currentStock || 0}
                             </span>
-                            {product.isLowStock && (
-                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 rounded-full">
-                                Low
-                              </span>
-                            )}
-                            {product.stockStatus === 'out_of_stock' && (
+                            {product.stockStatus === 'out_of_stock' ? (
                               <span className="text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">
                                 Out
+                              </span>
+                            ) : product.isLowStock && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 rounded-full">
+                                Low
                               </span>
                             )}
                           </div>
