@@ -193,7 +193,7 @@ export function QuotationItemRow({
                 {products.map((product) => (
                   <CommandItem
                     key={product.id}
-                    value={`${product.name} ${product.description || ''}`}
+                    value={product.name}
                     onSelect={() => {
                       handleProductChange(product.id.toString());
                       setOpen(false);
@@ -205,15 +205,7 @@ export function QuotationItemRow({
                         productId === product.id.toString() ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{product.name}</span>
-                      {product.description && (
-                        <span className="text-sm text-gray-500">{product.description}</span>
-                      )}
-                      <span className="text-sm text-green-600">
-                        {formatCurrency(parseFloat(product.currentSellingPrice || "0"))}
-                      </span>
-                    </div>
+                    <span>{product.name}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
