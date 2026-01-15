@@ -23,7 +23,7 @@ interface Product {
   name: string;
   description: string;
   currentSellingPrice: string;
-  baseUnit?: string;
+  unit?: string; // Base unit from database (pcs, kg, meter, etc.)
 }
 
 interface QuotationItem {
@@ -226,7 +226,7 @@ export function QuotationItemRow({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="base">
-                {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+                {products.find(p => p.id.toString() === productId)?.unit || "pcs"}
               </SelectItem>
               {productUnits.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id.toString()}>
@@ -238,7 +238,7 @@ export function QuotationItemRow({
         ) : (
           <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
             <span className="text-sm text-gray-500">
-              {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+              {products.find(p => p.id.toString() === productId)?.unit || "pcs"}
             </span>
           </div>
         )}

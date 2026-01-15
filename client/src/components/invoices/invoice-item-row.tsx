@@ -24,7 +24,7 @@ interface Product {
   description: string;
   currentSellingPrice: string;
   productType?: 'standard' | 'bundle';
-  baseUnit?: string;
+  unit?: string; // Base unit from database (pcs, kg, meter, etc.)
 }
 
 interface InvoiceItem {
@@ -338,7 +338,7 @@ export function InvoiceItemRow({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="base">
-                {products.find(p => p.id.toString() === productId)?.baseUnit || "pcs"}
+                {products.find(p => p.id.toString() === productId)?.unit || "pcs"}
               </SelectItem>
               {productUnits.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id.toString()}>
