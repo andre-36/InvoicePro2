@@ -51,6 +51,155 @@ interface PurchaseOrderFormProps {
   onSuccess?: () => void;
 }
 
+// Purchase Order Item Row Component
+interface PurchaseOrderItemRowProps {
+  index: number;
+  item: PurchaseOrderItem;
+  products: any[];
+  updateItem: (index: number, field: string, value: string) => void;
+  removeItem: (index: number) => void;
+  selectProduct: (index: number, productId: number) => void;
+  canRemove: boolean;
+}
+
+function PurchaseOrderItemRow({
+  index,
+  item,
+  products,
+  updateItem,
+  removeItem,
+  selectProduct,
+  canRemove
+}: PurchaseOrderItemRowProps) {
+  const [productOpen, setProductOpen] = useState(false);
+
+  const handleProductSelect = (productId: number) => {
+    selectProduct(index, productId);
+    setProductOpen(false);
+  };
+
+  const selectedProduct = item.productId ? products.find(p => p.id === item.productId) : null;
+
+  return (
+    <tr className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+      <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
+      <td className="px-3 py-2">
+        <Popover open={productOpen} onOpenChange={setProductOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              role="combobox"
+              aria-expanded={productOpen}
+              className="w-full justify-between text-sm h-9 px-2 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+            >
+              <span className="truncate text-left">
+                {selectedProduct ? selectedProduct.name : (item.description || "Select product...")}
+              </span>
+              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search products..." />
+              <CommandList>
+                <CommandEmpty>No product found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="manual"
+                    onSelect={() => {
+                      updateItem(index, 'productId', '');
+                      updateItem(index, 'description', '');
+                      setProductOpen(false);
+                    }}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${!item.productId ? "opacity-100" : "opacity-0"}`} />
+                    Enter manually
+                  </CommandItem>
+                  {products.map((product) => (
+                    <CommandItem
+                      key={product.id}
+                      value={product.name}
+                      onSelect={() => handleProductSelect(product.id)}
+                    >
+                      <Check
+                        className={`mr-2 h-4 w-4 ${item.productId === product.id ? "opacity-100" : "opacity-0"}`}
+                      />
+                      <div className="flex flex-col">
+                        <span>{product.name}</span>
+                        <span className="text-xs text-gray-500">Cost: {formatCurrency(product.costPrice || '0')}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {!selectedProduct && (
+          <Input
+            value={item.description}
+            onChange={(e) => updateItem(index, 'description', e.target.value)}
+            placeholder="Item description"
+            className="mt-1 h-8 text-sm"
+          />
+        )}
+      </td>
+      <td className="px-3 py-2">
+        <Input
+          type="number"
+          value={item.quantity}
+          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+          placeholder="1"
+          min="0"
+          step="any"
+          className="h-8 text-sm text-right"
+        />
+      </td>
+      <td className="px-3 py-2">
+        <Input
+          type="number"
+          value={item.unitCost}
+          onChange={(e) => updateItem(index, 'unitCost', e.target.value)}
+          placeholder="0.00"
+          min="0"
+          step="0.01"
+          className="h-8 text-sm text-right"
+        />
+      </td>
+      <td className="px-3 py-2">
+        <Select value={item.taxRate || "10"} onValueChange={(value) => updateItem(index, 'taxRate', value)}>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue placeholder="10%" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">0%</SelectItem>
+            <SelectItem value="5">5%</SelectItem>
+            <SelectItem value="10">10%</SelectItem>
+            <SelectItem value="15">15%</SelectItem>
+            <SelectItem value="20">20%</SelectItem>
+          </SelectContent>
+        </Select>
+      </td>
+      <td className="px-3 py-2 text-right text-sm font-medium">
+        {formatCurrency(item.totalAmount || "0")}
+      </td>
+      <td className="px-3 py-2 text-center">
+        {canRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => removeItem(index)}
+            className="text-gray-400 hover:text-red-600 p-1 h-8 w-8"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -77,12 +226,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   });
 
   // Fetch products for product selection
-  const { data: products } = useQuery({
+  const { data: products = [] } = useQuery<any[]>({
     queryKey: ['/api/products'],
   });
 
   // For new purchase orders, fetch the next PO number preview with fallback
-  const { data: nextPONumberData, isError: isNumberError } = useQuery({
+  const { data: nextPONumberData, isError: isNumberError } = useQuery<{ purchaseOrderNumber: string }>({
     queryKey: ['/api/purchase-orders/next-number'],
     enabled: !purchaseOrderId, // Only for new purchase orders
   });
@@ -207,9 +356,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     newItems[index] = { ...newItems[index], [field]: value };
     
     // Recalculate totals for this item
-    const quantity = parseFloat(newItems[index].quantity) || 0;
-    const unitCost = parseFloat(newItems[index].unitCost) || 0;
-    const taxRate = parseFloat(newItems[index].taxRate) || 0;
+    const quantity = parseFloat(newItems[index].quantity || '0') || 0;
+    const unitCost = parseFloat(newItems[index].unitCost || '0') || 0;
+    const taxRate = parseFloat(newItems[index].taxRate || '0') || 0;
     
     const subtotal = quantity * unitCost;
     const taxAmount = (subtotal * taxRate) / 100;
@@ -228,8 +377,8 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   const updateTotals = (currentItems: PurchaseOrderItem[]) => {
     const subtotal = currentItems.reduce((sum, item) => sum + (parseFloat(item.subtotal || "0")), 0);
     const taxAmount = currentItems.reduce((sum, item) => sum + (parseFloat(item.taxAmount || "0")), 0);
-    const discount = parseFloat(form.getValues('purchaseOrder.discount')) || 0;
-    const shipping = parseFloat(form.getValues('purchaseOrder.shipping')) || 0;
+    const discount = parseFloat(form.getValues('purchaseOrder.discount') || '0') || 0;
+    const shipping = parseFloat(form.getValues('purchaseOrder.shipping') || '0') || 0;
     const totalAmount = subtotal + taxAmount - discount + shipping;
     
     form.setValue('purchaseOrder.subtotal', subtotal.toFixed(2));
@@ -241,9 +390,29 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   const selectProduct = (index: number, productId: number) => {
     const product = products?.find(p => p.id === productId);
     if (product) {
-      updateItem(index, 'description', product.name);
-      updateItem(index, 'unitCost', product.cost_price || '0');
-      updateItem(index, 'productId', productId.toString());
+      const newItems = [...items];
+      newItems[index] = {
+        ...newItems[index],
+        description: product.name,
+        unitCost: product.costPrice || '0',
+        productId: productId
+      };
+      
+      // Recalculate totals
+      const quantity = parseFloat(newItems[index].quantity || '1') || 1;
+      const unitCost = parseFloat(product.costPrice || '0') || 0;
+      const taxRate = parseFloat(newItems[index].taxRate || '10') || 10;
+      const subtotal = quantity * unitCost;
+      const taxAmount = (subtotal * taxRate) / 100;
+      const totalAmount = subtotal + taxAmount;
+      
+      newItems[index].subtotal = subtotal.toFixed(2);
+      newItems[index].taxAmount = taxAmount.toFixed(2);
+      newItems[index].totalAmount = totalAmount.toFixed(2);
+      
+      setItems(newItems);
+      form.setValue('items', newItems);
+      updateTotals(newItems);
     }
   };
 
@@ -351,7 +520,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input {...field} type="email" placeholder="supplier@example.com" readOnly className="bg-gray-50" data-testid="input-supplier-email" />
+                      <Input {...field} value={field.value || ''} type="email" placeholder="supplier@example.com" readOnly className="bg-gray-50" data-testid="input-supplier-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -365,7 +534,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Phone number" readOnly className="bg-gray-50" data-testid="input-supplier-phone" />
+                      <Input {...field} value={field.value || ''} placeholder="Phone number" readOnly className="bg-gray-50" data-testid="input-supplier-phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -418,7 +587,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                     <FormItem>
                       <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Supplier address" readOnly className="bg-gray-50" data-testid="textarea-supplier-address" />
+                        <Textarea {...field} value={field.value || ''} placeholder="Supplier address" readOnly className="bg-gray-50" data-testid="textarea-supplier-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -440,96 +609,34 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {items.map((item, index) => (
-                  <div key={index} className="border rounded-lg p-4 bg-gray-50" data-testid={`item-row-${index}`}>
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium mb-1">Product/Description *</label>
-                        <div className="space-y-2">
-                          <Select onValueChange={(value) => selectProduct(index, parseInt(value))}>
-                            <SelectTrigger data-testid={`select-product-${index}`}>
-                              <SelectValue placeholder="Select product (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products?.map((product) => (
-                                <SelectItem key={product.id} value={product.id.toString()}>
-                                  {product.name} - {formatCurrency(product.cost_price || 0)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            value={item.description}
-                            onChange={(e) => updateItem(index, 'description', e.target.value)}
-                            placeholder="Item description"
-                            data-testid={`input-description-${index}`}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Quantity *</label>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                          placeholder="0"
-                          min="0"
-                          step="any"
-                          data-testid={`input-quantity-${index}`}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Unit Cost *</label>
-                        <Input
-                          type="number"
-                          value={item.unitCost}
-                          onChange={(e) => updateItem(index, 'unitCost', e.target.value)}
-                          placeholder="0.00"
-                          min="0"
-                          step="0.01"
-                          data-testid={`input-unit-cost-${index}`}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Tax Rate (%)</label>
-                        <Input
-                          type="number"
-                          value={item.taxRate}
-                          onChange={(e) => updateItem(index, 'taxRate', e.target.value)}
-                          placeholder="10"
-                          min="0"
-                          step="0.1"
-                          data-testid={`input-tax-rate-${index}`}
-                        />
-                      </div>
-                      
-                      <div className="flex flex-col justify-between">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Total</label>
-                          <div className="text-lg font-semibold" data-testid={`text-total-${index}`}>
-                            {formatCurrency(item.totalAmount || "0")}
-                          </div>
-                        </div>
-                        {items.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeItem(index)}
-                            className="mt-2 text-red-600 hover:text-red-700"
-                            data-testid={`button-remove-item-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '35%' }}>Product / Description</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '100px' }}>Qty</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '140px' }}>Unit Cost</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Tax %</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Total</th>
+                      <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" style={{ width: '50px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => (
+                      <PurchaseOrderItemRow
+                        key={index}
+                        index={index}
+                        item={item}
+                        products={products || []}
+                        updateItem={(idx, field, value) => updateItem(idx, field, value)}
+                        removeItem={removeItem}
+                        selectProduct={selectProduct}
+                        canRemove={items.length > 1}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -549,6 +656,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                       <FormControl>
                         <Textarea
                           {...field}
+                          value={field.value || ''}
                           placeholder="Additional notes or terms..."
                           className="min-h-[120px]"
                           data-testid="textarea-notes"
@@ -584,6 +692,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                     render={({ field }) => (
                       <Input
                         {...field}
+                        value={field.value || '0'}
                         type="number"
                         className="w-24 text-right"
                         min="0"
@@ -606,6 +715,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                     render={({ field }) => (
                       <Input
                         {...field}
+                        value={field.value || '0'}
                         type="number"
                         className="w-24 text-right"
                         min="0"
