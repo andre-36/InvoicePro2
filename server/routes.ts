@@ -557,6 +557,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id/invoices", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const clientInvoices = await storage.getInvoicesByClient(clientId);
+      res.json(clientInvoices);
+    } catch (error) {
+      console.error("Error getting client invoices:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertClientSchema, req, res);

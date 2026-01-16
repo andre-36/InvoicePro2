@@ -104,6 +104,7 @@ export interface IStorage {
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
   getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
+  getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
   getOpenInvoices(storeId: number): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
@@ -1122,6 +1123,16 @@ export class DatabaseStorage implements IStorage {
     );
 
     return updatedResults;
+  }
+
+  async getInvoicesByClient(clientId: number): Promise<Invoice[]> {
+    const results = await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.clientId, clientId))
+      .orderBy(desc(invoices.issueDate));
+    
+    return Promise.all(results.map(inv => this.checkAndUpdateOverdueStatus(inv)));
   }
 
   async getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]> {

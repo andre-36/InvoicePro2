@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { ClientForm } from "@/components/clients/client-form";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -35,9 +37,19 @@ type MonthlyPurchase = {
   invoiceCount: number;
 };
 
+type ClientInvoice = {
+  id: number;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string | null;
+  status: string;
+  totalAmount: string;
+};
+
 export default function ClientDetailPage() {
   const { id } = useParams();
   const clientId = parseInt(id!);
+  const [, setLocation] = useLocation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: client, isLoading: clientLoading } = useQuery<Client>({
@@ -51,6 +63,27 @@ export default function ClientDetailPage() {
   const { data: monthlyPurchases, isLoading: purchasesLoading } = useQuery<MonthlyPurchase[]>({
     queryKey: [`/api/clients/${clientId}/monthly-purchases`],
   });
+
+  const { data: clientInvoices, isLoading: invoicesLoading } = useQuery<ClientInvoice[]>({
+    queryKey: [`/api/clients/${clientId}/invoices`],
+  });
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      draft: { variant: "secondary", label: "Draft" },
+      sent: { variant: "default", label: "Sent" },
+      pending: { variant: "outline", label: "Pending" },
+      paid: { variant: "default", label: "Paid" },
+      overdue: { variant: "destructive", label: "Overdue" },
+      void: { variant: "secondary", label: "Void" },
+    };
+    const config = statusConfig[status] || { variant: "outline" as const, label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const handleInvoiceDoubleClick = (invoiceId: number) => {
+    setLocation(`/invoices/${invoiceId}`);
+  };
 
   if (clientLoading || statsLoading) {
     return (
@@ -343,6 +376,61 @@ export default function ClientDetailPage() {
               </ResponsiveContainer>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Invoice List */}
+      <Card className="border-gray-200 dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+            <Receipt className="h-5 w-5" />
+            Invoices
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {invoicesLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : !clientInvoices || clientInvoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Receipt className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No invoices</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                This client doesn't have any invoices yet.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientInvoices.map((invoice) => (
+                    <TableRow 
+                      key={invoice.id}
+                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onDoubleClick={() => handleInvoiceDoubleClick(invoice.id)}
+                    >
+                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{format(new Date(invoice.issueDate), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM d, yyyy') : '-'}</TableCell>
+                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                      <TableCell className="text-right">{invoice.totalAmount || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+            Double-click on an invoice to view details
+          </p>
         </CardContent>
       </Card>
 
