@@ -453,7 +453,7 @@ async function createWithSimpleSequentialNumber<T>(
           .insert(table)
           .values({
             ...data,
-            clientNumber: uniqueNumber
+            [column.name]: uniqueNumber
           })
           .returning();
 
