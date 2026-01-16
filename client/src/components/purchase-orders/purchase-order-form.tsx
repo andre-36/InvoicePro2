@@ -107,8 +107,7 @@ function PurchaseOrderItemRow({
                   <CommandItem
                     value="manual"
                     onSelect={() => {
-                      updateItem(index, 'productId', '');
-                      updateItem(index, 'description', '');
+                      selectProduct(index, 0);
                       setProductOpen(false);
                     }}
                   >
@@ -388,32 +387,46 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   // Update product selection for item
   const selectProduct = (index: number, productId: number) => {
-    const product = products?.find(p => p.id === productId);
-    if (product) {
-      const newItems = [...items];
+    const newItems = [...items];
+    
+    if (productId === 0) {
+      // Manual entry - clear product selection and reset totals
       newItems[index] = {
         ...newItems[index],
-        description: product.name,
-        unitCost: product.costPrice || '0',
-        productId: productId
+        description: '',
+        unitCost: '0',
+        productId: null,
+        subtotal: '0',
+        taxAmount: '0',
+        totalAmount: '0'
       };
-      
-      // Recalculate totals
-      const quantity = parseFloat(newItems[index].quantity || '1') || 1;
-      const unitCost = parseFloat(product.costPrice || '0') || 0;
-      const taxRate = parseFloat(newItems[index].taxRate || '10') || 10;
-      const subtotal = quantity * unitCost;
-      const taxAmount = (subtotal * taxRate) / 100;
-      const totalAmount = subtotal + taxAmount;
-      
-      newItems[index].subtotal = subtotal.toFixed(2);
-      newItems[index].taxAmount = taxAmount.toFixed(2);
-      newItems[index].totalAmount = totalAmount.toFixed(2);
-      
-      setItems(newItems);
-      form.setValue('items', newItems);
-      updateTotals(newItems);
+    } else {
+      const product = products?.find(p => p.id === productId);
+      if (product) {
+        newItems[index] = {
+          ...newItems[index],
+          description: product.name,
+          unitCost: product.costPrice || '0',
+          productId: productId
+        };
+        
+        // Recalculate totals
+        const quantity = parseFloat(newItems[index].quantity || '1') || 1;
+        const unitCost = parseFloat(product.costPrice || '0') || 0;
+        const taxRate = parseFloat(newItems[index].taxRate || '10') || 10;
+        const subtotal = quantity * unitCost;
+        const taxAmount = (subtotal * taxRate) / 100;
+        const totalAmount = subtotal + taxAmount;
+        
+        newItems[index].subtotal = subtotal.toFixed(2);
+        newItems[index].taxAmount = taxAmount.toFixed(2);
+        newItems[index].totalAmount = totalAmount.toFixed(2);
+      }
     }
+    
+    setItems(newItems);
+    form.setValue('items', newItems);
+    updateTotals(newItems);
   };
 
   const onSubmit = (values: PurchaseOrderFormValues) => {
