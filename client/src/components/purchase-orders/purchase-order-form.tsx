@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Plus, Trash2, ArrowLeft, Package } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertPurchaseOrderSchema } from "@shared/schema";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +67,14 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       productId: null
     }
   ]);
+  
+  // Supplier combobox state
+  const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
+
+  // Fetch suppliers for the dropdown
+  const { data: suppliers } = useQuery<any[]>({
+    queryKey: ['/api/suppliers'],
+  });
 
   // Fetch products for product selection
   const { data: products } = useQuery({
@@ -93,6 +103,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     defaultValues: {
       purchaseOrder: {
         storeId: 1,
+        supplierId: null,
         supplierName: "",
         supplierEmail: "",
         supplierPhone: "",
@@ -111,6 +122,19 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       items: items
     }
   });
+
+  // Handle supplier selection and auto-fill fields
+  const handleSupplierSelect = (supplierId: number) => {
+    const supplier = suppliers?.find(s => s.id === supplierId);
+    if (supplier) {
+      form.setValue('purchaseOrder.supplierId', supplierId);
+      form.setValue('purchaseOrder.supplierName', supplier.name || '');
+      form.setValue('purchaseOrder.supplierEmail', supplier.email || '');
+      form.setValue('purchaseOrder.supplierPhone', supplier.phone || '');
+      form.setValue('purchaseOrder.supplierAddress', supplier.address || '');
+    }
+    setSupplierComboboxOpen(false);
+  };
 
   // Create/update purchase order mutation
   const mutation = useMutation({
@@ -259,19 +283,66 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="purchaseOrder.supplierName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter supplier name" data-testid="input-supplier-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Supplier Dropdown */}
+              <div className="md:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="purchaseOrder.supplierName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Select Supplier *</FormLabel>
+                      <Popover open={supplierComboboxOpen} onOpenChange={setSupplierComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={supplierComboboxOpen}
+                              className="w-full justify-between font-normal"
+                              data-testid="button-select-supplier"
+                            >
+                              {form.watch('purchaseOrder.supplierId')
+                                ? (() => {
+                                    const supplier = suppliers?.find((s: any) => s.id === form.watch('purchaseOrder.supplierId'));
+                                    return supplier ? `${supplier.supplierNumber ? `[${supplier.supplierNumber}] ` : ''}${supplier.name}` : field.value || '-- Select Supplier --';
+                                  })()
+                                : field.value || "-- Select Supplier --"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search suppliers..." data-testid="input-search-supplier" />
+                            <CommandList>
+                              <CommandEmpty>No supplier found.</CommandEmpty>
+                              <CommandGroup>
+                                {suppliers?.map((supplier: any) => (
+                                  <CommandItem
+                                    key={supplier.id}
+                                    value={`${supplier.supplierNumber || ''} ${supplier.name}`}
+                                    onSelect={() => handleSupplierSelect(supplier.id)}
+                                    data-testid={`supplier-option-${supplier.id}`}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        form.watch('purchaseOrder.supplierId') === supplier.id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {supplier.supplierNumber && <span className="text-gray-500 mr-2">[{supplier.supplierNumber}]</span>}
+                                    {supplier.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
@@ -280,7 +351,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input {...field} type="email" placeholder="supplier@example.com" data-testid="input-supplier-email" />
+                      <Input {...field} type="email" placeholder="supplier@example.com" readOnly className="bg-gray-50" data-testid="input-supplier-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -294,7 +365,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Phone number" data-testid="input-supplier-phone" />
+                      <Input {...field} placeholder="Phone number" readOnly className="bg-gray-50" data-testid="input-supplier-phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -347,7 +418,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                     <FormItem>
                       <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Supplier address" data-testid="textarea-supplier-address" />
+                        <Textarea {...field} placeholder="Supplier address" readOnly className="bg-gray-50" data-testid="textarea-supplier-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
