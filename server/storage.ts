@@ -440,6 +440,7 @@ async function createWithUniqueNumber<T>(
 async function createWithSimpleSequentialNumber<T>(
   table: any,
   column: any,
+  columnKey: string,
   prefix: string,
   data: any,
   maxRetries: number = 5
@@ -453,7 +454,7 @@ async function createWithSimpleSequentialNumber<T>(
           .insert(table)
           .values({
             ...data,
-            [column.name]: uniqueNumber
+            [columnKey]: uniqueNumber
           })
           .returning();
 
@@ -562,7 +563,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createClient(client: InsertClient): Promise<Client> {
-    return createWithSimpleSequentialNumber<Client>(clients, clients.clientNumber, "C", client);
+    return createWithSimpleSequentialNumber<Client>(clients, clients.clientNumber, "clientNumber", "C", client);
   }
 
   async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client> {
@@ -650,7 +651,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-    return createWithSimpleSequentialNumber<Supplier>(suppliers, suppliers.supplierNumber, "S", supplier);
+    return createWithSimpleSequentialNumber<Supplier>(suppliers, suppliers.supplierNumber, "supplierNumber", "S", supplier);
   }
 
   async updateSupplier(id: number, supplierData: Partial<InsertSupplier>): Promise<Supplier> {
