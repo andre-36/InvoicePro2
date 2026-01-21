@@ -5,7 +5,7 @@ import {
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
-  cashAccounts, accountTransfers,
+  cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -22,7 +22,9 @@ import {
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
   type PrintSettings, type InsertPrintSettings,
   type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm,
-  type CashAccount, type InsertCashAccount, type AccountTransfer, type InsertAccountTransfer
+  type CashAccount, type InsertCashAccount, type AccountTransfer, type InsertAccountTransfer,
+  type GoodsReceipt, type InsertGoodsReceipt, type GoodsReceiptItem, type InsertGoodsReceiptItem,
+  type GoodsReceiptPayment, type InsertGoodsReceiptPayment
 } from "../shared/schema";
 
 import session from "express-session";
@@ -211,6 +213,27 @@ export interface IStorage {
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
   getImportExportLogs(userId: number): Promise<ImportExportLog[]>;
+
+  // Goods Receipt methods
+  getGoodsReceipt(id: number): Promise<GoodsReceipt | undefined>;
+  getGoodsReceiptWithItems(id: number): Promise<{ goodsReceipt: GoodsReceipt, items: GoodsReceiptItem[], payments: GoodsReceiptPayment[] } | undefined>;
+  getGoodsReceipts(storeId: number): Promise<GoodsReceipt[]>;
+  getGoodsReceiptsWithPendingReturns(storeId: number): Promise<GoodsReceipt[]>;
+  createGoodsReceipt(goodsReceipt: InsertGoodsReceipt, items: Array<InsertGoodsReceiptItem & { productId: number }>): Promise<GoodsReceipt>;
+  updateGoodsReceipt(id: number, goodsReceipt: Partial<InsertGoodsReceipt>, items?: Array<InsertGoodsReceiptItem & { id?: number, productId: number }>): Promise<GoodsReceipt>;
+  updateGoodsReceiptStatus(id: number, status: string): Promise<GoodsReceipt>;
+  deleteGoodsReceipt(id: number): Promise<void>;
+  getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string>;
+
+  // Goods Receipt Item methods
+  updateGoodsReceiptItem(id: number, item: Partial<InsertGoodsReceiptItem>): Promise<GoodsReceiptItem>;
+
+  // Goods Receipt Payment methods
+  getGoodsReceiptPayment(paymentId: number): Promise<GoodsReceiptPayment | undefined>;
+  getGoodsReceiptPayments(goodsReceiptId: number): Promise<GoodsReceiptPayment[]>;
+  createGoodsReceiptPayment(payment: InsertGoodsReceiptPayment): Promise<GoodsReceiptPayment>;
+  updateGoodsReceiptPayment(id: number, payment: Partial<InsertGoodsReceiptPayment>): Promise<GoodsReceiptPayment>;
+  deleteGoodsReceiptPayment(id: number): Promise<void>;
 
   // Dashboard metrics
   getDashboardStats(storeId: number): Promise<DashboardStats>;
@@ -1790,6 +1813,228 @@ export class DatabaseStorage implements IStorage {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const yearMonth = year + month;
     return generateNextNumber("DN", yearMonth, deliveryNotes, deliveryNotes.deliveryNumber, db);
+  }
+
+  // Goods Receipt methods
+  async getGoodsReceipt(id: number): Promise<GoodsReceipt | undefined> {
+    const [receipt] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, id));
+    return receipt;
+  }
+
+  async getGoodsReceiptWithItems(id: number): Promise<{ goodsReceipt: GoodsReceipt, items: GoodsReceiptItem[], payments: GoodsReceiptPayment[] } | undefined> {
+    const [goodsReceipt] = await db.select().from(goodsReceipts).where(eq(goodsReceipts.id, id));
+    if (!goodsReceipt) return undefined;
+
+    const items = await db.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id)).orderBy(goodsReceiptItems.id);
+    const payments = await db.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id)).orderBy(desc(goodsReceiptPayments.paymentDate));
+
+    return { goodsReceipt, items, payments };
+  }
+
+  async getGoodsReceipts(storeId: number): Promise<GoodsReceipt[]> {
+    return db.select().from(goodsReceipts).where(eq(goodsReceipts.storeId, storeId)).orderBy(desc(goodsReceipts.receiptDate));
+  }
+
+  async getGoodsReceiptsWithPendingReturns(storeId: number): Promise<GoodsReceipt[]> {
+    return db.select().from(goodsReceipts).where(and(eq(goodsReceipts.storeId, storeId), eq(goodsReceipts.hasReturns, true))).orderBy(desc(goodsReceipts.receiptDate));
+  }
+
+  async createGoodsReceipt(goodsReceiptData: InsertGoodsReceipt, items: Array<InsertGoodsReceiptItem & { productId: number }>): Promise<GoodsReceipt> {
+    return withTransaction(async (tx) => {
+      const receiptNumber = await this.getNextGoodsReceiptNumber(goodsReceiptData.receiptDate ? new Date(goodsReceiptData.receiptDate) : undefined);
+
+      const [newReceipt] = await tx.insert(goodsReceipts).values({
+        ...goodsReceiptData,
+        receiptNumber
+      }).returning();
+
+      if (items && items.length > 0) {
+        const hasReturns = items.some(item => parseFloat(String(item.returnQuantity || 0)) > 0);
+        
+        for (const item of items) {
+          await tx.insert(goodsReceiptItems).values({
+            ...item,
+            goodsReceiptId: newReceipt.id
+          });
+        }
+
+        if (hasReturns) {
+          await tx.update(goodsReceipts).set({ hasReturns: true }).where(eq(goodsReceipts.id, newReceipt.id));
+        }
+      }
+
+      return newReceipt;
+    });
+  }
+
+  async updateGoodsReceipt(id: number, goodsReceiptData: Partial<InsertGoodsReceipt>, items?: Array<InsertGoodsReceiptItem & { id?: number, productId: number }>): Promise<GoodsReceipt> {
+    return withTransaction(async (tx) => {
+      const [updatedReceipt] = await tx.update(goodsReceipts)
+        .set({ ...goodsReceiptData, updatedAt: new Date() })
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+
+      if (!updatedReceipt) {
+        throw new Error(`Goods Receipt with ID ${id} not found`);
+      }
+
+      if (items) {
+        await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
+
+        const hasReturns = items.some(item => parseFloat(String(item.returnQuantity || 0)) > 0);
+
+        for (const item of items) {
+          const { id: itemId, ...itemData } = item;
+          await tx.insert(goodsReceiptItems).values({
+            ...itemData,
+            goodsReceiptId: id
+          });
+        }
+
+        await tx.update(goodsReceipts).set({ hasReturns }).where(eq(goodsReceipts.id, id));
+      }
+
+      return updatedReceipt;
+    });
+  }
+
+  async updateGoodsReceiptStatus(id: number, status: string): Promise<GoodsReceipt> {
+    const [updatedReceipt] = await db.update(goodsReceipts)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(goodsReceipts.id, id))
+      .returning();
+
+    if (!updatedReceipt) {
+      throw new Error(`Goods Receipt with ID ${id} not found`);
+    }
+
+    return updatedReceipt;
+  }
+
+  async deleteGoodsReceipt(id: number): Promise<void> {
+    await db.delete(goodsReceipts).where(eq(goodsReceipts.id, id));
+  }
+
+  async getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string> {
+    const date = receiptDate || new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const yearMonth = year + month;
+    return generateNextNumber("GR", yearMonth, goodsReceipts, goodsReceipts.receiptNumber, db);
+  }
+
+  async updateGoodsReceiptItem(id: number, itemData: Partial<InsertGoodsReceiptItem>): Promise<GoodsReceiptItem> {
+    return withTransaction(async (tx) => {
+      const [updatedItem] = await tx.update(goodsReceiptItems)
+        .set({ ...itemData, updatedAt: new Date() })
+        .where(eq(goodsReceiptItems.id, id))
+        .returning();
+
+      if (!updatedItem) {
+        throw new Error(`Goods Receipt Item with ID ${id} not found`);
+      }
+
+      const receiptItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, updatedItem.goodsReceiptId));
+      const hasReturns = receiptItems.some(item => parseFloat(String(item.returnQuantity || 0)) > 0 && item.returnStatus !== 'returned');
+
+      await tx.update(goodsReceipts).set({ hasReturns }).where(eq(goodsReceipts.id, updatedItem.goodsReceiptId));
+
+      return updatedItem;
+    });
+  }
+
+  async getGoodsReceiptPayment(paymentId: number): Promise<GoodsReceiptPayment | undefined> {
+    const [payment] = await db.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, paymentId));
+    return payment;
+  }
+
+  async getGoodsReceiptPayments(goodsReceiptId: number): Promise<GoodsReceiptPayment[]> {
+    return db.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, goodsReceiptId)).orderBy(desc(goodsReceiptPayments.paymentDate));
+  }
+
+  async createGoodsReceiptPayment(payment: InsertGoodsReceiptPayment): Promise<GoodsReceiptPayment> {
+    return withTransaction(async (tx) => {
+      const [newPayment] = await tx.insert(goodsReceiptPayments).values(payment).returning();
+
+      const allPayments = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, payment.goodsReceiptId));
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+
+      const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, payment.goodsReceiptId));
+      const totalAmount = parseFloat(String(receipt.totalAmount));
+
+      let newStatus = receipt.status;
+      if (totalPaid >= totalAmount) {
+        newStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newStatus = 'partial_paid';
+      }
+
+      await tx.update(goodsReceipts).set({ amountPaid: String(totalPaid), status: newStatus, updatedAt: new Date() }).where(eq(goodsReceipts.id, payment.goodsReceiptId));
+
+      return newPayment;
+    });
+  }
+
+  async updateGoodsReceiptPayment(id: number, paymentData: Partial<InsertGoodsReceiptPayment>): Promise<GoodsReceiptPayment> {
+    return withTransaction(async (tx) => {
+      const [updatedPayment] = await tx.update(goodsReceiptPayments)
+        .set({ ...paymentData, updatedAt: new Date() })
+        .where(eq(goodsReceiptPayments.id, id))
+        .returning();
+
+      if (!updatedPayment) {
+        throw new Error(`Goods Receipt Payment with ID ${id} not found`);
+      }
+
+      const allPayments = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, updatedPayment.goodsReceiptId));
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+
+      const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, updatedPayment.goodsReceiptId));
+      const totalAmount = parseFloat(String(receipt.totalAmount));
+
+      let newStatus = receipt.status;
+      if (receipt.status !== 'draft' && receipt.status !== 'cancelled') {
+        if (totalPaid >= totalAmount) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
+          newStatus = 'partial_paid';
+        } else {
+          newStatus = 'confirmed';
+        }
+      }
+
+      await tx.update(goodsReceipts).set({ amountPaid: String(totalPaid), status: newStatus, updatedAt: new Date() }).where(eq(goodsReceipts.id, updatedPayment.goodsReceiptId));
+
+      return updatedPayment;
+    });
+  }
+
+  async deleteGoodsReceiptPayment(id: number): Promise<void> {
+    await withTransaction(async (tx) => {
+      const [payment] = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
+      if (!payment) return;
+
+      await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
+
+      const allPayments = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, payment.goodsReceiptId));
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+
+      const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, payment.goodsReceiptId));
+      const totalAmount = parseFloat(String(receipt.totalAmount));
+
+      let newStatus = receipt.status;
+      if (receipt.status !== 'draft' && receipt.status !== 'cancelled') {
+        if (totalPaid >= totalAmount) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
+          newStatus = 'partial_paid';
+        } else {
+          newStatus = 'confirmed';
+        }
+      }
+
+      await tx.update(goodsReceipts).set({ amountPaid: String(totalPaid), status: newStatus, updatedAt: new Date() }).where(eq(goodsReceipts.id, payment.goodsReceiptId));
+    });
   }
 
   // Quotation methods
