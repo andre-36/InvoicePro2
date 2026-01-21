@@ -5,6 +5,7 @@ import {
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
+  cashAccounts, accountTransfers,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -20,7 +21,8 @@ import {
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
   type PrintSettings, type InsertPrintSettings,
-  type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm
+  type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm,
+  type CashAccount, type InsertCashAccount, type AccountTransfer, type InsertAccountTransfer
 } from "../shared/schema";
 
 import session from "express-session";
@@ -189,6 +191,22 @@ export interface IStorage {
   updatePaymentTerm(id: number, paymentTerm: Partial<InsertPaymentTerm>): Promise<PaymentTerm>;
   deletePaymentTerm(id: number): Promise<void>;
 
+  // Cash Account methods
+  getCashAccounts(storeId: number): Promise<CashAccount[]>;
+  getCashAccount(id: number): Promise<CashAccount | undefined>;
+  getCashAccountWithBalance(id: number): Promise<CashAccountWithBalance | undefined>;
+  getCashAccountsWithBalance(storeId: number): Promise<CashAccountWithBalance[]>;
+  createCashAccount(account: InsertCashAccount): Promise<CashAccount>;
+  updateCashAccount(id: number, account: Partial<InsertCashAccount>): Promise<CashAccount>;
+  deleteCashAccount(id: number): Promise<void>;
+
+  // Account Transfer methods
+  getAccountTransfers(storeId: number): Promise<AccountTransfer[]>;
+  getAccountTransfer(id: number): Promise<AccountTransfer | undefined>;
+  createAccountTransfer(transfer: InsertAccountTransfer): Promise<AccountTransfer>;
+  updateAccountTransfer(id: number, transfer: Partial<InsertAccountTransfer>): Promise<AccountTransfer>;
+  deleteAccountTransfer(id: number): Promise<void>;
+
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
   getImportExportLogs(userId: number): Promise<ImportExportLog[]>;
@@ -233,6 +251,14 @@ export type ClientWithSalesStats = {
   totalSpent: number;
   averageSpend: number;
   lastPurchaseDate: Date | null;
+};
+
+export type CashAccountWithBalance = CashAccount & {
+  currentBalance: number;
+  totalIncome: number;
+  totalExpense: number;
+  totalTransfersIn: number;
+  totalTransfersOut: number;
 };
 
 export type InvoiceStatusSummary = {
@@ -2474,6 +2500,145 @@ export class DatabaseStorage implements IStorage {
 
   async deletePaymentTerm(id: number): Promise<void> {
     await db.delete(paymentTermsConfig).where(eq(paymentTermsConfig.id, id));
+  }
+
+  // Cash Account methods
+  async getCashAccounts(storeId: number): Promise<CashAccount[]> {
+    return db
+      .select()
+      .from(cashAccounts)
+      .where(eq(cashAccounts.storeId, storeId))
+      .orderBy(cashAccounts.name);
+  }
+
+  async getCashAccount(id: number): Promise<CashAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(cashAccounts)
+      .where(eq(cashAccounts.id, id));
+    return account;
+  }
+
+  async getCashAccountWithBalance(id: number): Promise<CashAccountWithBalance | undefined> {
+    const account = await this.getCashAccount(id);
+    if (!account) return undefined;
+
+    // Get total income for this account
+    const incomeResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE account_id = ${id} AND type = 'income'
+    `);
+    const totalIncome = parseFloat(incomeResult[0]?.total || '0');
+
+    // Get total expenses for this account
+    const expenseResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${transactions}
+      WHERE account_id = ${id} AND type = 'expense'
+    `);
+    const totalExpense = parseFloat(expenseResult[0]?.total || '0');
+
+    // Get total transfers in
+    const transfersInResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${accountTransfers}
+      WHERE to_account_id = ${id}
+    `);
+    const totalTransfersIn = parseFloat(transfersInResult[0]?.total || '0');
+
+    // Get total transfers out
+    const transfersOutResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount::numeric), 0) as total
+      FROM ${accountTransfers}
+      WHERE from_account_id = ${id}
+    `);
+    const totalTransfersOut = parseFloat(transfersOutResult[0]?.total || '0');
+
+    const initialBalance = parseFloat(account.initialBalance || '0');
+    const currentBalance = initialBalance + totalIncome - totalExpense + totalTransfersIn - totalTransfersOut;
+
+    return {
+      ...account,
+      currentBalance,
+      totalIncome,
+      totalExpense,
+      totalTransfersIn,
+      totalTransfersOut
+    };
+  }
+
+  async getCashAccountsWithBalance(storeId: number): Promise<CashAccountWithBalance[]> {
+    const accounts = await this.getCashAccounts(storeId);
+    const accountsWithBalance: CashAccountWithBalance[] = [];
+
+    for (const account of accounts) {
+      const withBalance = await this.getCashAccountWithBalance(account.id);
+      if (withBalance) {
+        accountsWithBalance.push(withBalance);
+      }
+    }
+
+    return accountsWithBalance;
+  }
+
+  async createCashAccount(account: InsertCashAccount): Promise<CashAccount> {
+    const [newAccount] = await db
+      .insert(cashAccounts)
+      .values(account)
+      .returning();
+    return newAccount;
+  }
+
+  async updateCashAccount(id: number, account: Partial<InsertCashAccount>): Promise<CashAccount> {
+    const [updatedAccount] = await db
+      .update(cashAccounts)
+      .set({ ...account, updatedAt: new Date() })
+      .where(eq(cashAccounts.id, id))
+      .returning();
+    return updatedAccount;
+  }
+
+  async deleteCashAccount(id: number): Promise<void> {
+    await db.delete(cashAccounts).where(eq(cashAccounts.id, id));
+  }
+
+  // Account Transfer methods
+  async getAccountTransfers(storeId: number): Promise<AccountTransfer[]> {
+    return db
+      .select()
+      .from(accountTransfers)
+      .where(eq(accountTransfers.storeId, storeId))
+      .orderBy(desc(accountTransfers.date));
+  }
+
+  async getAccountTransfer(id: number): Promise<AccountTransfer | undefined> {
+    const [transfer] = await db
+      .select()
+      .from(accountTransfers)
+      .where(eq(accountTransfers.id, id));
+    return transfer;
+  }
+
+  async createAccountTransfer(transfer: InsertAccountTransfer): Promise<AccountTransfer> {
+    const [newTransfer] = await db
+      .insert(accountTransfers)
+      .values(transfer)
+      .returning();
+    return newTransfer;
+  }
+
+  async updateAccountTransfer(id: number, transfer: Partial<InsertAccountTransfer>): Promise<AccountTransfer> {
+    const [updatedTransfer] = await db
+      .update(accountTransfers)
+      .set({ ...transfer, updatedAt: new Date() })
+      .where(eq(accountTransfers.id, id))
+      .returning();
+    return updatedTransfer;
+  }
+
+  async deleteAccountTransfer(id: number): Promise<void> {
+    await db.delete(accountTransfers).where(eq(accountTransfers.id, id));
   }
 
   // Import/Export methods

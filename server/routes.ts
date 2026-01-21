@@ -31,6 +31,8 @@ import {
   insertPrintSettingsSchema,
   insertPaymentTypeSchema,
   insertPaymentTermSchema,
+  insertCashAccountSchema,
+  insertAccountTransferSchema,
   loginSchema,
   updateUserProfileSchema,
   updateUserCompanySchema,
@@ -2892,6 +2894,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting payment term:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Cash Account routes
+  app.get("/api/stores/:storeId/cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const accounts = await storage.getCashAccountsWithBalance(storeId);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error getting cash accounts:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const storeId = 1; // Default store
+      const accounts = await storage.getCashAccountsWithBalance(storeId);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error getting cash accounts:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/cash-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const account = await storage.getCashAccountWithBalance(id);
+      
+      if (!account) {
+        return res.status(404).json({ error: "Cash account not found" });
+      }
+      
+      res.json(account);
+    } catch (error) {
+      console.error("Error getting cash account:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertCashAccountSchema, req, res);
+      if (!validatedData) return;
+      
+      const newAccount = await storage.createCashAccount(validatedData);
+      res.status(201).json(newAccount);
+    } catch (error) {
+      console.error("Error creating cash account:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/cash-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertCashAccountSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedAccount = await storage.updateCashAccount(id, validatedData);
+      res.json(updatedAccount);
+    } catch (error) {
+      console.error("Error updating cash account:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/cash-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCashAccount(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting cash account:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Account Transfer routes
+  app.get("/api/stores/:storeId/account-transfers", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const transfers = await storage.getAccountTransfers(storeId);
+      res.json(transfers);
+    } catch (error) {
+      console.error("Error getting account transfers:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/account-transfers", requireAuth, async (req, res) => {
+    try {
+      const storeId = 1; // Default store
+      const transfers = await storage.getAccountTransfers(storeId);
+      res.json(transfers);
+    } catch (error) {
+      console.error("Error getting account transfers:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/account-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const transfer = await storage.getAccountTransfer(id);
+      
+      if (!transfer) {
+        return res.status(404).json({ error: "Account transfer not found" });
+      }
+      
+      res.json(transfer);
+    } catch (error) {
+      console.error("Error getting account transfer:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/account-transfers", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertAccountTransferSchema, req, res);
+      if (!validatedData) return;
+      
+      const newTransfer = await storage.createAccountTransfer(validatedData);
+      res.status(201).json(newTransfer);
+    } catch (error) {
+      console.error("Error creating account transfer:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/account-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertAccountTransferSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedTransfer = await storage.updateAccountTransfer(id, validatedData);
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error updating account transfer:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/account-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteAccountTransfer(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting account transfer:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

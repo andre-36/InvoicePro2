@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText, Wallet, ArrowLeftRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -99,8 +99,55 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
+// Cash account schema
+const cashAccountSchema = z.object({
+  name: z.string().min(1, "Account name is required"),
+  accountType: z.enum(["cash", "bank_company", "bank_personal", "other"]).default("cash"),
+  initialBalance: z.string().default("0"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+  storeId: z.number().default(1)
+});
+
+// Account transfer schema
+const accountTransferSchema = z.object({
+  fromAccountId: z.number().min(1, "Source account is required"),
+  toAccountId: z.number().min(1, "Destination account is required"),
+  amount: z.string().min(1, "Amount is required"),
+  date: z.string().min(1, "Date is required"),
+  notes: z.string().optional(),
+  reference: z.string().optional(),
+  storeId: z.number().default(1)
+});
+
 type CategoryFormData = z.infer<typeof categorySchema>;
 type Category = { id: number; name: string; description: string | null };
+
+type CashAccountFormData = z.infer<typeof cashAccountSchema>;
+type CashAccountWithBalance = { 
+  id: number; 
+  name: string; 
+  accountType: string; 
+  initialBalance: string;
+  description: string | null;
+  isActive: boolean;
+  currentBalance: number;
+  totalIncome: number;
+  totalExpense: number;
+  totalTransfersIn: number;
+  totalTransfersOut: number;
+};
+
+type AccountTransferFormData = z.infer<typeof accountTransferSchema>;
+type AccountTransfer = {
+  id: number;
+  fromAccountId: number;
+  toAccountId: number;
+  amount: string;
+  date: string;
+  notes: string | null;
+  reference: string | null;
+};
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 type CompanyFormValues = z.infer<typeof companySchema>;
@@ -121,6 +168,11 @@ export default function SettingsPage() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [editingCashAccount, setEditingCashAccount] = useState<CashAccountWithBalance | null>(null);
+  const [deletingCashAccount, setDeletingCashAccount] = useState<CashAccountWithBalance | null>(null);
+  const [cashAccountDialogOpen, setCashAccountDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [deletingTransfer, setDeletingTransfer] = useState<AccountTransfer | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
@@ -142,6 +194,16 @@ export default function SettingsPage() {
   // Fetch categories
   const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+  });
+
+  // Fetch cash accounts
+  const { data: cashAccounts, isLoading: cashAccountsLoading } = useQuery<CashAccountWithBalance[]>({
+    queryKey: ['/api/cash-accounts'],
+  });
+
+  // Fetch account transfers
+  const { data: accountTransfers, isLoading: transfersLoading } = useQuery<AccountTransfer[]>({
+    queryKey: ['/api/account-transfers'],
   });
 
   // Profile form setup
@@ -223,6 +285,33 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       description: "",
+    }
+  });
+
+  // Cash account form setup
+  const cashAccountForm = useForm<CashAccountFormData>({
+    resolver: zodResolver(cashAccountSchema),
+    defaultValues: {
+      name: "",
+      accountType: "cash",
+      initialBalance: "0",
+      description: "",
+      isActive: true,
+      storeId: 1
+    }
+  });
+
+  // Account transfer form setup
+  const transferForm = useForm<AccountTransferFormData>({
+    resolver: zodResolver(accountTransferSchema),
+    defaultValues: {
+      fromAccountId: 0,
+      toAccountId: 0,
+      amount: "",
+      date: new Date().toISOString().split('T')[0],
+      notes: "",
+      reference: "",
+      storeId: 1
     }
   });
 
@@ -442,6 +531,101 @@ export default function SettingsPage() {
       toast({
         title: "Category deleted",
         description: "The category has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cash account mutation
+  const cashAccountMutation = useMutation({
+    mutationFn: async (data: CashAccountFormData & { id?: number }) => {
+      const { id, ...payload } = data;
+      if (id) {
+        return apiRequest('PUT', `/api/cash-accounts/${id}`, payload);
+      }
+      return apiRequest('POST', '/api/cash-accounts', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      setEditingCashAccount(null);
+      setCashAccountDialogOpen(false);
+      cashAccountForm.reset();
+      toast({
+        title: "Cash account saved",
+        description: "The cash account has been saved successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCashAccountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/cash-accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      setDeletingCashAccount(null);
+      toast({
+        title: "Cash account deleted",
+        description: "The cash account has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Account transfer mutation
+  const transferMutation = useMutation({
+    mutationFn: async (data: AccountTransferFormData) => {
+      return apiRequest('POST', '/api/account-transfers', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/account-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      setTransferDialogOpen(false);
+      transferForm.reset();
+      toast({
+        title: "Transfer completed",
+        description: "The transfer has been recorded successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTransferMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/account-transfers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/account-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      setDeletingTransfer(null);
+      toast({
+        title: "Transfer deleted",
+        description: "The transfer has been deleted successfully.",
       });
     },
     onError: (error: Error) => {
@@ -759,6 +943,10 @@ export default function SettingsPage() {
             <TabsTrigger value="categories" className="gap-2">
               <FolderOpen className="h-4 w-4" />
               <span>Categories</span>
+            </TabsTrigger>
+            <TabsTrigger value="cash-accounts" className="gap-2">
+              <Wallet className="h-4 w-4" />
+              <span>Cash Accounts</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1606,7 +1794,386 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="cash-accounts" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Cash Accounts</CardTitle>
+                <CardDescription>Manage your cash accounts and track balances</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => {
+                  transferForm.reset({
+                    fromAccountId: 0,
+                    toAccountId: 0,
+                    amount: "",
+                    date: new Date().toISOString().split('T')[0],
+                    notes: "",
+                    reference: "",
+                    storeId: 1
+                  });
+                  setTransferDialogOpen(true);
+                }} variant="outline" className="gap-2">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Transfer
+                </Button>
+                <Button onClick={() => {
+                  cashAccountForm.reset({
+                    name: "",
+                    accountType: "cash",
+                    initialBalance: "0",
+                    description: "",
+                    isActive: true,
+                    storeId: 1
+                  });
+                  setEditingCashAccount(null);
+                  setCashAccountDialogOpen(true);
+                }} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Account
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {cashAccountsLoading ? (
+                <div className="text-center py-4 text-muted-foreground">Loading...</div>
+              ) : !cashAccounts?.length ? (
+                <div className="text-center py-4 text-muted-foreground">No cash accounts yet</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {cashAccounts.map((account) => (
+                      <Card key={account.id} className="relative">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">{account.name}</CardTitle>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingCashAccount(account);
+                                  cashAccountForm.reset({
+                                    name: account.name,
+                                    accountType: account.accountType as "cash" | "bank_company" | "bank_personal" | "other",
+                                    initialBalance: account.initialBalance,
+                                    description: account.description || "",
+                                    isActive: account.isActive,
+                                    storeId: 1
+                                  });
+                                  setCashAccountDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingCashAccount(account)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                          <CardDescription>
+                            {account.accountType === 'cash' && 'Cash'}
+                            {account.accountType === 'bank_company' && 'Company Bank Account'}
+                            {account.accountType === 'bank_personal' && 'Personal Bank Account'}
+                            {account.accountType === 'other' && 'Other'}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            Rp {account.currentBalance.toLocaleString('id-ID')}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Initial Balance:</span>
+                              <span>Rp {parseFloat(account.initialBalance).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600">
+                              <span>Income:</span>
+                              <span>+Rp {account.totalIncome.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-red-600">
+                              <span>Expense:</span>
+                              <span>-Rp {account.totalExpense.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-blue-600">
+                              <span>Transfers In:</span>
+                              <span>+Rp {account.totalTransfersIn.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-orange-600">
+                              <span>Transfers Out:</span>
+                              <span>-Rp {account.totalTransfersOut.toLocaleString('id-ID')}</span>
+                            </div>
+                          </div>
+                          {!account.isActive && (
+                            <div className="mt-2 text-xs text-red-500">Inactive</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Cash Account Add/Edit Dialog */}
+      <Dialog open={cashAccountDialogOpen} onOpenChange={setCashAccountDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCashAccount ? "Edit Cash Account" : "Add Cash Account"}</DialogTitle>
+          </DialogHeader>
+          <Form {...cashAccountForm}>
+            <form onSubmit={cashAccountForm.handleSubmit((data) => {
+              cashAccountMutation.mutate({ ...data, id: editingCashAccount?.id });
+            })} className="space-y-4">
+              <FormField
+                control={cashAccountForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Cash, Rekening PT" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={cashAccountForm.control}
+                name="accountType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Type</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        {...field}
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="bank_company">Company Bank Account</option>
+                        <option value="bank_personal">Personal Bank Account</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={cashAccountForm.control}
+                name="initialBalance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Initial Balance</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={cashAccountForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional description" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={cashAccountForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">Enable this account</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setCashAccountDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={cashAccountMutation.isPending}>
+                  {cashAccountMutation.isPending ? "Saving..." : (editingCashAccount ? "Update" : "Create")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cash Account Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingCashAccount} onOpenChange={() => setDeletingCashAccount(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the cash account "{deletingCashAccount?.name}". 
+              Transactions linked to this account will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingCashAccount && deleteCashAccountMutation.mutate(deletingCashAccount.id)}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteCashAccountMutation.isPending}
+            >
+              {deleteCashAccountMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Transfer Dialog */}
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transfer Between Accounts</DialogTitle>
+          </DialogHeader>
+          <Form {...transferForm}>
+            <form onSubmit={transferForm.handleSubmit((data) => {
+              if (data.fromAccountId === data.toAccountId) {
+                toast({
+                  title: "Error",
+                  description: "Source and destination accounts must be different",
+                  variant: "destructive",
+                });
+                return;
+              }
+              transferMutation.mutate(data);
+            })} className="space-y-4">
+              <FormField
+                control={transferForm.control}
+                name="fromAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>From Account *</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      >
+                        <option value="">Select account</option>
+                        {cashAccounts?.filter(a => a.isActive).map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} (Rp {account.currentBalance.toLocaleString('id-ID')})
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={transferForm.control}
+                name="toAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>To Account *</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      >
+                        <option value="">Select account</option>
+                        {cashAccounts?.filter(a => a.isActive).map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} (Rp {account.currentBalance.toLocaleString('id-ID')})
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={transferForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount *</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={transferForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={transferForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Optional notes" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={transferForm.control}
+                name="reference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reference</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional reference" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setTransferDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={transferMutation.isPending}>
+                  {transferMutation.isPending ? "Transferring..." : "Transfer"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       {/* Category Add/Edit Dialog */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
