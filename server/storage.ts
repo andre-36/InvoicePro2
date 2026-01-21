@@ -180,6 +180,7 @@ export interface IStorage {
   // Payment Types methods
   getPaymentTypes(storeId: number): Promise<PaymentType[]>;
   getPaymentType(id: number): Promise<PaymentType | undefined>;
+  getPaymentTypeByName(storeId: number, name: string): Promise<PaymentType | undefined>;
   createPaymentType(paymentType: InsertPaymentType): Promise<PaymentType>;
   updatePaymentType(id: number, paymentType: Partial<InsertPaymentType>): Promise<PaymentType>;
   deletePaymentType(id: number): Promise<void>;
@@ -2440,6 +2441,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(paymentTypes)
       .where(eq(paymentTypes.id, id));
+    return paymentType;
+  }
+
+  async getPaymentTypeByName(storeId: number, name: string): Promise<PaymentType | undefined> {
+    const [paymentType] = await db
+      .select()
+      .from(paymentTypes)
+      .where(and(eq(paymentTypes.storeId, storeId), eq(paymentTypes.name, name)));
     return paymentType;
   }
 
