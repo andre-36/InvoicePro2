@@ -2717,6 +2717,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get ALL products, not just those with batches in this store
       const products = await storage.getProducts();
       
+      // Get pending PO quantities for all products
+      const pendingPOQuantities = await storage.getPendingPOQuantityByProduct(storeId);
+      
       const productsWithStock = await Promise.all(
         products.map(async (product) => {
           const batches = await storage.getProductBatches(product.id, storeId);
@@ -2724,9 +2727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sum + parseFloat(batch.remainingQuantity.toString()), 0
           );
           
+          const pendingPOQuantity = pendingPOQuantities.get(product.id) || 0;
+          
           return {
             ...product,
             currentStock,
+            pendingPOQuantity,
             isLowStock: currentStock <= (product.minStock || 0),
             stockStatus: currentStock === 0 ? 'out_of_stock' : 
                         currentStock <= (product.minStock || 0) ? 'low_stock' : 'in_stock'

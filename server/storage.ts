@@ -148,6 +148,7 @@ export interface IStorage {
   getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
   getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined>;
   getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]>;
+  getPendingPOQuantityByProduct(storeId: number): Promise<Map<number, number>>;
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
@@ -2299,6 +2300,40 @@ export class DatabaseStorage implements IStorage {
       .from(purchaseOrders)
       .where(eq(purchaseOrders.storeId, storeId))
       .orderBy(desc(purchaseOrders.orderDate));
+  }
+
+  async getPendingPOQuantityByProduct(storeId: number): Promise<Map<number, number>> {
+    const result = new Map<number, number>();
+    
+    const activePOs = await db
+      .select()
+      .from(purchaseOrders)
+      .where(
+        and(
+          eq(purchaseOrders.storeId, storeId),
+          inArray(purchaseOrders.status, ['draft', 'sent', 'partial'])
+        )
+      );
+    
+    for (const po of activePOs) {
+      const items = await db
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+      
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity.toString()) || 0;
+        const received = parseFloat(item.receivedQuantity?.toString() || '0') || 0;
+        const pending = quantity - received;
+        
+        if (pending > 0) {
+          const current = result.get(item.productId) || 0;
+          result.set(item.productId, current + pending);
+        }
+      }
+    }
+    
+    return result;
   }
 
   async createPurchaseOrder(purchaseOrderData: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder> {
