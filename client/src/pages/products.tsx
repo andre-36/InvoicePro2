@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -112,6 +113,7 @@ const productSchema = z.object({
   productType: z.enum(["standard", "bundle"]).optional().default("standard"),
   baseUnit: z.string().optional(),
   categoryId: z.number().nullable().optional(),
+  isActive: z.boolean().default(true),
 }).refine((data) => {
   if (data.lowestPrice && data.currentSellingPrice) {
     const price = parseFloat(data.currentSellingPrice);
@@ -340,6 +342,7 @@ export default function ProductsPage() {
       productType: "standard",
       baseUnit: "",
       categoryId: null,
+      isActive: true,
     }
   });
 
@@ -358,6 +361,7 @@ export default function ProductsPage() {
       productType: product.productType || "standard",
       baseUnit: product.unit || "", // Map unit from database to baseUnit in form
       categoryId: product.categoryId || null,
+      isActive: product.isActive ?? true,
     });
     
     // Load bundle components if product is a bundle
@@ -404,6 +408,7 @@ export default function ProductsPage() {
       productType: type,
       baseUnit: "",
       categoryId: null,
+      isActive: true,
     });
     setBundleComponents([]);
     setProductUnits([]);
@@ -431,6 +436,7 @@ export default function ProductsPage() {
         productType: data.productType,
         unit: data.baseUnit || "pcs", // Map baseUnit to unit
         categoryId: data.categoryId,
+        isActive: data.isActive,
       };
       
       if (productId) {
@@ -1132,6 +1138,27 @@ export default function ProductsPage() {
                   </div>
                 )}
               </div>
+              
+              {/* Active Status - Only show when editing */}
+              {editingProduct && (
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <FormLabel>Active</FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Inactive products won't appear in invoice/quotation dropdowns
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <DialogFooter className="pt-4">
                 <Button 
