@@ -451,7 +451,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                     key={index}
                     item={item}
                     index={index}
-                    products={products || []}
+                    products={(products || []).filter(p => p.isActive !== false)}
                     onUpdate={updateItem}
                     onRemove={() => removeItem(index)}
                     canRemove={items.length > 1}

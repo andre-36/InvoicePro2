@@ -1102,7 +1102,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           key={index}
                           index={index}
                           item={item}
-                          products={products || []}
+                          products={(products || []).filter(p => p.isActive !== false)}
                           updateItem={(idx, updatedItem) => {
                             setItems(prevItems => {
                               const newItems = [...prevItems];
