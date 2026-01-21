@@ -9,6 +9,7 @@ export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['draft',
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
 export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs', 'halfsize']);
 export const productTypeEnum = pgEnum('product_type', ['standard', 'bundle']);
+export const cashAccountTypeEnum = pgEnum('cash_account_type', ['cash', 'bank_company', 'bank_personal', 'other']);
 
 // Users table
 export const users = pgTable("users", {
@@ -45,6 +46,43 @@ export const stores = pgTable("stores", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
+// Cash Accounts table (for multi-account cash management)
+export const cashAccounts = pgTable("cash_accounts", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  accountType: cashAccountTypeEnum("account_type").default("cash").notNull(),
+  initialBalance: numeric("initial_balance", { precision: 15, scale: 2 }).default("0").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("cash_accounts_store_id_idx").on(table.storeId)
+  };
+});
+
+// Account Transfers table (for transfers between cash accounts)
+export const accountTransfers = pgTable("account_transfers", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  fromAccountId: integer("from_account_id").references(() => cashAccounts.id, { onDelete: 'cascade' }).notNull(),
+  toAccountId: integer("to_account_id").references(() => cashAccounts.id, { onDelete: 'cascade' }).notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  date: date("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("account_transfers_store_id_idx").on(table.storeId),
+    fromAccountIdIdx: index("account_transfers_from_account_id_idx").on(table.fromAccountId),
+    toAccountIdIdx: index("account_transfers_to_account_id_idx").on(table.toAccountId),
+    dateIdx: index("account_transfers_date_idx").on(table.date)
+  };
 });
 
 // Clients/customers table
@@ -381,6 +419,7 @@ export const quotationItems = pgTable("quotation_items", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  accountId: integer("account_id").references(() => cashAccounts.id),
   type: transactionTypeEnum("type").notNull(),
   date: date("date").notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
@@ -393,6 +432,7 @@ export const transactions = pgTable("transactions", {
 }, (table) => {
   return {
     storeIdIdx: index("transactions_store_id_idx").on(table.storeId),
+    accountIdIdx: index("transactions_account_id_idx").on(table.accountId),
     typeIdx: index("transactions_type_idx").on(table.type),
     dateIdx: index("transactions_date_idx").on(table.date),
     invoiceIdIdx: index("transactions_invoice_id_idx").on(table.invoiceId)
@@ -575,6 +615,8 @@ export const insertInvoicePaymentSchema = createInsertSchema(invoicePayments).om
 export const insertInvoiceItemBatchSchema = createInsertSchema(invoiceItemBatches).omit({ id: true, createdAt: true });
 export const insertQuotationSchema = createInsertSchema(quotations).omit({ id: true, quotationNumber: true, createdAt: true, updatedAt: true });
 export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCashAccountSchema = createInsertSchema(cashAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAccountTransferSchema = createInsertSchema(accountTransfers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, purchaseOrderNumber: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
@@ -592,6 +634,12 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Store = typeof stores.$inferSelect;
 export type InsertStore = z.infer<typeof insertStoreSchema>;
+
+export type CashAccount = typeof cashAccounts.$inferSelect;
+export type InsertCashAccount = z.infer<typeof insertCashAccountSchema>;
+
+export type AccountTransfer = typeof accountTransfers.$inferSelect;
+export type InsertAccountTransfer = z.infer<typeof insertAccountTransferSchema>;
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -694,7 +742,28 @@ export const storesRelations = relations(stores, ({ many }) => ({
   products: many(productBatches),
   invoices: many(invoices),
   quotations: many(quotations),
-  purchaseOrders: many(purchaseOrders)
+  purchaseOrders: many(purchaseOrders),
+  cashAccounts: many(cashAccounts),
+  accountTransfers: many(accountTransfers)
+}));
+
+export const cashAccountsRelations = relations(cashAccounts, ({ one, many }) => ({
+  store: one(stores, { fields: [cashAccounts.storeId], references: [stores.id] }),
+  transactions: many(transactions),
+  transfersFrom: many(accountTransfers, { relationName: 'fromAccount' }),
+  transfersTo: many(accountTransfers, { relationName: 'toAccount' })
+}));
+
+export const accountTransfersRelations = relations(accountTransfers, ({ one }) => ({
+  store: one(stores, { fields: [accountTransfers.storeId], references: [stores.id] }),
+  fromAccount: one(cashAccounts, { fields: [accountTransfers.fromAccountId], references: [cashAccounts.id], relationName: 'fromAccount' }),
+  toAccount: one(cashAccounts, { fields: [accountTransfers.toAccountId], references: [cashAccounts.id], relationName: 'toAccount' })
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  store: one(stores, { fields: [transactions.storeId], references: [stores.id] }),
+  account: one(cashAccounts, { fields: [transactions.accountId], references: [cashAccounts.id] }),
+  invoice: one(invoices, { fields: [transactions.invoiceId], references: [invoices.id] })
 }));
 
 export const clientsRelations = relations(clients, ({ one, many }) => ({
