@@ -636,7 +636,16 @@ export default function ProductsPage() {
                       onDoubleClick={() => handleEdit(product)}
                       data-testid={`row-product-${product.id}`}
                     >
-                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {product.name}
+                          {product.isActive === false && (
+                            <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono text-sm text-gray-600 dark:text-gray-400">
                         {product.sku || "—"}
                       </TableCell>
