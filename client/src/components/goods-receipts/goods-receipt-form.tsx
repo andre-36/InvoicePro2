@@ -1,0 +1,891 @@
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, AlertTriangle, Check } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { insertGoodsReceiptSchema, insertGoodsReceiptPaymentSchema } from "@shared/schema";
+import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+
+const extendedGoodsReceiptSchema = insertGoodsReceiptSchema.extend({
+  receiptDate: z.coerce.date(),
+  dueDate: z.coerce.date().nullable().optional(),
+  subtotal: z.string().optional(),
+  taxRate: z.string().optional(),
+  taxAmount: z.string().optional(),
+  discount: z.string().optional(),
+  totalAmount: z.string().optional(),
+});
+
+const goodsReceiptItemSchema = z.object({
+  id: z.number().optional(),
+  productId: z.number(),
+  purchaseOrderId: z.number().nullable().optional(),
+  description: z.string().min(1, "Description is required"),
+  quantity: z.string().min(1, "Quantity is required"),
+  unitCost: z.string().min(1, "Unit cost is required"),
+  taxRate: z.string().optional(),
+  taxAmount: z.string().optional(),
+  discount: z.string().optional(),
+  subtotal: z.string().optional(),
+  totalAmount: z.string().optional(),
+  returnQuantity: z.string().optional(),
+  returnReason: z.string().optional(),
+  returnStatus: z.enum(['none', 'pending', 'returned']).optional(),
+  returnedQuantity: z.string().optional(),
+});
+
+type GoodsReceiptItem = z.infer<typeof goodsReceiptItemSchema>;
+
+interface GoodsReceiptFormProps {
+  goodsReceiptId?: number;
+  onSuccess?: () => void;
+}
+
+export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsReceiptFormProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+  const isEditing = !!goodsReceiptId;
+  
+  const [items, setItems] = useState<GoodsReceiptItem[]>([{
+    productId: 0,
+    purchaseOrderId: null,
+    description: "",
+    quantity: "1",
+    unitCost: "0",
+    taxRate: "0",
+    taxAmount: "0",
+    discount: "0",
+    subtotal: "0",
+    totalAmount: "0",
+    returnQuantity: "0",
+    returnReason: "",
+    returnStatus: 'none',
+    returnedQuantity: "0"
+  }]);
+
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<GoodsReceiptPayment | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+    paymentType: 'Cash',
+    amount: '',
+    reference: '',
+    notes: ''
+  });
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [productOpen, setProductOpen] = useState<number | null>(null);
+  const [poOpen, setPOOpen] = useState<number | null>(null);
+
+  const form = useForm({
+    resolver: zodResolver(extendedGoodsReceiptSchema),
+    defaultValues: {
+      storeId: 1,
+      supplierId: null as number | null,
+      supplierName: "",
+      supplierEmail: "",
+      supplierPhone: "",
+      supplierAddress: "",
+      supplierDocNumber: "",
+      receiptDate: new Date(),
+      dueDate: null as Date | null,
+      status: "draft" as const,
+      subtotal: "0",
+      taxRate: "0",
+      taxAmount: "0",
+      discount: "0",
+      totalAmount: "0",
+      notes: "",
+    }
+  });
+
+  const { data: suppliers } = useQuery<Supplier[]>({
+    queryKey: ['/api/suppliers'],
+  });
+
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const { data: purchaseOrders } = useQuery<PurchaseOrder[]>({
+    queryKey: ['/api/purchase-orders'],
+  });
+
+  const { data: paymentTypes } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['/api/payment-types'],
+  });
+
+  const { data: existingReceipt } = useQuery({
+    queryKey: ['/api/goods-receipts', goodsReceiptId],
+    enabled: isEditing,
+  });
+
+  const { data: receiptPayments, refetch: refetchPayments } = useQuery<GoodsReceiptPayment[]>({
+    queryKey: ['/api/goods-receipts', goodsReceiptId, 'payments'],
+    enabled: isEditing,
+  });
+
+  useEffect(() => {
+    if (existingReceipt) {
+      const receipt = existingReceipt.goodsReceipt;
+      form.reset({
+        storeId: receipt.storeId,
+        supplierId: receipt.supplierId,
+        supplierName: receipt.supplierName,
+        supplierEmail: receipt.supplierEmail || "",
+        supplierPhone: receipt.supplierPhone || "",
+        supplierAddress: receipt.supplierAddress || "",
+        supplierDocNumber: receipt.supplierDocNumber || "",
+        receiptDate: new Date(receipt.receiptDate),
+        dueDate: receipt.dueDate ? new Date(receipt.dueDate) : null,
+        status: receipt.status,
+        subtotal: receipt.subtotal,
+        taxRate: receipt.taxRate || "0",
+        taxAmount: receipt.taxAmount || "0",
+        discount: receipt.discount || "0",
+        totalAmount: receipt.totalAmount,
+        notes: receipt.notes || "",
+      });
+
+      if (existingReceipt.items && existingReceipt.items.length > 0) {
+        setItems(existingReceipt.items.map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          purchaseOrderId: item.purchaseOrderId,
+          description: item.description,
+          quantity: String(item.quantity),
+          unitCost: String(item.unitCost),
+          taxRate: String(item.taxRate || 0),
+          taxAmount: String(item.taxAmount || 0),
+          discount: String(item.discount || 0),
+          subtotal: String(item.subtotal),
+          totalAmount: String(item.totalAmount),
+          returnQuantity: String(item.returnQuantity || 0),
+          returnReason: item.returnReason || "",
+          returnStatus: item.returnStatus || 'none',
+          returnedQuantity: String(item.returnedQuantity || 0),
+        })));
+      }
+    }
+  }, [existingReceipt, form]);
+
+  const calculateItemTotals = (item: GoodsReceiptItem): GoodsReceiptItem => {
+    const qty = parseFloat(item.quantity) || 0;
+    const cost = parseFloat(item.unitCost) || 0;
+    const taxRate = parseFloat(item.taxRate || "0") || 0;
+    const discount = parseFloat(item.discount || "0") || 0;
+    
+    const subtotal = qty * cost;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount - discount;
+
+    return {
+      ...item,
+      subtotal: subtotal.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      totalAmount: total.toFixed(2)
+    };
+  };
+
+  const updateFormTotals = (updatedItems: GoodsReceiptItem[]) => {
+    const subtotal = updatedItems.reduce((sum, item) => sum + parseFloat(item.subtotal || "0"), 0);
+    const taxAmount = updatedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount || "0"), 0);
+    const discount = updatedItems.reduce((sum, item) => sum + parseFloat(item.discount || "0"), 0);
+    const totalAmount = subtotal + taxAmount - discount;
+
+    form.setValue("subtotal", subtotal.toFixed(2));
+    form.setValue("taxAmount", taxAmount.toFixed(2));
+    form.setValue("discount", discount.toFixed(2));
+    form.setValue("totalAmount", totalAmount.toFixed(2));
+  };
+
+  const updateItem = (index: number, field: keyof GoodsReceiptItem, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    if (['quantity', 'unitCost', 'taxRate', 'discount'].includes(field)) {
+      updatedItems[index] = calculateItemTotals(updatedItems[index]);
+    }
+    
+    setItems(updatedItems);
+    updateFormTotals(updatedItems);
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      productId: 0,
+      purchaseOrderId: null,
+      description: "",
+      quantity: "1",
+      unitCost: "0",
+      taxRate: "0",
+      taxAmount: "0",
+      discount: "0",
+      subtotal: "0",
+      totalAmount: "0",
+      returnQuantity: "0",
+      returnReason: "",
+      returnStatus: 'none',
+      returnedQuantity: "0"
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      const updatedItems = items.filter((_, i) => i !== index);
+      setItems(updatedItems);
+      updateFormTotals(updatedItems);
+    }
+  };
+
+  const selectSupplier = (supplier: Supplier) => {
+    form.setValue("supplierId", supplier.id);
+    form.setValue("supplierName", supplier.name);
+    form.setValue("supplierEmail", supplier.email || "");
+    form.setValue("supplierPhone", supplier.phone || "");
+    form.setValue("supplierAddress", supplier.address || "");
+    setSupplierOpen(false);
+  };
+
+  const selectProduct = (index: number, product: Product) => {
+    updateItem(index, 'productId', product.id);
+    updateItem(index, 'description', product.name);
+    updateItem(index, 'unitCost', product.costPrice || "0");
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      productId: product.id,
+      description: product.name,
+      unitCost: String(product.costPrice || 0)
+    };
+    updatedItems[index] = calculateItemTotals(updatedItems[index]);
+    setItems(updatedItems);
+    updateFormTotals(updatedItems);
+    setProductOpen(null);
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('POST', '/api/goods-receipts', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      toast({ title: "Success", description: "Goods receipt created successfully." });
+      navigate('/goods-receipts');
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to create goods receipt: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('PUT', `/api/goods-receipts/${goodsReceiptId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      toast({ title: "Success", description: "Goods receipt updated successfully." });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update goods receipt: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('POST', `/api/goods-receipts/${goodsReceiptId}/payments`, data);
+    },
+    onSuccess: () => {
+      refetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      setPaymentDialogOpen(false);
+      resetPaymentForm();
+      toast({ title: "Success", description: "Payment added successfully." });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to add payment: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const updatePaymentMutation = useMutation({
+    mutationFn: async ({ paymentId, data }: { paymentId: number, data: any }) => {
+      return apiRequest('PUT', `/api/goods-receipts/${goodsReceiptId}/payments/${paymentId}`, data);
+    },
+    onSuccess: () => {
+      refetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      setPaymentDialogOpen(false);
+      setEditingPayment(null);
+      resetPaymentForm();
+      toast({ title: "Success", description: "Payment updated successfully." });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update payment: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (paymentId: number) => {
+      return apiRequest('DELETE', `/api/goods-receipts/${goodsReceiptId}/payments/${paymentId}`, undefined);
+    },
+    onSuccess: () => {
+      refetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      toast({ title: "Success", description: "Payment deleted successfully." });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to delete payment: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const resetPaymentForm = () => {
+    setPaymentForm({
+      paymentDate: format(new Date(), 'yyyy-MM-dd'),
+      paymentType: 'Cash',
+      amount: '',
+      reference: '',
+      notes: ''
+    });
+  };
+
+  const handlePaymentSubmit = () => {
+    if (editingPayment) {
+      updatePaymentMutation.mutate({ paymentId: editingPayment.id, data: paymentForm });
+    } else {
+      createPaymentMutation.mutate(paymentForm);
+    }
+  };
+
+  const openEditPayment = (payment: GoodsReceiptPayment) => {
+    setEditingPayment(payment);
+    setPaymentForm({
+      paymentDate: payment.paymentDate,
+      paymentType: payment.paymentType,
+      amount: String(payment.amount),
+      reference: payment.reference || '',
+      notes: payment.notes || ''
+    });
+    setPaymentDialogOpen(true);
+  };
+
+  const onSubmit = (data: any) => {
+    const formattedData = {
+      goodsReceipt: {
+        ...data,
+        receiptDate: format(data.receiptDate, 'yyyy-MM-dd'),
+        dueDate: data.dueDate ? format(data.dueDate, 'yyyy-MM-dd') : null,
+      },
+      items: items.map(item => ({
+        ...item,
+        purchaseOrderId: item.purchaseOrderId || null,
+      }))
+    };
+
+    if (isEditing) {
+      updateMutation.mutate(formattedData);
+    } else {
+      createMutation.mutate(formattedData);
+    }
+  };
+
+  const totalPaid = (receiptPayments || []).reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+  const totalAmount = parseFloat(form.watch("totalAmount") || "0");
+  const remainingBalance = totalAmount - totalPaid;
+
+  const supplierPOs = purchaseOrders?.filter(po => 
+    po.supplierId === form.watch("supplierId") && 
+    (po.status === 'sent' || po.status === 'partial')
+  ) || [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/goods-receipts')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isEditing ? `Edit Goods Receipt` : 'New Goods Receipt'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {isEditing ? `Editing receipt ${existingReceipt?.goodsReceipt?.receiptNumber}` : 'Record incoming inventory from supplier'}
+          </p>
+        </div>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <Tabs defaultValue="details" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="items">Items</TabsTrigger>
+              <TabsTrigger value="payments" disabled={!isEditing}>
+                Payments {receiptPayments && receiptPayments.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{receiptPayments.length}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Receipt Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="supplierName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Supplier *</FormLabel>
+                            <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
+                                    {field.value || "Select supplier"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[400px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search suppliers..." />
+                                  <CommandList>
+                                    <CommandEmpty>No supplier found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {suppliers?.map((supplier) => (
+                                        <CommandItem key={supplier.id} value={supplier.name} onSelect={() => selectSupplier(supplier)}>
+                                          <Check className={cn("mr-2 h-4 w-4", form.watch("supplierId") === supplier.id ? "opacity-100" : "opacity-0")} />
+                                          <div>
+                                            <div className="font-medium">{supplier.name}</div>
+                                            <div className="text-xs text-gray-500">{supplier.phone}</div>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="supplierDocNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supplier Doc Number (Invoice/DN)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., INV-2024-001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="supplierAddress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supplier Address</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Supplier address..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="receiptDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Receipt Date *</FormLabel>
+                            <FormControl>
+                              <Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => field.onChange(new Date(e.target.value))} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dueDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Due Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                <SelectItem value="partial_paid">Partial Paid</SelectItem>
+                                <SelectItem value="paid">Paid</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Additional notes..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="items">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Items</CardTitle>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Item
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {items.map((item, index) => (
+                      <div key={index} className="border rounded-lg p-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Item #{index + 1}</span>
+                          {items.length > 1 && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-medium">Product *</label>
+                            <Popover open={productOpen === index} onOpenChange={(open) => setProductOpen(open ? index : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between mt-1">
+                                  {item.description || "Select product"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[400px] p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search products..." />
+                                  <CommandList>
+                                    <CommandEmpty>No product found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {products?.map((product) => (
+                                        <CommandItem key={product.id} value={product.name} onSelect={() => selectProduct(index, product)}>
+                                          <Check className={cn("mr-2 h-4 w-4", item.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                          <div>
+                                            <div className="font-medium">{product.name}</div>
+                                            <div className="text-xs text-gray-500">Cost: {formatCurrency(product.costPrice)}</div>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Linked PO</label>
+                            <Select value={item.purchaseOrderId ? String(item.purchaseOrderId) : "none"} onValueChange={(v) => updateItem(index, 'purchaseOrderId', v === 'none' ? null : parseInt(v))}>
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Select PO" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No PO Link</SelectItem>
+                                {supplierPOs.map((po) => (
+                                  <SelectItem key={po.id} value={String(po.id)}>
+                                    {po.purchaseOrderNumber}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium">Quantity *</label>
+                            <Input type="number" step="0.01" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} className="mt-1" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                          <div>
+                            <label className="text-sm font-medium">Unit Cost *</label>
+                            <Input type="number" step="0.01" value={item.unitCost} onChange={(e) => updateItem(index, 'unitCost', e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Tax Rate %</label>
+                            <Input type="number" step="0.01" value={item.taxRate} onChange={(e) => updateItem(index, 'taxRate', e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Discount</label>
+                            <Input type="number" step="0.01" value={item.discount} onChange={(e) => updateItem(index, 'discount', e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Subtotal</label>
+                            <Input value={formatCurrency(item.subtotal || "0")} readOnly className="mt-1 bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">Total</label>
+                            <Input value={formatCurrency(item.totalAmount || "0")} readOnly className="mt-1 bg-gray-50 font-semibold" />
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <span className="text-sm font-medium text-orange-700">Return/Damage Info</span>
+                            {item.returnStatus === 'pending' && <Badge variant="destructive" className="bg-orange-100 text-orange-800">Pending</Badge>}
+                            {item.returnStatus === 'returned' && <Badge className="bg-green-100 text-green-800">Returned</Badge>}
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                              <label className="text-sm font-medium">Return Qty</label>
+                              <Input type="number" step="0.01" value={item.returnQuantity} onChange={(e) => {
+                                updateItem(index, 'returnQuantity', e.target.value);
+                                if (parseFloat(e.target.value) > 0 && item.returnStatus === 'none') {
+                                  updateItem(index, 'returnStatus', 'pending');
+                                }
+                              }} className="mt-1" />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Return Status</label>
+                              <Select value={item.returnStatus || 'none'} onValueChange={(v) => updateItem(index, 'returnStatus', v as any)}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="returned">Returned</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Returned Qty</label>
+                              <Input type="number" step="0.01" value={item.returnedQuantity} onChange={(e) => updateItem(index, 'returnedQuantity', e.target.value)} className="mt-1" />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Return Reason</label>
+                              <Input placeholder="e.g., Damaged, Dented" value={item.returnReason} onChange={(e) => updateItem(index, 'returnReason', e.target.value)} className="mt-1" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <div className="w-64 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="font-medium">{formatCurrency(form.watch("subtotal") || "0")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Tax:</span>
+                        <span className="font-medium">{formatCurrency(form.watch("taxAmount") || "0")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Discount:</span>
+                        <span className="font-medium">-{formatCurrency(form.watch("discount") || "0")}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-bold">Total:</span>
+                        <span className="font-bold text-lg">{formatCurrency(form.watch("totalAmount") || "0")}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="payments">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Payments</CardTitle>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { resetPaymentForm(); setEditingPayment(null); setPaymentDialogOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Payment
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-sm text-gray-600">Total Amount</p>
+                        <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Amount Paid</p>
+                        <p className="text-xl font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Balance</p>
+                        <p className={cn("text-xl font-bold", remainingBalance > 0 ? "text-red-600" : "text-green-600")}>
+                          {formatCurrency(remainingBalance)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {receiptPayments && receiptPayments.length > 0 ? (
+                    <div className="space-y-3">
+                      {receiptPayments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="p-2 bg-green-100 rounded-full">
+                              <DollarSign className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                              <p className="text-sm text-gray-500">{payment.paymentType} - {format(new Date(payment.paymentDate), 'dd MMM yyyy')}</p>
+                              {payment.reference && <p className="text-xs text-gray-400">Ref: {payment.reference}</p>}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openEditPayment(payment)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => deletePaymentMutation.mutate(payment.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No payments recorded yet</p>
+                      <p className="text-sm">Add a payment to track supplier payments</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <CardFooter className="flex justify-between pt-6">
+              <Button type="button" variant="outline" onClick={() => navigate('/goods-receipts')}>
+                <X className="mr-2 h-4 w-4" /> Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                <Save className="mr-2 h-4 w-4" />
+                {isEditing ? 'Update' : 'Create'} Goods Receipt
+              </Button>
+            </CardFooter>
+          </Tabs>
+        </form>
+      </Form>
+
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingPayment ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+            <DialogDescription>Record a payment for this goods receipt</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Payment Date *</label>
+              <Input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Payment Type *</label>
+              <Select value={paymentForm.paymentType} onValueChange={(v) => setPaymentForm({ ...paymentForm, paymentType: v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentTypes?.map((pt) => (
+                    <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                  ))}
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="Check">Check</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Amount *</label>
+              <Input type="number" step="0.01" placeholder="0.00" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Reference</label>
+              <Input placeholder="e.g., Transfer #123" value={paymentForm.reference} onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Notes</label>
+              <Textarea placeholder="Additional notes..." value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handlePaymentSubmit} disabled={createPaymentMutation.isPending || updatePaymentMutation.isPending}>
+              {editingPayment ? 'Update' : 'Add'} Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

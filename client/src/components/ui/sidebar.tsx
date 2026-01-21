@@ -253,6 +253,22 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                 )} />
                 <span>Purchase Orders</span>
               </Link>
+              
+              <Link 
+                href="/goods-receipts"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/goods-receipts") 
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                <Package className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/goods-receipts") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>Goods Receipt</span>
+              </Link>
             </div>
             
             <div className="mt-8">
