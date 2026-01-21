@@ -135,6 +135,10 @@ export default function ProductsPage() {
     queryKey: ['/api/stores/1/products/stock'],
   });
   
+  const { data: categories } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+  
   // Create/update product mutation
   const productMutation = useMutation({
     mutationFn: async ({ id, data }: { id?: number, data: ProductFormValues }) => {
