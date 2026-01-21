@@ -44,6 +44,13 @@ import {
 } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -332,6 +339,7 @@ export default function ProductsPage() {
       lowestPrice: "",
       productType: "standard",
       baseUnit: "",
+      categoryId: null,
     }
   });
 
@@ -349,6 +357,7 @@ export default function ProductsPage() {
       lowestPrice: product.lowestPrice || "",
       productType: product.productType || "standard",
       baseUnit: product.unit || "", // Map unit from database to baseUnit in form
+      categoryId: product.categoryId || null,
     });
     
     // Load bundle components if product is a bundle
@@ -394,6 +403,7 @@ export default function ProductsPage() {
       currentSellingPrice: "",
       productType: type,
       baseUnit: "",
+      categoryId: null,
     });
     setBundleComponents([]);
     setProductUnits([]);
@@ -420,6 +430,7 @@ export default function ProductsPage() {
         lowestPrice: data.lowestPrice,
         productType: data.productType,
         unit: data.baseUnit || "pcs", // Map baseUnit to unit
+        categoryId: data.categoryId,
       };
       
       if (productId) {
@@ -758,6 +769,35 @@ export default function ProductsPage() {
                         <FormControl>
                           <Input placeholder="Enter product SKU or code" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="categoryId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select 
+                          onValueChange={(value) => field.onChange(value === "none" ? null : Number(value))} 
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No Category</SelectItem>
+                            {categories?.map((category) => (
+                              <SelectItem key={category.id} value={category.id.toString()}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
