@@ -33,6 +33,9 @@ import {
   insertPaymentTermSchema,
   insertCashAccountSchema,
   insertAccountTransferSchema,
+  insertGoodsReceiptSchema,
+  insertGoodsReceiptItemSchema,
+  insertGoodsReceiptPaymentSchema,
   loginSchema,
   updateUserProfileSchema,
   updateUserCompanySchema,
@@ -1961,6 +1964,261 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error) {
       console.error("Error receiving purchase order items:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Goods Receipt routes
+  app.get("/api/stores/:storeId/goods-receipts", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const goodsReceipts = await storage.getGoodsReceipts(storeId);
+      res.json(goodsReceipts);
+    } catch (error) {
+      console.error("Error getting goods receipts:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/stores/:storeId/goods-receipts/pending-returns", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const goodsReceipts = await storage.getGoodsReceiptsWithPendingReturns(storeId);
+      res.json(goodsReceipts);
+    } catch (error) {
+      console.error("Error getting goods receipts with pending returns:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/goods-receipts/next-number", requireAuth, async (req, res) => {
+    try {
+      const receiptDate = req.query.receiptDate ? new Date(req.query.receiptDate as string) : new Date();
+      const nextNumber = await storage.getNextGoodsReceiptNumber(receiptDate);
+      res.json({ receiptNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next goods receipt number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/goods-receipts/:id", requireAuth, async (req, res) => {
+    try {
+      const receiptId = parseInt(req.params.id);
+      const goodsReceipt = await storage.getGoodsReceiptWithItems(receiptId);
+      
+      if (!goodsReceipt) {
+        return res.status(404).json({ error: "Goods receipt not found" });
+      }
+      
+      res.json(goodsReceipt);
+    } catch (error) {
+      console.error("Error getting goods receipt:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/goods-receipts", requireAuth, async (req, res) => {
+    try {
+      const schema = z.object({
+        goodsReceipt: insertGoodsReceiptSchema,
+        items: z.array(
+          z.object({
+            productId: z.number(),
+            purchaseOrderId: z.number().nullable().optional(),
+            description: z.string(),
+            quantity: z.union([z.string(), z.number()]),
+            unitCost: z.union([z.string(), z.number()]),
+            taxRate: z.union([z.string(), z.number()]).optional(),
+            taxAmount: z.union([z.string(), z.number()]).optional(),
+            discount: z.union([z.string(), z.number()]).optional(),
+            subtotal: z.union([z.string(), z.number()]),
+            totalAmount: z.union([z.string(), z.number()]),
+            returnQuantity: z.union([z.string(), z.number()]).optional(),
+            returnReason: z.string().optional(),
+            returnStatus: z.enum(['none', 'pending', 'returned']).optional()
+          })
+        )
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const newGoodsReceipt = await storage.createGoodsReceipt(
+        validatedData.goodsReceipt,
+        validatedData.items
+      );
+      
+      res.status(201).json(newGoodsReceipt);
+    } catch (error) {
+      console.error("Error creating goods receipt:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/goods-receipts/:id", requireAuth, async (req, res) => {
+    try {
+      const receiptId = parseInt(req.params.id);
+      const schema = z.object({
+        goodsReceipt: insertGoodsReceiptSchema.partial(),
+        items: z.array(
+          z.object({
+            id: z.number().optional(),
+            productId: z.number(),
+            purchaseOrderId: z.number().nullable().optional(),
+            description: z.string(),
+            quantity: z.union([z.string(), z.number()]),
+            unitCost: z.union([z.string(), z.number()]),
+            taxRate: z.union([z.string(), z.number()]).optional(),
+            taxAmount: z.union([z.string(), z.number()]).optional(),
+            discount: z.union([z.string(), z.number()]).optional(),
+            subtotal: z.union([z.string(), z.number()]),
+            totalAmount: z.union([z.string(), z.number()]),
+            returnQuantity: z.union([z.string(), z.number()]).optional(),
+            returnReason: z.string().optional(),
+            returnStatus: z.enum(['none', 'pending', 'returned']).optional()
+          })
+        ).optional()
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedGoodsReceipt = await storage.updateGoodsReceipt(
+        receiptId, 
+        validatedData.goodsReceipt, 
+        validatedData.items
+      );
+      
+      res.json(updatedGoodsReceipt);
+    } catch (error) {
+      console.error("Error updating goods receipt:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/goods-receipts/:id", requireAuth, async (req, res) => {
+    try {
+      const receiptId = parseInt(req.params.id);
+      await storage.deleteGoodsReceipt(receiptId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting goods receipt:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/goods-receipts/:id/status", requireAuth, async (req, res) => {
+    try {
+      const receiptId = parseInt(req.params.id);
+      const schema = z.object({
+        status: z.enum(['draft', 'confirmed', 'partial_paid', 'paid', 'cancelled'])
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedGoodsReceipt = await storage.updateGoodsReceiptStatus(
+        receiptId, 
+        validatedData.status
+      );
+      
+      res.json(updatedGoodsReceipt);
+    } catch (error) {
+      console.error("Error updating goods receipt status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Goods Receipt Item update (for return tracking)
+  app.patch("/api/goods-receipt-items/:id", requireAuth, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      const schema = z.object({
+        returnQuantity: z.union([z.string(), z.number()]).optional(),
+        returnReason: z.string().optional(),
+        returnStatus: z.enum(['none', 'pending', 'returned']).optional(),
+        returnedQuantity: z.union([z.string(), z.number()]).optional()
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedItem = await storage.updateGoodsReceiptItem(itemId, validatedData);
+      res.json(updatedItem);
+    } catch (error) {
+      console.error("Error updating goods receipt item:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Goods Receipt Payment routes
+  app.get("/api/goods-receipts/:goodsReceiptId/payments", requireAuth, async (req, res) => {
+    try {
+      const goodsReceiptId = parseInt(req.params.goodsReceiptId);
+      const payments = await storage.getGoodsReceiptPayments(goodsReceiptId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error getting goods receipt payments:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/goods-receipts/:goodsReceiptId/payments", requireAuth, async (req, res) => {
+    try {
+      const goodsReceiptId = parseInt(req.params.goodsReceiptId);
+      const schema = z.object({
+        paymentDate: z.string(),
+        paymentType: z.string(),
+        amount: z.union([z.string(), z.number()]),
+        reference: z.string().optional(),
+        notes: z.string().optional()
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const newPayment = await storage.createGoodsReceiptPayment({
+        ...validatedData,
+        goodsReceiptId
+      });
+      
+      res.status(201).json(newPayment);
+    } catch (error) {
+      console.error("Error creating goods receipt payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/goods-receipts/:goodsReceiptId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      const schema = z.object({
+        paymentDate: z.string().optional(),
+        paymentType: z.string().optional(),
+        amount: z.union([z.string(), z.number()]).optional(),
+        reference: z.string().optional(),
+        notes: z.string().optional()
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedPayment = await storage.updateGoodsReceiptPayment(paymentId, validatedData);
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error("Error updating goods receipt payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/goods-receipts/:goodsReceiptId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      await storage.deleteGoodsReceiptPayment(paymentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting goods receipt payment:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
