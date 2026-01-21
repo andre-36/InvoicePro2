@@ -80,6 +80,8 @@ const securitySchema = z.object({
 const paymentTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  cashAccountId: z.number().nullable().optional(),
+  deductionPercentage: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   storeId: z.number().default(1)
 });
@@ -262,6 +264,8 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       description: "",
+      cashAccountId: null,
+      deductionPercentage: null,
       isActive: true,
       storeId: 1
     }
@@ -694,7 +698,14 @@ export default function SettingsPage() {
   // Handlers for Payment Types
   const handleAddType = () => {
     setEditingTypeId(null);
-    typeForm.reset();
+    typeForm.reset({
+      name: "",
+      description: "",
+      cashAccountId: null,
+      deductionPercentage: null,
+      isActive: true,
+      storeId: 1
+    });
     setIsTypeDialogOpen(true);
   };
 
@@ -706,6 +717,8 @@ export default function SettingsPage() {
       typeForm.reset({
         name: type.name,
         description: type.description || "",
+        cashAccountId: type.cashAccountId || null,
+        deductionPercentage: type.deductionPercentage || null,
         isActive: type.isActive,
         storeId: type.storeId
       });
@@ -2295,6 +2308,53 @@ export default function SettingsPage() {
                     <FormControl>
                       <Textarea placeholder="Optional description" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="cashAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cash Account</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                      >
+                        <option value="">No account linked</option>
+                        {cashAccounts?.filter(a => a.isActive).map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Select which account this payment type flows into</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={typeForm.control}
+                name="deductionPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deduction Percentage (%)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="e.g., 0.15 for EDC fees" 
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Optional bank/processing fee percentage</p>
                     <FormMessage />
                   </FormItem>
                 )}

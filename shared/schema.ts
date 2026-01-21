@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, numeric, integer, pgEnum, boolean, date, foreignKey, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, timestamp, numeric, integer, pgEnum, boolean, date, foreignKey, uniqueIndex, index, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -532,6 +532,8 @@ export const paymentTypes = pgTable("payment_types", {
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
+  cashAccountId: integer("cash_account_id"),
+  deductionPercentage: decimal("deduction_percentage", { precision: 5, scale: 2 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
