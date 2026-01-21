@@ -734,7 +734,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProducts(storeId?: number): Promise<Product[]> {
-    const query = db.select().from(products).where(eq(products.isActive, true));
+    const query = db.select().from(products);
 
     // If storeId is provided, we filter only products that have batches in the specified store
     if (storeId) {
@@ -742,7 +742,7 @@ export class DatabaseStorage implements IStorage {
         SELECT DISTINCT p.*
         FROM ${products} p
         JOIN ${productBatches} pb ON p.id = pb.product_id
-        WHERE pb.store_id = ${storeId} AND p.is_active = true
+        WHERE pb.store_id = ${storeId}
         ORDER BY p.name
       `);
       return productsInStore;
