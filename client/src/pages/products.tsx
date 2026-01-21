@@ -53,6 +53,12 @@ import { z } from "zod";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
 
+type Category = {
+  id: number;
+  name: string;
+  description?: string;
+};
+
 type Product = {
   id: number;
   name: string;
@@ -67,6 +73,8 @@ type Product = {
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
   productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
+  categoryId?: number | null;
+  category?: Category;
 };
 
 type BundleComponent = {
@@ -96,6 +104,7 @@ const productSchema = z.object({
   lowestPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
   productType: z.enum(["standard", "bundle"]).optional().default("standard"),
   baseUnit: z.string().optional(),
+  categoryId: z.number().nullable().optional(),
 }).refine((data) => {
   if (data.lowestPrice && data.currentSellingPrice) {
     const price = parseFloat(data.currentSellingPrice);
