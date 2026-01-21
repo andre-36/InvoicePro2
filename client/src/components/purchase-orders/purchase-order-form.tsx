@@ -13,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -259,6 +260,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         orderDate: new Date(),
         expectedDeliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
         status: "draft",
+        useFakturPajak: false,
         subtotal: "0",
         taxRate: "10",
         taxAmount: "0",
@@ -588,6 +590,27 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="purchaseOrder.useFakturPajak"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Gunakan Faktur Pajak (PPN 11%)</FormLabel>
+                      <FormDescription>
+                        Centang jika PO ini menggunakan faktur pajak
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />

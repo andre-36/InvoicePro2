@@ -455,6 +455,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   expectedDeliveryDate: date("expected_delivery_date"),
   deliveredDate: date("delivered_date"),
   status: purchaseOrderStatusEnum("status").default("draft").notNull(),
+  useFakturPajak: boolean("use_faktur_pajak").default(false).notNull(),
   subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
   taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
   taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),

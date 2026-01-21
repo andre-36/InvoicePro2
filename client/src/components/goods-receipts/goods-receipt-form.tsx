@@ -4,10 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, AlertTriangle, Check } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, ChevronsUpDown, Check, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertGoodsReceiptSchema, insertGoodsReceiptPaymentSchema } from "@shared/schema";
+import { insertGoodsReceiptSchema } from "@shared/schema";
 import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,38 @@ const goodsReceiptItemSchema = z.object({
 });
 
 type GoodsReceiptItem = z.infer<typeof goodsReceiptItemSchema>;
+
+interface PurchaseOrderWithItems {
+  id: number;
+  purchaseOrderNumber: string;
+  supplierId: number | null;
+  status: string;
+  useFakturPajak?: boolean;
+  items?: { productId: number; description: string; quantity: string; unitCost: string }[];
+}
+
+interface GoodsReceiptData {
+  goodsReceipt: {
+    storeId: number;
+    supplierId: number | null;
+    supplierName: string;
+    supplierEmail: string | null;
+    supplierPhone: string | null;
+    supplierAddress: string | null;
+    supplierDocNumber: string | null;
+    receiptNumber: string;
+    receiptDate: string;
+    dueDate: string | null;
+    status: string;
+    subtotal: string;
+    taxRate: string | null;
+    taxAmount: string | null;
+    discount: string | null;
+    totalAmount: string;
+    notes: string | null;
+  };
+  items: any[];
+}
 
 interface GoodsReceiptFormProps {
   goodsReceiptId?: number;
@@ -94,6 +127,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [productOpen, setProductOpen] = useState<number | null>(null);
   const [poOpen, setPOOpen] = useState<number | null>(null);
+  const [poSearchQuery, setPOSearchQuery] = useState("");
 
   const form = useForm({
     resolver: zodResolver(extendedGoodsReceiptSchema),
@@ -107,7 +141,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       supplierDocNumber: "",
       receiptDate: new Date(),
       dueDate: null as Date | null,
-      status: "draft" as const,
+      status: "draft" as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
       subtotal: "0",
       taxRate: "0",
       taxAmount: "0",
@@ -125,7 +159,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     queryKey: ['/api/products'],
   });
 
-  const { data: purchaseOrders } = useQuery<PurchaseOrder[]>({
+  const { data: purchaseOrders } = useQuery<PurchaseOrderWithItems[]>({
     queryKey: ['/api/purchase-orders'],
   });
 
@@ -133,7 +167,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     queryKey: ['/api/payment-types'],
   });
 
-  const { data: existingReceipt } = useQuery({
+  const { data: existingReceipt } = useQuery<GoodsReceiptData>({
     queryKey: ['/api/goods-receipts', goodsReceiptId],
     enabled: isEditing,
   });
@@ -156,7 +190,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
         supplierDocNumber: receipt.supplierDocNumber || "",
         receiptDate: new Date(receipt.receiptDate),
         dueDate: receipt.dueDate ? new Date(receipt.dueDate) : null,
-        status: receipt.status,
+        status: receipt.status as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
         subtotal: receipt.subtotal,
         taxRate: receipt.taxRate || "0",
         taxAmount: receipt.taxAmount || "0",
@@ -266,20 +300,58 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   };
 
   const selectProduct = (index: number, product: Product) => {
-    updateItem(index, 'productId', product.id);
-    updateItem(index, 'description', product.name);
-    updateItem(index, 'unitCost', product.costPrice || "0");
     const updatedItems = [...items];
     updatedItems[index] = {
       ...updatedItems[index],
       productId: product.id,
       description: product.name,
-      unitCost: String(product.costPrice || 0)
+      unitCost: String(product.costPrice || 0),
+      purchaseOrderId: null, // Reset PO when product changes
+      taxRate: "0" // Reset tax when product changes
     };
     updatedItems[index] = calculateItemTotals(updatedItems[index]);
     setItems(updatedItems);
     updateFormTotals(updatedItems);
     setProductOpen(null);
+  };
+
+  const getFilteredPOs = (productId: number) => {
+    const supplierId = form.watch("supplierId");
+    if (!supplierId || !productId) return [];
+    
+    return (purchaseOrders || []).filter(po => {
+      if (po.supplierId !== supplierId) return false;
+      if (po.status !== 'sent' && po.status !== 'partial') return false;
+      
+      // Filter by search query
+      if (poSearchQuery && !po.purchaseOrderNumber.toLowerCase().includes(poSearchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  const selectPO = (index: number, po: PurchaseOrderWithItems | null) => {
+    const updatedItems = [...items];
+    if (po) {
+      updatedItems[index] = {
+        ...updatedItems[index],
+        purchaseOrderId: po.id,
+        taxRate: po.useFakturPajak ? "11" : "0" // 11% PPN if using Faktur Pajak
+      };
+    } else {
+      updatedItems[index] = {
+        ...updatedItems[index],
+        purchaseOrderId: null,
+        taxRate: "0"
+      };
+    }
+    updatedItems[index] = calculateItemTotals(updatedItems[index]);
+    setItems(updatedItems);
+    updateFormTotals(updatedItems);
+    setPOOpen(null);
+    setPOSearchQuery("");
   };
 
   const createMutation = useMutation({
@@ -410,10 +482,10 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   const totalAmount = parseFloat(form.watch("totalAmount") || "0");
   const remainingBalance = totalAmount - totalPaid;
 
-  const supplierPOs = purchaseOrders?.filter(po => 
-    po.supplierId === form.watch("supplierId") && 
-    (po.status === 'sent' || po.status === 'partial')
-  ) || [];
+  const getPOName = (poId: number | null | undefined) => {
+    if (!poId) return null;
+    return purchaseOrders?.find(po => po.id === poId)?.purchaseOrderNumber || null;
+  };
 
   return (
     <div className="space-y-6">
@@ -599,141 +671,222 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Items</CardTitle>
                   <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                    <Plus className="h-4 w-4 mr-2" /> Add Item
+                    <Plus className="h-4 w-4 mr-2" /> Add Row
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {items.map((item, index) => (
-                      <div key={index} className="border rounded-lg p-4 space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">Item #{index + 1}</span>
-                          {items.length > 1 && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <div className="md:col-span-2">
-                            <label className="text-sm font-medium">Product *</label>
-                            <Popover open={productOpen === index} onOpenChange={(open) => setProductOpen(open ? index : null)}>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between mt-1">
-                                  {item.description || "Select product"}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[400px] p-0">
-                                <Command>
-                                  <CommandInput placeholder="Search products..." />
-                                  <CommandList>
-                                    <CommandEmpty>No product found.</CommandEmpty>
-                                    <CommandGroup>
-                                      {products?.map((product) => (
-                                        <CommandItem key={product.id} value={product.name} onSelect={() => selectProduct(index, product)}>
-                                          <Check className={cn("mr-2 h-4 w-4", item.productId === product.id ? "opacity-100" : "opacity-0")} />
-                                          <div>
-                                            <div className="font-medium">{product.name}</div>
-                                            <div className="text-xs text-gray-500">Cost: {formatCurrency(product.costPrice)}</div>
-                                          </div>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[200px]">Product</TableHead>
+                          <TableHead className="w-[150px]">Linked PO</TableHead>
+                          <TableHead className="w-[80px] text-right">Qty</TableHead>
+                          <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
+                          <TableHead className="w-[70px] text-right">Tax %</TableHead>
+                          <TableHead className="w-[80px] text-right">Discount</TableHead>
+                          <TableHead className="w-[100px] text-right">Subtotal</TableHead>
+                          <TableHead className="w-[40px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="p-1">
+                              <Popover open={productOpen === index} onOpenChange={(open) => setProductOpen(open ? index : null)}>
+                                <PopoverTrigger asChild>
+                                  <Button variant="ghost" role="combobox" className="w-full justify-start h-8 px-2 font-normal text-left">
+                                    {item.description || <span className="text-muted-foreground">Select...</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search products..." />
+                                    <CommandList>
+                                      <CommandEmpty>No product found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {products?.map((product) => (
+                                          <CommandItem key={product.id} value={product.name} onSelect={() => selectProduct(index, product)}>
+                                            <Check className={cn("mr-2 h-4 w-4", item.productId === product.id ? "opacity-100" : "opacity-0")} />
+                                            <div>
+                                              <div className="font-medium">{product.name}</div>
+                                              <div className="text-xs text-gray-500">{formatCurrency(product.costPrice || 0)}</div>
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Popover open={poOpen === index} onOpenChange={(open) => { setPOOpen(open ? index : null); if (!open) setPOSearchQuery(""); }}>
+                                <PopoverTrigger asChild>
+                                  <Button variant="ghost" role="combobox" className="w-full justify-start h-8 px-2 font-normal text-left" disabled={!item.productId || !form.watch("supplierId")}>
+                                    {getPOName(item.purchaseOrderId) || <span className="text-muted-foreground">-</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[250px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search PO..." value={poSearchQuery} onValueChange={setPOSearchQuery} />
+                                    <CommandList>
+                                      <CommandEmpty>No PO found.</CommandEmpty>
+                                      <CommandGroup>
+                                        <CommandItem onSelect={() => selectPO(index, null)}>
+                                          <Check className={cn("mr-2 h-4 w-4", !item.purchaseOrderId ? "opacity-100" : "opacity-0")} />
+                                          No PO Link
                                         </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
+                                        {getFilteredPOs(item.productId).map((po) => (
+                                          <CommandItem key={po.id} value={po.purchaseOrderNumber} onSelect={() => selectPO(index, po)}>
+                                            <Check className={cn("mr-2 h-4 w-4", item.purchaseOrderId === po.id ? "opacity-100" : "opacity-0")} />
+                                            <div>
+                                              <div>{po.purchaseOrderNumber}</div>
+                                              {po.useFakturPajak && <Badge variant="outline" className="text-xs ml-1">PPN</Badge>}
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.quantity} 
+                                onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
+                                className="h-8 text-right" 
+                              />
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.unitCost} 
+                                onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
+                                className="h-8 text-right" 
+                              />
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.taxRate} 
+                                onChange={(e) => updateItem(index, 'taxRate', e.target.value)} 
+                                className="h-8 text-right" 
+                                readOnly={!!item.purchaseOrderId}
+                              />
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.discount} 
+                                onChange={(e) => updateItem(index, 'discount', e.target.value)} 
+                                className="h-8 text-right" 
+                              />
+                            </TableCell>
+                            <TableCell className="p-1 text-right font-medium">
+                              {formatCurrency(item.subtotal || "0")}
+                            </TableCell>
+                            <TableCell className="p-1">
+                              {items.length > 1 && (
+                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removeItem(index)}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-                          <div>
-                            <label className="text-sm font-medium">Linked PO</label>
-                            <Select value={item.purchaseOrderId ? String(item.purchaseOrderId) : "none"} onValueChange={(v) => updateItem(index, 'purchaseOrderId', v === 'none' ? null : parseInt(v))}>
-                              <SelectTrigger className="mt-1">
-                                <SelectValue placeholder="Select PO" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No PO Link</SelectItem>
-                                {supplierPOs.map((po) => (
-                                  <SelectItem key={po.id} value={String(po.id)}>
-                                    {po.purchaseOrderNumber}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                  {/* Return/Damage Section */}
+                  {items.some(item => parseFloat(item.returnQuantity || "0") > 0) && (
+                    <div className="mt-4 border rounded-lg p-4 bg-orange-50">
+                      <h4 className="font-medium text-orange-800 mb-3">Return/Damage Items</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead className="w-[80px] text-right">Return Qty</TableHead>
+                            <TableHead className="w-[100px]">Status</TableHead>
+                            <TableHead className="w-[80px] text-right">Returned</TableHead>
+                            <TableHead>Reason</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.filter(item => parseFloat(item.returnQuantity || "0") > 0).map((item, idx) => {
+                            const originalIndex = items.findIndex(i => i === item);
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell>{item.description}</TableCell>
+                                <TableCell className="text-right">{item.returnQuantity}</TableCell>
+                                <TableCell>
+                                  <Select value={item.returnStatus || 'pending'} onValueChange={(v) => updateItem(originalIndex, 'returnStatus', v as any)}>
+                                    <SelectTrigger className="h-8">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="returned">Returned</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={item.returnedQuantity} 
+                                    onChange={(e) => updateItem(originalIndex, 'returnedQuantity', e.target.value)} 
+                                    className="h-8 text-right w-16" 
+                                  />
+                                </TableCell>
+                                <TableCell>{item.returnReason}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
 
-                          <div>
-                            <label className="text-sm font-medium">Quantity *</label>
-                            <Input type="number" step="0.01" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} className="mt-1" />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                          <div>
-                            <label className="text-sm font-medium">Unit Cost *</label>
-                            <Input type="number" step="0.01" value={item.unitCost} onChange={(e) => updateItem(index, 'unitCost', e.target.value)} className="mt-1" />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Tax Rate %</label>
-                            <Input type="number" step="0.01" value={item.taxRate} onChange={(e) => updateItem(index, 'taxRate', e.target.value)} className="mt-1" />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Discount</label>
-                            <Input type="number" step="0.01" value={item.discount} onChange={(e) => updateItem(index, 'discount', e.target.value)} className="mt-1" />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Subtotal</label>
-                            <Input value={formatCurrency(item.subtotal || "0")} readOnly className="mt-1 bg-gray-50" />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Total</label>
-                            <Input value={formatCurrency(item.totalAmount || "0")} readOnly className="mt-1 bg-gray-50 font-semibold" />
-                          </div>
-                        </div>
-
-                        <div className="border-t pt-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            <span className="text-sm font-medium text-orange-700">Return/Damage Info</span>
-                            {item.returnStatus === 'pending' && <Badge variant="destructive" className="bg-orange-100 text-orange-800">Pending</Badge>}
-                            {item.returnStatus === 'returned' && <Badge className="bg-green-100 text-green-800">Returned</Badge>}
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <label className="text-sm font-medium">Return Qty</label>
-                              <Input type="number" step="0.01" value={item.returnQuantity} onChange={(e) => {
+                  {/* Add return fields inline for each item */}
+                  <div className="mt-4 space-y-2">
+                    {items.map((item, index) => (
+                      item.productId > 0 && (
+                        <div key={index} className="flex items-center gap-4 text-sm">
+                          <span className="w-40 truncate text-gray-600">{item.description}:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500">Return:</span>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              value={item.returnQuantity} 
+                              onChange={(e) => {
                                 updateItem(index, 'returnQuantity', e.target.value);
                                 if (parseFloat(e.target.value) > 0 && item.returnStatus === 'none') {
                                   updateItem(index, 'returnStatus', 'pending');
                                 }
-                              }} className="mt-1" />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Return Status</label>
-                              <Select value={item.returnStatus || 'none'} onValueChange={(v) => updateItem(index, 'returnStatus', v as any)}>
-                                <SelectTrigger className="mt-1">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">None</SelectItem>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="returned">Returned</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Returned Qty</label>
-                              <Input type="number" step="0.01" value={item.returnedQuantity} onChange={(e) => updateItem(index, 'returnedQuantity', e.target.value)} className="mt-1" />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Return Reason</label>
-                              <Input placeholder="e.g., Damaged, Dented" value={item.returnReason} onChange={(e) => updateItem(index, 'returnReason', e.target.value)} className="mt-1" />
-                            </div>
+                              }} 
+                              className="h-7 w-16 text-right" 
+                              placeholder="0"
+                            />
                           </div>
+                          {parseFloat(item.returnQuantity || "0") > 0 && (
+                            <Input 
+                              value={item.returnReason} 
+                              onChange={(e) => updateItem(index, 'returnReason', e.target.value)} 
+                              className="h-7 w-40" 
+                              placeholder="Reason (e.g., Dented)"
+                            />
+                          )}
                         </div>
-                      </div>
+                      )
                     ))}
                   </div>
 
