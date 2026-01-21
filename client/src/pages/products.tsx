@@ -77,6 +77,7 @@ type Product = {
   lowestPrice?: string;
   minStock?: number;
   currentStock?: number;
+  pendingPOQuantity?: number;
   isLowStock?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
   productType?: 'standard' | 'bundle';
@@ -622,6 +623,7 @@ export default function ProductsPage() {
                     <TableHead className="w-[300px]">Name</TableHead>
                     <TableHead className="w-[150px]">SKU/Code</TableHead>
                     <TableHead className="w-[120px]">Stock</TableHead>
+                    <TableHead className="w-[80px]">PO</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Cost Price</TableHead>
                     <TableHead>Lowest Price</TableHead>
@@ -673,6 +675,15 @@ export default function ProductsPage() {
                             Min: {product.minStock || 0}
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {(product.pendingPOQuantity || 0) > 0 ? (
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {product.pendingPOQuantity}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
                       </TableCell>
                       <TableCell>{formatCurrency(product.currentSellingPrice || "0")}</TableCell>
                       <TableCell>{product.costPrice ? formatCurrency(product.costPrice) : "—"}</TableCell>
