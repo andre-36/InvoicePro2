@@ -16,6 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -260,6 +261,11 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     queryKey: ['/api/products'],
   });
 
+  // Fetch current user for default notes and tax rate
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
   // Fetch existing purchase order for edit mode
   const { data: existingPO, isLoading: isLoadingPO } = useQuery<any>({
     queryKey: ['/api/purchase-orders', purchaseOrderId],
@@ -308,6 +314,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       items: items
     }
   });
+
+  // Watch the useFakturPajak toggle
+  const useFakturPajak = form.watch('purchaseOrder.useFakturPajak');
+  
+  // Get the global tax rate from user settings
+  const globalTaxRate = currentUser?.defaultTaxRate || 11;
 
   // Track if we've already loaded items for this PO
   const [itemsLoaded, setItemsLoaded] = useState(false);
@@ -464,14 +476,36 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   // Update totals
   const updateTotals = (currentItems: PurchaseOrderItem[]) => {
-    const subtotal = currentItems.reduce((sum, item) => sum + (parseFloat(item.subtotal || "0")), 0);
-    const taxAmount = currentItems.reduce((sum, item) => sum + (parseFloat(item.taxAmount || "0")), 0);
+    const isFakturPajak = form.getValues('purchaseOrder.useFakturPajak');
+    const taxRate = globalTaxRate;
+    
+    let subtotal = 0;
+    let taxAmount = 0;
+    
+    if (isFakturPajak) {
+      // Tax-inclusive pricing: stored prices include tax
+      // DPP (base price) = fullPrice / (1 + taxRate/100)
+      // PPN = fullPrice - DPP
+      currentItems.forEach(item => {
+        const fullPrice = parseFloat(item.subtotal || "0");
+        const basePrice = fullPrice / (1 + taxRate / 100);
+        const itemTax = fullPrice - basePrice;
+        subtotal += basePrice;
+        taxAmount += itemTax;
+      });
+    } else {
+      // No tax separation - show full price only
+      subtotal = currentItems.reduce((sum, item) => sum + (parseFloat(item.subtotal || "0")), 0);
+      taxAmount = 0;
+    }
+    
     const discount = parseFloat(form.getValues('purchaseOrder.discount') || '0') || 0;
     const shipping = parseFloat(form.getValues('purchaseOrder.shipping') || '0') || 0;
     const totalAmount = subtotal + taxAmount - discount + shipping;
     
     form.setValue('purchaseOrder.subtotal', subtotal.toFixed(2));
     form.setValue('purchaseOrder.taxAmount', taxAmount.toFixed(2));
+    form.setValue('purchaseOrder.taxRate', taxRate.toString());
     form.setValue('purchaseOrder.totalAmount', totalAmount.toFixed(2));
   };
 
@@ -801,15 +835,48 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span data-testid="text-subtotal">{formatCurrency(form.watch('purchaseOrder.subtotal') || "0")}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span data-testid="text-tax">{formatCurrency(form.watch('purchaseOrder.taxAmount') || "0")}</span>
-                </div>
+                {/* Faktur Pajak Toggle */}
+                <FormField
+                  control={form.control}
+                  name="purchaseOrder.useFakturPajak"
+                  render={({ field }) => (
+                    <div className="flex justify-between items-center py-2 border-b mb-2">
+                      <div>
+                        <span className="font-medium">Faktur Pajak</span>
+                        <p className="text-xs text-muted-foreground">Tampilkan DPP + PPN terpisah</p>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                          setTimeout(() => updateTotals(items), 0);
+                        }}
+                      />
+                    </div>
+                  )}
+                />
+
+                {useFakturPajak ? (
+                  <>
+                    {/* DPP (Base Price) - when faktur pajak is active */}
+                    <div className="flex justify-between">
+                      <span>DPP (Dasar Pengenaan Pajak):</span>
+                      <span data-testid="text-subtotal">{formatCurrency(form.watch('purchaseOrder.subtotal') || "0")}</span>
+                    </div>
+                    
+                    {/* PPN (Tax) - when faktur pajak is active */}
+                    <div className="flex justify-between">
+                      <span>PPN ({globalTaxRate}%):</span>
+                      <span data-testid="text-tax">{formatCurrency(form.watch('purchaseOrder.taxAmount') || "0")}</span>
+                    </div>
+                  </>
+                ) : (
+                  /* Full price only when faktur pajak is inactive */
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span data-testid="text-subtotal">{formatCurrency(form.watch('purchaseOrder.subtotal') || "0")}</span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between items-center">
                   <span>Discount:</span>
