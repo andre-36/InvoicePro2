@@ -4,7 +4,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -249,16 +249,46 @@ export function QuotationItemRow({
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Qty
         </label>
-        <Input
-          type="number"
-          min="0"
-          step="1"
-          placeholder="1"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          className="w-full"
-          data-testid={`input-quantity-${index}`}
-        />
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="flex-1"
+            data-testid={`input-quantity-${index}`}
+          />
+          <div className="flex flex-col">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-6 p-0 hover:bg-gray-100"
+              onClick={() => {
+                const currentQty = parseFloat(quantity) || 0;
+                setQuantity(String(currentQty + 1));
+              }}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-6 p-0 hover:bg-gray-100"
+              onClick={() => {
+                const currentQty = parseFloat(quantity) || 0;
+                if (currentQty > 0) {
+                  setQuantity(String(Math.max(0, currentQty - 1)));
+                }
+              }}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Unit Price */}

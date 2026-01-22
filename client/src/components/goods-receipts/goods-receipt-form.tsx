@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, ChevronsUpDown, Check, Search } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, ChevronsUpDown, Check, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertGoodsReceiptSchema } from "@shared/schema";
@@ -753,13 +753,43 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                               </Popover>
                             </TableCell>
                             <TableCell className="p-1">
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                value={item.quantity} 
-                                onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
-                                className="h-8 text-right" 
-                              />
+                              <div className="flex items-center gap-1">
+                                <Input 
+                                  type="number" 
+                                  step="1" 
+                                  value={item.quantity} 
+                                  onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
+                                  className="h-8 text-right flex-1" 
+                                />
+                                <div className="flex flex-col">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-6 p-0 hover:bg-gray-100"
+                                    onClick={() => {
+                                      const currentQty = parseFloat(item.quantity) || 0;
+                                      updateItem(index, 'quantity', String(currentQty + 1));
+                                    }}
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-6 p-0 hover:bg-gray-100"
+                                    onClick={() => {
+                                      const currentQty = parseFloat(item.quantity) || 0;
+                                      if (currentQty > 0) {
+                                        updateItem(index, 'quantity', String(Math.max(0, currentQty - 1)));
+                                      }
+                                    }}
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell className="p-1">
                               <Input 
