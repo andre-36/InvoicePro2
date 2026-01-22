@@ -84,22 +84,15 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
     }
   });
 
-  // Handle sending purchase order (change status to sent)
-  const handleSendPurchaseOrder = () => {
-    updateStatusMutation.mutate('sent');
-  };
-
   // Render badge based on purchase order status
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'draft':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800"><Clock className="w-3 h-3 mr-1" />Draft</Badge>;
-      case 'sent':
-        return <Badge className="bg-blue-100 text-blue-800"><Send className="w-3 h-3 mr-1" />Sent</Badge>;
-      case 'received':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Received</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
       case 'partial':
         return <Badge className="bg-yellow-100 text-yellow-800"><Package className="w-3 h-3 mr-1" />Partial</Badge>;
+      case 'received':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Received</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800"><X className="w-3 h-3 mr-1" />Cancelled</Badge>;
       default:
@@ -159,13 +152,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
         
         <div className="flex flex-wrap items-center gap-2">
           {getStatusBadge(purchaseOrder.status)}
-          
-          {purchaseOrder.status === 'draft' && (
-            <Button onClick={handleSendPurchaseOrder} disabled={updateStatusMutation.isPending}>
-              <Send className="mr-2 h-4 w-4" />
-              Send to Supplier
-            </Button>
-          )}
           
           <Button onClick={() => navigate(`/purchase-orders/${id}/edit`)} variant="outline">
             <Edit className="mr-2 h-4 w-4" />
@@ -267,6 +253,23 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
               <label className="text-sm font-medium text-gray-500">Status</label>
               <div className="mt-1" data-testid="status-badge">
                 {getStatusBadge(purchaseOrder.status)}
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-500">Faktur Pajak</label>
+              <div className="mt-1">
+                {purchaseOrder.useFakturPajak ? (
+                  <Badge className="bg-green-100 text-green-800">
+                    <Check className="w-3 h-3 mr-1" />
+                    Menggunakan Faktur Pajak (PPN 11%)
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                    <X className="w-3 h-3 mr-1" />
+                    Tidak Menggunakan Faktur Pajak
+                  </Badge>
+                )}
               </div>
             </div>
           </CardContent>

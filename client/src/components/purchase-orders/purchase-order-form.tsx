@@ -259,7 +259,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         supplierAddress: "",
         orderDate: new Date(),
         expectedDeliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-        status: "draft",
+        status: "pending",
         useFakturPajak: false,
         subtotal: "0",
         taxRate: "10",

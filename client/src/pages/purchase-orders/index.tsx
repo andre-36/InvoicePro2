@@ -46,10 +46,10 @@ type PurchaseOrder = {
   orderDate: string;
   expectedDeliveryDate: string;
   totalAmount: string;
-  status: 'draft' | 'sent' | 'received' | 'partial' | 'cancelled';
+  status: 'pending' | 'partial' | 'received' | 'cancelled';
 };
 
-type PurchaseOrderStatus = 'all' | 'draft' | 'sent' | 'received' | 'partial' | 'cancelled';
+type PurchaseOrderStatus = 'all' | 'pending' | 'partial' | 'received' | 'cancelled';
 
 export default function PurchaseOrdersPage() {
   const [, navigate] = useLocation();
@@ -120,14 +120,12 @@ export default function PurchaseOrdersPage() {
   // Render badge based on purchase order status
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'draft':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
-      case 'sent':
-        return <Badge className="bg-blue-100 text-blue-800">Sent</Badge>;
-      case 'received':
-        return <Badge className="bg-green-100 text-green-800">Received</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Pending</Badge>;
       case 'partial':
         return <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
+      case 'received':
+        return <Badge className="bg-green-100 text-green-800">Received</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
       default:
@@ -178,10 +176,9 @@ export default function PurchaseOrdersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="received">Received</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="partial">Partial</SelectItem>
+                  <SelectItem value="received">Received</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -283,8 +280,7 @@ export default function PurchaseOrdersPage() {
                                   <span className="text-sm">Change Status</span>
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="draft">Draft</SelectItem>
-                                  <SelectItem value="sent">Sent</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
                                   <SelectItem value="partial">Partial</SelectItem>
                                   <SelectItem value="received">Received</SelectItem>
                                   <SelectItem value="cancelled">Cancelled</SelectItem>

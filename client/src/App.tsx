@@ -17,6 +17,7 @@ import CreateQuotationPage from "@/pages/quotations/create";
 import EditQuotationPage from "@/pages/quotations/edit";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import CreatePurchaseOrderPage from "@/pages/purchase-orders/create";
+import EditPurchaseOrderPage from "@/pages/purchase-orders/edit";
 import PurchaseOrderDetailPage from "@/pages/purchase-orders/purchase-order-detail";
 import GoodsReceiptsPage from "@/pages/goods-receipts";
 import CreateGoodsReceiptPage from "@/pages/goods-receipts/create";
@@ -165,6 +166,9 @@ function App() {
                 </Route>
                 <Route path="/purchase-orders" component={PurchaseOrdersPage} />
                 <Route path="/purchase-orders/create" component={CreatePurchaseOrderPage} />
+                <Route path="/purchase-orders/:id/edit">
+                  {params => <EditPurchaseOrderPage id={parseInt(params.id)} />}
+                </Route>
                 <Route path="/purchase-orders/:id">
                   {params => <PurchaseOrderDetailPage id={parseInt(params.id)} />}
                 </Route>

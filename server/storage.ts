@@ -2312,7 +2312,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(purchaseOrders.storeId, storeId),
-          inArray(purchaseOrders.status, ['draft', 'sent', 'partial'])
+          inArray(purchaseOrders.status, ['pending', 'partial'])
         )
       );
     
