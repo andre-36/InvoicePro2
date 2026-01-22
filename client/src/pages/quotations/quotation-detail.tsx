@@ -397,14 +397,21 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-footer-right">
-              <div className="print-total-row">
-                <span className="print-total-label">Subtotal</span>
-                <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
-              </div>
-              {printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 && (
+              {quotation.useFakturPajak && printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 ? (
+                <>
+                  <div className="print-total-row">
+                    <span className="print-total-label">DPP</span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
+                  </div>
+                  <div className="print-total-row">
+                    <span className="print-total-label">PPN ({quotation.taxRate || 11}%)</span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
+                  </div>
+                </>
+              ) : (
                 <div className="print-total-row">
-                  <span className="print-total-label">Tax ({quotation.taxRate}%)</span>
-                  <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
+                  <span className="print-total-label">Subtotal</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
                 </div>
               )}
               {printSettings?.showDiscount !== false && parseFloat(quotation.discount || '0') > 0 && (

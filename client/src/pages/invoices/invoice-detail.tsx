@@ -908,6 +908,29 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </div>
             
             <div className="print-footer-right">
+              {(invoice as any).useFakturPajak && parseFloat(invoice.tax || '0') > 0 ? (
+                <>
+                  <div className="print-total-row">
+                    <span className="print-total-label">DPP</span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
+                  </div>
+                  <div className="print-total-row">
+                    <span className="print-total-label">PPN ({(invoice as any).taxRate || 11}%)</span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.tax))}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="print-total-row">
+                  <span className="print-total-label">Subtotal</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
+                </div>
+              )}
+              {parseFloat(invoice.discount || '0') > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Discount</span>
+                  <span className="print-total-value">-{formatCurrency(parseFloat(invoice.discount))}</span>
+                </div>
+              )}
               {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Shipping</span>
