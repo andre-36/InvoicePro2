@@ -2002,6 +2002,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fallback route without storeId - uses default store 1
+  app.get("/api/goods-receipts", requireAuth, async (req, res) => {
+    try {
+      const goodsReceipts = await storage.getGoodsReceipts(1);
+      res.json(goodsReceipts);
+    } catch (error) {
+      console.error("Error getting goods receipts:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/goods-receipts/next-number", requireAuth, async (req, res) => {
     try {
       const receiptDate = req.query.receiptDate ? new Date(req.query.receiptDate as string) : new Date();
