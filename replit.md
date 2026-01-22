@@ -10,6 +10,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 22, 2026 - Global Tax Rate and Faktur Pajak Support
+- **Feature**: Implemented global tax rate settings with Indonesian faktur pajak support
+  - Added `defaultTaxRate` field to users table (default 11% for Indonesia's PPN)
+  - Settings General page now includes tax rate configuration
+  - Added `useFakturPajak` toggle to Invoice, Quotation, and Purchase Order forms
+  - When Faktur Pajak is ON: Prices are displayed split into DPP (Dasar Pengenaan Pajak) + PPN
+  - When Faktur Pajak is OFF: Full price shown without tax separation
+  - Tax-inclusive pricing model: stored prices include tax, split only for display when needed
+  - Tax calculation formula: DPP = fullPrice / (1 + taxRate/100)
+  - Updated PDF generator and print templates to show DPP + PPN when faktur pajak is active
+- **Schema Updates**: Added `useFakturPajak` and `taxRate` fields to invoices, quotations, and purchase orders tables
+
 ### December 12, 2025 - UI Simplification
 - **Navigation**: Moved Categories from sidebar into Settings page as a new "Categories" tab
   - Removed standalone Categories page and route
