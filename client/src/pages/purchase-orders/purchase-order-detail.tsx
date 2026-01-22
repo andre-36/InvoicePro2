@@ -1,16 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useState } from "react";
-import { format } from "date-fns";
-import { Edit, Trash2, Package, Send, Check, Clock, X, AlertTriangle, CheckCircle } from "lucide-react";
+import { Edit, Trash2, Send, Check, Clock, X, AlertTriangle, CheckCircle, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -40,7 +36,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [receivingQuantities, setReceivingQuantities] = useState<{ [key: number]: string }>({});
 
   const { data: purchaseOrder, isLoading, error } = useQuery({
     queryKey: ['/api/purchase-orders', id],
@@ -89,68 +84,9 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
     }
   });
 
-  // Receive items mutation
-  const receiveItemsMutation = useMutation({
-    mutationFn: async (itemReceived: { itemId: number, quantityReceived: number }[]) => {
-      return apiRequest('POST', `/api/purchase-orders/${id}/receive`, { items: itemReceived });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
-      setReceivingQuantities({});
-      toast({
-        title: "Items received",
-        description: "Items have been marked as received and inventory has been updated.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to receive items: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-
   // Handle sending purchase order (change status to sent)
   const handleSendPurchaseOrder = () => {
     updateStatusMutation.mutate('sent');
-  };
-
-  // Handle marking as received
-  const handleMarkAsReceived = () => {
-    updateStatusMutation.mutate('received');
-  };
-
-  // Handle receiving specific items
-  const handleReceiveItems = () => {
-    if (!purchaseOrder?.items) return;
-
-    const itemsToReceive = Object.entries(receivingQuantities)
-      .filter(([, quantity]) => quantity && parseFloat(quantity) > 0)
-      .map(([itemId, quantity]) => ({
-        itemId: parseInt(itemId),
-        quantityReceived: parseFloat(quantity)
-      }));
-
-    if (itemsToReceive.length === 0) {
-      toast({
-        title: "No items selected",
-        description: "Please enter quantities for items you want to receive.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    receiveItemsMutation.mutate(itemsToReceive);
-  };
-
-  // Update receiving quantity for an item
-  const updateReceivingQuantity = (itemId: number, quantity: string) => {
-    setReceivingQuantities(prev => ({
-      ...prev,
-      [itemId]: quantity
-    }));
   };
 
   // Render badge based on purchase order status
@@ -206,6 +142,12 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
 
   return (
     <div className="space-y-6">
+      {/* Back Button */}
+      <Button variant="ghost" onClick={() => navigate("/purchase-orders")} className="w-fit">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Purchase Orders
+      </Button>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -222,87 +164,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
             <Button onClick={handleSendPurchaseOrder} disabled={updateStatusMutation.isPending}>
               <Send className="mr-2 h-4 w-4" />
               Send to Supplier
-            </Button>
-          )}
-          
-          {(purchaseOrder.status === 'sent' || purchaseOrder.status === 'partial') && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button>
-                  <Package className="mr-2 h-4 w-4" />
-                  Receive Items
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Receive Items</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Ordered</TableHead>
-                        <TableHead>Received</TableHead>
-                        <TableHead>Remaining</TableHead>
-                        <TableHead>Receive Now</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {purchaseOrder.items.map((item: any) => {
-                        const orderedQty = parseFloat(item.quantity);
-                        const receivedQty = parseFloat(item.receivedQuantity || '0');
-                        const remainingQty = orderedQty - receivedQty;
-                        const maxReceivable = remainingQty;
-                        
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.description}</TableCell>
-                            <TableCell>{orderedQty}</TableCell>
-                            <TableCell>{receivedQty}</TableCell>
-                            <TableCell>{remainingQty}</TableCell>
-                            <TableCell>
-                              {remainingQty > 0 ? (
-                                <Input
-                                  type="number"
-                                  placeholder="0"
-                                  min="0"
-                                  max={maxReceivable}
-                                  step="any"
-                                  value={receivingQuantities[item.id] || ''}
-                                  onChange={(e) => updateReceivingQuantity(item.id, e.target.value)}
-                                  className="w-24"
-                                  data-testid={`input-receive-quantity-${item.id}`}
-                                />
-                              ) : (
-                                <span className="text-green-600">Complete</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                  
-                  <div className="flex justify-end space-x-2">
-                    <Button 
-                      onClick={handleReceiveItems} 
-                      disabled={receiveItemsMutation.isPending}
-                      data-testid="button-confirm-receive"
-                    >
-                      <Check className="mr-2 h-4 w-4" />
-                      {receiveItemsMutation.isPending ? 'Processing...' : 'Confirm Receipt'}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-          
-          {purchaseOrder.status !== 'received' && purchaseOrder.status !== 'cancelled' && (
-            <Button onClick={handleMarkAsReceived} variant="outline" disabled={updateStatusMutation.isPending}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Mark as Received
             </Button>
           )}
           
