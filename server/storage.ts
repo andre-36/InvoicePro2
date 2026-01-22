@@ -149,6 +149,7 @@ export interface IStorage {
   getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined>;
   getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]>;
   getPendingPOQuantityByProduct(storeId: number): Promise<Map<number, number>>;
+  getReceivedQuantitiesForPO(purchaseOrderId: number): Promise<Map<number, string>>;
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
@@ -2331,6 +2332,28 @@ export class DatabaseStorage implements IStorage {
           result.set(item.productId, current + pending);
         }
       }
+    }
+    
+    return result;
+  }
+
+  async getReceivedQuantitiesForPO(purchaseOrderId: number): Promise<Map<number, string>> {
+    const result = new Map<number, string>();
+    
+    // Get all goods receipt items linked to this purchase order
+    const items = await db
+      .select({
+        productId: goodsReceiptItems.productId,
+        quantity: goodsReceiptItems.quantity,
+      })
+      .from(goodsReceiptItems)
+      .where(eq(goodsReceiptItems.purchaseOrderId, purchaseOrderId));
+    
+    // Accumulate quantities by productId
+    for (const item of items) {
+      const qty = parseFloat(item.quantity.toString()) || 0;
+      const current = parseFloat(result.get(item.productId) || '0');
+      result.set(item.productId, (current + qty).toString());
     }
     
     return result;

@@ -1838,13 +1838,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
       const purchaseOrderId = parseInt(req.params.id);
-      const purchaseOrder = await storage.getPurchaseOrderWithItems(purchaseOrderId);
+      const result = await storage.getPurchaseOrderWithItems(purchaseOrderId);
       
-      if (!purchaseOrder) {
+      if (!result) {
         return res.status(404).json({ error: "Purchase order not found" });
       }
       
-      res.json(purchaseOrder);
+      // Calculate received quantities from Goods Receipts for each PO item
+      const receivedQuantitiesMap = await storage.getReceivedQuantitiesForPO(purchaseOrderId);
+      
+      // Update items with calculated received quantities
+      const itemsWithReceivedQty = result.items.map(item => ({
+        ...item,
+        receivedQuantity: receivedQuantitiesMap.get(item.productId) || "0"
+      }));
+      
+      // Return a flattened object with purchaseOrder fields and items array
+      res.json({
+        ...result.purchaseOrder,
+        items: itemsWithReceivedQty
+      });
     } catch (error) {
       console.error("Error getting purchase order:", error);
       res.status(500).json({ error: "Server error" });
