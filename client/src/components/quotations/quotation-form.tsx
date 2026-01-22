@@ -521,7 +521,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                   render={({ field }) => (
                     <div className="flex justify-between items-center py-2 border-b mb-2">
                       <div>
-                        <span className="font-medium">Faktur Pajak</span>
+                        <span className="font-medium">Faktur Pajak (PPN {globalTaxRate}%)</span>
                         <p className="text-xs text-muted-foreground">Tampilkan DPP + PPN terpisah</p>
                       </div>
                       <Switch

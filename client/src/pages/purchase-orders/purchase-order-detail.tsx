@@ -257,7 +257,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                 {purchaseOrder.useFakturPajak ? (
                   <Badge className="bg-green-100 text-green-800">
                     <Check className="w-3 h-3 mr-1" />
-                    Menggunakan Faktur Pajak (PPN 11%)
+                    Menggunakan Faktur Pajak (PPN {purchaseOrder.taxRate || 11}%)
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="bg-gray-100 text-gray-600">

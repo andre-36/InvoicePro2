@@ -731,7 +731,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Gunakan Faktur Pajak (PPN 11%)</FormLabel>
+                      <FormLabel>Gunakan Faktur Pajak (PPN {globalTaxRate}%)</FormLabel>
                       <FormDescription>
                         Centang jika PO ini menggunakan faktur pajak
                       </FormDescription>
