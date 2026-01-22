@@ -857,6 +857,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         discount: values.invoice.discount || "0",
         total: values.invoice.total || "0",
         notes: values.invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes,
+        useFakturPajak: values.invoice.useFakturPajak || false,
+        taxRate: values.invoice.taxRate || globalTaxRate,
       };
 
       console.log("Generating PDF with:", { 

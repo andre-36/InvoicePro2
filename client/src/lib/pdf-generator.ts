@@ -33,6 +33,8 @@ interface Invoice {
   discount: string;
   total: string;
   notes?: string;
+  useFakturPajak?: boolean;
+  taxRate?: string | number;
 }
 
 interface PDFData {
@@ -173,46 +175,71 @@ export async function generatePDF(data: PDFData) {
     // Summary box
     const boxX = 120;
     const boxWidth = 70;
+    const useFakturPajak = invoice.useFakturPajak || false;
+    const taxRate = typeof invoice.taxRate === 'string' ? parseFloat(invoice.taxRate) : (invoice.taxRate || 11);
+    
+    // Calculate box height based on content
+    let boxHeight = 40;
+    if (useFakturPajak && parseFloat(invoice.tax) > 0) {
+      boxHeight = 50; // More space for DPP + PPN
+    }
+    if (parseFloat(invoice.discount) > 0) {
+      boxHeight += 10;
+    }
     
     doc.setFillColor(245, 245, 245);
     doc.setDrawColor(220, 220, 220);
-    doc.roundedRect(boxX, finalY, boxWidth, 40, 2, 2, 'FD');
+    doc.roundedRect(boxX, finalY, boxWidth, boxHeight, 2, 2, 'FD');
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     
-    // Subtotal
-    doc.text("Subtotal:", boxX + 5, finalY + 10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(formatCurrency(invoice.subtotal), boxX + boxWidth - 5, finalY + 10, { align: "right" });
+    let yOffset = 10;
     
-    // Tax
-    doc.setTextColor(100, 100, 100);
-    doc.text("Tax:", boxX + 5, finalY + 20);
-    doc.setTextColor(0, 0, 0);
-    doc.text(formatCurrency(invoice.tax), boxX + boxWidth - 5, finalY + 20, { align: "right" });
+    if (useFakturPajak && parseFloat(invoice.tax) > 0) {
+      // DPP (Base Price) - when faktur pajak is active
+      doc.text("DPP:", boxX + 5, finalY + yOffset);
+      doc.setTextColor(0, 0, 0);
+      doc.text(formatCurrency(invoice.subtotal), boxX + boxWidth - 5, finalY + yOffset, { align: "right" });
+      yOffset += 10;
+      
+      // PPN (Tax) - when faktur pajak is active
+      doc.setTextColor(100, 100, 100);
+      doc.text(`PPN (${taxRate}%):`, boxX + 5, finalY + yOffset);
+      doc.setTextColor(0, 0, 0);
+      doc.text(formatCurrency(invoice.tax), boxX + boxWidth - 5, finalY + yOffset, { align: "right" });
+      yOffset += 10;
+    } else {
+      // Subtotal - when faktur pajak is inactive
+      doc.text("Subtotal:", boxX + 5, finalY + yOffset);
+      doc.setTextColor(0, 0, 0);
+      doc.text(formatCurrency(invoice.subtotal), boxX + boxWidth - 5, finalY + yOffset, { align: "right" });
+      yOffset += 10;
+    }
     
     // Discount (if applicable)
     if (parseFloat(invoice.discount) > 0) {
       doc.setTextColor(100, 100, 100);
-      doc.text("Discount:", boxX + 5, finalY + 30);
+      doc.text("Discount:", boxX + 5, finalY + yOffset);
       doc.setTextColor(220, 38, 38); // red for discount
-      doc.text(`-${formatCurrency(invoice.discount)}`, boxX + boxWidth - 5, finalY + 30, { align: "right" });
-      
-      // Move finalY for total
-      finalY += 10;
+      doc.text(`-${formatCurrency(invoice.discount)}`, boxX + boxWidth - 5, finalY + yOffset, { align: "right" });
+      yOffset += 10;
     }
     
     // Line before total
     doc.setDrawColor(200, 200, 200);
-    doc.line(boxX + 5, finalY + 30, boxX + boxWidth - 5, finalY + 30);
+    doc.line(boxX + 5, finalY + yOffset, boxX + boxWidth - 5, finalY + yOffset);
+    yOffset += 10;
     
     // Total
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
-    doc.text("Total:", boxX + 5, finalY + 40);
-    doc.text(formatCurrency(invoice.total), boxX + boxWidth - 5, finalY + 40, { align: "right" });
+    doc.text("Total:", boxX + 5, finalY + yOffset);
+    doc.text(formatCurrency(invoice.total), boxX + boxWidth - 5, finalY + yOffset, { align: "right" });
+    
+    // Update finalY for notes positioning
+    finalY += boxHeight - 40;
     
     // Add notes
     if (invoice.notes) {
