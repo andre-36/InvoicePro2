@@ -161,6 +161,7 @@ export interface IStorage {
   getNextQuotationNumber(): Promise<string>;
   getNextPurchaseOrderNumber(orderDate?: Date): Promise<string>;
   getNextClientNumber(): Promise<string>;
+  getNextSupplierNumber(): Promise<string>;
 
   // Transaction methods
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -3641,6 +3642,17 @@ export class DatabaseStorage implements IStorage {
       });
     } catch (error) {
       console.error('Error in getNextClientNumber:', error);
+      throw error;
+    }
+  }
+
+  async getNextSupplierNumber(): Promise<string> {
+    try {
+      return withTransaction(async (tx) => {
+        return await generateSimpleSequentialNumber("S", suppliers, suppliers.supplierNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextSupplierNumber:', error);
       throw error;
     }
   }

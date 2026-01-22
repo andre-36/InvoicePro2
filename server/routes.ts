@@ -618,6 +618,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Supplier routes
+  app.get("/api/suppliers/next-number", requireAuth, async (req, res) => {
+    try {
+      const nextNumber = await storage.getNextSupplierNumber();
+      res.json({ supplierNumber: nextNumber });
+    } catch (error) {
+      console.error("Error generating supplier number:", error);
+      res.status(500).json({ error: "Failed to generate supplier number" });
+    }
+  });
+
   app.get("/api/suppliers", requireAuth, async (req, res) => {
     try {
       // Default to store 1 for general supplier listing
