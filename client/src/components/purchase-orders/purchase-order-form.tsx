@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertPurchaseOrderSchema } from "@shared/schema";
@@ -145,15 +145,45 @@ function PurchaseOrderItemRow({
         )}
       </td>
       <td className="px-3 py-2">
-        <Input
-          type="number"
-          value={item.quantity}
-          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-          placeholder="1"
-          min="0"
-          step="any"
-          className="h-8 text-sm text-right"
-        />
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            value={item.quantity}
+            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+            placeholder="1"
+            min="0"
+            step="any"
+            className="h-8 text-sm text-right flex-1"
+          />
+          <div className="flex flex-col">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-6 p-0 hover:bg-gray-100"
+              onClick={() => {
+                const currentQty = parseFloat(item.quantity) || 0;
+                updateItem(index, 'quantity', String(currentQty + 1));
+              }}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-4 w-6 p-0 hover:bg-gray-100"
+              onClick={() => {
+                const currentQty = parseFloat(item.quantity) || 0;
+                if (currentQty > 0) {
+                  updateItem(index, 'quantity', String(Math.max(0, currentQty - 1)));
+                }
+              }}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       </td>
       <td className="px-3 py-2">
         <Input
@@ -230,6 +260,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     queryKey: ['/api/products'],
   });
 
+  // Fetch existing purchase order for edit mode
+  const { data: existingPO, isLoading: isLoadingPO } = useQuery<any>({
+    queryKey: ['/api/purchase-orders', purchaseOrderId],
+    enabled: !!purchaseOrderId,
+  });
+
   // For new purchase orders, fetch the next PO number preview with fallback
   const { data: nextPONumberData, isError: isNumberError } = useQuery<{ purchaseOrderNumber: string }>({
     queryKey: ['/api/purchase-orders/next-number'],
@@ -272,6 +308,51 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       items: items
     }
   });
+
+  // Populate form with existing purchase order data when editing
+  useEffect(() => {
+    if (existingPO && purchaseOrderId) {
+      // Set form values from existing PO
+      form.reset({
+        purchaseOrder: {
+          storeId: existingPO.storeId || 1,
+          supplierId: existingPO.supplierId,
+          supplierName: existingPO.supplierName || '',
+          supplierEmail: existingPO.supplierEmail || '',
+          supplierPhone: existingPO.supplierPhone || '',
+          supplierAddress: existingPO.supplierAddress || '',
+          orderDate: existingPO.orderDate ? new Date(existingPO.orderDate) : new Date(),
+          expectedDeliveryDate: existingPO.expectedDeliveryDate ? new Date(existingPO.expectedDeliveryDate) : new Date(),
+          status: existingPO.status || 'pending',
+          useFakturPajak: existingPO.useFakturPajak || false,
+          subtotal: existingPO.subtotal?.toString() || '0',
+          taxRate: existingPO.taxRate?.toString() || '10',
+          taxAmount: existingPO.taxAmount?.toString() || '0',
+          discount: existingPO.discount?.toString() || '0',
+          shipping: existingPO.shipping?.toString() || '0',
+          totalAmount: existingPO.totalAmount?.toString() || '0',
+          notes: existingPO.notes || ''
+        },
+        items: []
+      });
+      
+      // Set items from existing PO
+      if (existingPO.items && existingPO.items.length > 0) {
+        const loadedItems = existingPO.items.map((item: any) => ({
+          id: item.id,
+          description: item.description || '',
+          quantity: item.quantity?.toString() || '1',
+          unitCost: item.unitCost?.toString() || '0',
+          taxRate: item.taxRate?.toString() || '10',
+          subtotal: item.subtotal?.toString() || '0',
+          taxAmount: item.taxAmount?.toString() || '0',
+          totalAmount: item.totalAmount?.toString() || '0',
+          productId: item.productId || null
+        }));
+        setItems(loadedItems);
+      }
+    }
+  }, [existingPO, purchaseOrderId, form]);
 
   // Handle supplier selection and auto-fill fields
   const handleSupplierSelect = (supplierId: number) => {
@@ -435,6 +516,20 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     mutation.mutate(values);
   };
 
+  // Show loading state when fetching existing PO
+  if (purchaseOrderId && isLoadingPO) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-gray-500 mt-4">Loading purchase order...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -445,6 +540,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           </h1>
           {!purchaseOrderId && nextPONumber && (
             <p className="text-sm text-gray-500 mt-1">Order Number: {nextPONumber}</p>
+          )}
+          {purchaseOrderId && existingPO?.purchaseOrderNumber && (
+            <p className="text-sm text-gray-500 mt-1">Order Number: {existingPO.purchaseOrderNumber}</p>
           )}
         </div>
         
