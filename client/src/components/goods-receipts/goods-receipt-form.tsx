@@ -622,30 +622,19 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="draft">Draft</SelectItem>
-                                <SelectItem value="confirmed">Confirmed</SelectItem>
-                                <SelectItem value="partial_paid">Partial Paid</SelectItem>
-                                <SelectItem value="paid">Paid</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Payment Status - Calculated automatically */}
+                      {isEditing && (
+                        <div>
+                          <FormLabel>Status Pembayaran</FormLabel>
+                          <div className="mt-2">
+                            {totalPaid >= totalAmount && totalAmount > 0 ? (
+                              <Badge className="bg-green-500 text-white">Terbayar</Badge>
+                            ) : (
+                              <Badge variant="destructive">Belum Terbayar</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <FormField
                         control={form.control}

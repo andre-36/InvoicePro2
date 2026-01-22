@@ -47,11 +47,11 @@ type GoodsReceipt = {
   dueDate: string | null;
   totalAmount: string;
   amountPaid: string;
-  status: 'draft' | 'confirmed' | 'partial_paid' | 'paid' | 'cancelled';
+  status: string;
   hasReturns: boolean;
 };
 
-type GoodsReceiptStatus = 'all' | 'draft' | 'confirmed' | 'partial_paid' | 'paid' | 'cancelled';
+type GoodsReceiptStatus = 'all' | 'paid' | 'unpaid';
 
 export default function GoodsReceiptsPage() {
   const [, navigate] = useLocation();
@@ -111,38 +111,33 @@ export default function GoodsReceiptsPage() {
           receipt.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (receipt.supplierDocNumber && receipt.supplierDocNumber.toLowerCase().includes(searchQuery.toLowerCase()));
         
-        const matchesStatus = statusFilter === 'all' || receipt.status === statusFilter;
+        // Calculate payment status for filtering
+        const total = parseFloat(receipt.totalAmount) || 0;
+        const paid = parseFloat(receipt.amountPaid) || 0;
+        const paymentStatus = paid >= total && total > 0 ? 'paid' : 'unpaid';
+        const matchesStatus = statusFilter === 'all' || paymentStatus === statusFilter;
         
         return matchesSearch && matchesStatus;
       })
     : [];
   
-  const getStatusBadge = (status: string, hasReturns: boolean) => {
-    let badge;
-    switch (status) {
-      case 'draft':
-        badge = <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
-        break;
-      case 'confirmed':
-        badge = <Badge className="bg-blue-100 text-blue-800">Confirmed</Badge>;
-        break;
-      case 'partial_paid':
-        badge = <Badge className="bg-yellow-100 text-yellow-800">Partial Paid</Badge>;
-        break;
-      case 'paid':
-        badge = <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-        break;
-      case 'cancelled':
-        badge = <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
-        break;
-      default:
-        badge = <Badge>{status}</Badge>;
-    }
+  // Calculate payment status based on amountPaid vs totalAmount
+  const getPaymentStatus = (receipt: GoodsReceipt) => {
+    const total = parseFloat(receipt.totalAmount) || 0;
+    const paid = parseFloat(receipt.amountPaid) || 0;
+    return paid >= total && total > 0 ? 'paid' : 'unpaid';
+  };
+
+  const getStatusBadge = (receipt: GoodsReceipt) => {
+    const paymentStatus = getPaymentStatus(receipt);
+    const badge = paymentStatus === 'paid' 
+      ? <Badge className="bg-green-500 text-white">Terbayar</Badge>
+      : <Badge variant="destructive">Belum Terbayar</Badge>;
     
     return (
       <div className="flex items-center gap-2">
         {badge}
-        {hasReturns && (
+        {receipt.hasReturns && (
           <Badge variant="destructive" className="bg-orange-100 text-orange-800 border-orange-300">
             <AlertTriangle className="h-3 w-3 mr-1" />
             Return Pending
@@ -203,12 +198,9 @@ export default function GoodsReceiptsPage() {
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="partial_paid">Partial Paid</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="paid">Terbayar</SelectItem>
+                  <SelectItem value="unpaid">Belum Terbayar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -281,7 +273,7 @@ export default function GoodsReceiptsPage() {
                       <TableCell>{receipt.dueDate ? formatDate(receipt.dueDate) : '-'}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(receipt.totalAmount)}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(receipt.amountPaid)}</TableCell>
-                      <TableCell>{getStatusBadge(receipt.status, receipt.hasReturns)}</TableCell>
+                      <TableCell>{getStatusBadge(receipt)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

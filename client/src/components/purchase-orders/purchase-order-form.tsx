@@ -315,9 +315,6 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   // Populate form with existing purchase order data when editing
   useEffect(() => {
     if (existingPO && purchaseOrderId && !itemsLoaded) {
-      console.log('Loading existing PO:', existingPO);
-      console.log('PO items:', existingPO.items);
-      
       // Set form values from existing PO
       form.reset({
         purchaseOrder: {
@@ -355,11 +352,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           totalAmount: item.totalAmount?.toString() || '0',
           productId: item.productId || null
         }));
-        console.log('Setting loaded items:', loadedItems);
         setItems(loadedItems);
         setItemsLoaded(true);
       } else {
-        console.log('No items found in existing PO or items not an array');
         // Keep the default empty item
         setItemsLoaded(true);
       }
