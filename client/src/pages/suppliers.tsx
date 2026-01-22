@@ -50,6 +50,11 @@ export default function SuppliersPage() {
     queryKey: ['/api/suppliers'],
   });
 
+  const { data: nextNumberData } = useQuery<{ supplierNumber: string }>({
+    queryKey: ['/api/suppliers/next-number'],
+    enabled: isDialogOpen && !editingSupplier,
+  });
+
   const form = useForm<InsertSupplier>({
     resolver: zodResolver(insertSupplierSchema),
     defaultValues: {
@@ -265,7 +270,11 @@ export default function SuppliersPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
+            <DialogTitle>
+              {editingSupplier 
+                ? `Edit Supplier: ${editingSupplier.supplierNumber}` 
+                : `Add Supplier: ${nextNumberData?.supplierNumber || '...'}`}
+            </DialogTitle>
             <DialogDescription>
               {editingSupplier 
                 ? "Update the supplier information below." 
