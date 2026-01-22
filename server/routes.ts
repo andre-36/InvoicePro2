@@ -1812,6 +1812,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fallback route without storeId - uses default store 1
+  app.get("/api/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrders = await storage.getPurchaseOrders(1);
+      res.json(purchaseOrders);
+    } catch (error) {
+      console.error("Error getting purchase orders:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Get next purchase order number preview - MUST be before /:id route
   app.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
     try {
