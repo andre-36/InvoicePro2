@@ -49,6 +49,7 @@ const companySchema = z.object({
   companyPhone: z.string().optional(),
   companyEmail: z.string().email("Please enter a valid email").optional().or(z.literal("")),
   taxNumber: z.string().optional(),
+  defaultTaxRate: z.string().optional(),
   logoUrl: z.string().optional(),
   quotationNotes: z.string().optional(),
   invoiceNotes: z.string().optional(),
@@ -231,6 +232,7 @@ export default function SettingsPage() {
       companyPhone: "",
       companyEmail: "",
       taxNumber: "",
+      defaultTaxRate: "11",
       logoUrl: "",
     }
   });
@@ -667,6 +669,7 @@ export default function SettingsPage() {
         companyPhone: userData.companyPhone || "",
         companyEmail: userData.companyEmail || "",
         taxNumber: userData.taxNumber || "",
+        defaultTaxRate: userData.defaultTaxRate || "11",
         logoUrl: userData.logoUrl || "",
         quotationNotes: userData.quotationNotes || "",
         invoiceNotes: userData.invoiceNotes || "",
@@ -1308,6 +1311,31 @@ export default function SettingsPage() {
                           <FormControl>
                             <Input placeholder="Enter tax number" {...field} data-testid="input-tax-number" />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
+                      name="defaultTaxRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Tax Rate (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              placeholder="11" 
+                              {...field} 
+                              data-testid="input-tax-rate" 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Tarif pajak yang akan digunakan untuk dokumen dengan faktur pajak (PPN)
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
