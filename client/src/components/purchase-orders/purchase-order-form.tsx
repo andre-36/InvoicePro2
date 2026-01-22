@@ -309,9 +309,15 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     }
   });
 
+  // Track if we've already loaded items for this PO
+  const [itemsLoaded, setItemsLoaded] = useState(false);
+
   // Populate form with existing purchase order data when editing
   useEffect(() => {
-    if (existingPO && purchaseOrderId) {
+    if (existingPO && purchaseOrderId && !itemsLoaded) {
+      console.log('Loading existing PO:', existingPO);
+      console.log('PO items:', existingPO.items);
+      
       // Set form values from existing PO
       form.reset({
         purchaseOrder: {
@@ -337,7 +343,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       });
       
       // Set items from existing PO
-      if (existingPO.items && existingPO.items.length > 0) {
+      if (existingPO.items && Array.isArray(existingPO.items) && existingPO.items.length > 0) {
         const loadedItems = existingPO.items.map((item: any) => ({
           id: item.id,
           description: item.description || '',
@@ -349,10 +355,16 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           totalAmount: item.totalAmount?.toString() || '0',
           productId: item.productId || null
         }));
+        console.log('Setting loaded items:', loadedItems);
         setItems(loadedItems);
+        setItemsLoaded(true);
+      } else {
+        console.log('No items found in existing PO or items not an array');
+        // Keep the default empty item
+        setItemsLoaded(true);
       }
     }
-  }, [existingPO, purchaseOrderId, form]);
+  }, [existingPO, purchaseOrderId, itemsLoaded]);
 
   // Handle supplier selection and auto-fill fields
   const handleSupplierSelect = (supplierId: number) => {
@@ -745,7 +757,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <tbody>
                     {items.map((item, index) => (
                       <PurchaseOrderItemRow
-                        key={index}
+                        key={item.id ? `item-${item.id}` : `new-${index}`}
                         index={index}
                         item={item}
                         products={products || []}

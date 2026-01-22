@@ -1844,6 +1844,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Purchase order not found" });
       }
       
+      console.log(`PO ${purchaseOrderId} items count:`, result.items?.length || 0);
+      
       // Calculate received quantities from Goods Receipts for each PO item
       const receivedQuantitiesMap = await storage.getReceivedQuantitiesForPO(purchaseOrderId);
       
