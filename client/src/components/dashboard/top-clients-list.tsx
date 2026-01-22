@@ -56,9 +56,9 @@ export function TopClientsList() {
         <CardHeader className="px-5 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-semibold text-gray-900">Top Clients</CardTitle>
-            <Link href="/clients">
-              <a className="text-sm font-medium text-primary hover:text-primary/80">View All</a>
-            </Link>
+            <Link href="/clients" className="text-sm font-medium text-primary hover:text-primary/80">
+            View All
+          </Link>
           </div>
         </CardHeader>
         <CardContent className="flex justify-center items-center h-64">
