@@ -172,6 +172,11 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     enabled: isEditing,
   });
 
+  const { data: nextReceiptNumberData } = useQuery<{ receiptNumber: string }>({
+    queryKey: ['/api/goods-receipts/next-number'],
+    enabled: !isEditing,
+  });
+
   const { data: receiptPayments, refetch: refetchPayments } = useQuery<GoodsReceiptPayment[]>({
     queryKey: ['/api/goods-receipts', goodsReceiptId, 'payments'],
     enabled: isEditing,
@@ -498,7 +503,9 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
             {isEditing ? `Edit Goods Receipt` : 'New Goods Receipt'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {isEditing ? `Editing receipt ${existingReceipt?.goodsReceipt?.receiptNumber}` : 'Record incoming inventory from supplier'}
+            {isEditing 
+              ? `Editing receipt ${existingReceipt?.goodsReceipt?.receiptNumber}` 
+              : `Receipt Number: ${nextReceiptNumberData?.receiptNumber || '...'}`}
           </p>
         </div>
       </div>
