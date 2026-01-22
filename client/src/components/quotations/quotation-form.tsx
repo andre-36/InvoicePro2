@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -87,6 +88,11 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     queryKey: ['/api/products'],
   });
 
+  // Fetch current user for default notes and tax rate
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
   // If editing an existing quotation, fetch its data
   const { data: quotationData, isLoading: isLoadingQuotation } = useQuery({
     queryKey: ['/api/quotations', quotationId],
@@ -125,11 +131,18 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         taxAmount: "0",
         discount: "0",
         totalAmount: "0",
-        notes: ""
+        notes: "",
+        useFakturPajak: false
       },
       items: items
     }
   });
+
+  // Watch the useFakturPajak toggle
+  const useFakturPajak = form.watch('quotation.useFakturPajak');
+  
+  // Get the global tax rate from user settings
+  const globalTaxRate = currentUser?.defaultTaxRate || 11;
 
   // Create/update quotation mutation
   const mutation = useMutation({
@@ -257,19 +270,41 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   };
 
   const calculateTotals = (currentItems: QuotationItem[]) => {
-    const subtotal = currentItems.reduce((sum, item) => {
-      return sum + parseFloat(item.subtotal || "0");
-    }, 0);
-
-    const taxAmount = currentItems.reduce((sum, item) => {
-      return sum + parseFloat(item.taxAmount || "0");
-    }, 0);
+    const isFakturPajak = form.getValues('quotation.useFakturPajak');
+    const taxRate = globalTaxRate;
+    
+    // Calculate totals based on whether faktur pajak is active
+    // When faktur pajak is active, prices include tax and we need to split them
+    // When inactive, prices are shown as-is without tax separation
+    
+    let subtotal = 0;
+    let taxAmount = 0;
+    
+    if (isFakturPajak) {
+      // Tax-inclusive pricing: stored prices include tax
+      // DPP (base price) = fullPrice / (1 + taxRate/100)
+      // PPN = fullPrice - DPP
+      currentItems.forEach(item => {
+        const fullPrice = parseFloat(item.subtotal || "0");
+        const basePrice = fullPrice / (1 + taxRate / 100);
+        const itemTax = fullPrice - basePrice;
+        subtotal += basePrice;
+        taxAmount += itemTax;
+      });
+    } else {
+      // No tax separation - show full price only
+      subtotal = currentItems.reduce((sum, item) => {
+        return sum + parseFloat(item.subtotal || "0");
+      }, 0);
+      taxAmount = 0;
+    }
 
     const discountAmount = parseFloat(form.getValues('quotation.discount') || "0");
     const total = subtotal + taxAmount - discountAmount;
 
     form.setValue('quotation.subtotal', subtotal.toString());
     form.setValue('quotation.taxAmount', taxAmount.toString());
+    form.setValue('quotation.taxRate', taxRate.toString());
     form.setValue('quotation.totalAmount', Math.max(0, total).toString());
   };
 
@@ -479,12 +514,54 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span data-testid="text-subtotal">
-                    {formatCurrency(parseFloat(form.watch('quotation.subtotal') || '0'))}
-                  </span>
-                </div>
+                {/* Faktur Pajak Toggle */}
+                <FormField
+                  control={form.control}
+                  name="quotation.useFakturPajak"
+                  render={({ field }) => (
+                    <div className="flex justify-between items-center py-2 border-b mb-2">
+                      <div>
+                        <span className="font-medium">Faktur Pajak</span>
+                        <p className="text-xs text-muted-foreground">Tampilkan DPP + PPN terpisah</p>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                          setTimeout(() => calculateTotals(items), 0);
+                        }}
+                      />
+                    </div>
+                  )}
+                />
+
+                {useFakturPajak ? (
+                  <>
+                    {/* DPP (Base Price) - when faktur pajak is active */}
+                    <div className="flex justify-between">
+                      <span>DPP (Dasar Pengenaan Pajak):</span>
+                      <span data-testid="text-subtotal">
+                        {formatCurrency(parseFloat(form.watch('quotation.subtotal') || '0'))}
+                      </span>
+                    </div>
+                    
+                    {/* PPN (Tax) - when faktur pajak is active */}
+                    <div className="flex justify-between">
+                      <span>PPN ({globalTaxRate}%):</span>
+                      <span data-testid="text-tax">
+                        {formatCurrency(parseFloat(form.watch('quotation.taxAmount') || '0'))}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  /* Full price only when faktur pajak is inactive */
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span data-testid="text-subtotal">
+                      {formatCurrency(parseFloat(form.watch('quotation.subtotal') || '0'))}
+                    </span>
+                  </div>
+                )}
                 
                 <FormField
                   control={form.control}
@@ -510,13 +587,6 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                     </div>
                   )}
                 />
-
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span data-testid="text-tax">
-                    {formatCurrency(parseFloat(form.watch('quotation.taxAmount') || '0'))}
-                  </span>
-                </div>
 
                 <div className="border-t pt-2">
                   <div className="flex justify-between text-lg font-semibold">
