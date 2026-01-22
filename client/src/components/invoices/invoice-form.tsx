@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -34,6 +35,8 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   tax: z.string().optional(),
   discount: z.string().optional(),
   total: z.string().optional(),
+  useFakturPajak: z.boolean().optional(),
+  taxRate: z.string().optional(),
 });
 
 // For editing existing invoices, we need to include the invoice number for display
@@ -129,6 +132,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
+  // Fetch current user for default notes and tax rate
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
   // Mutation for creating a payment
   const createPaymentMutation = useMutation({
     mutationFn: async (payment: any) => {
@@ -217,7 +225,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         tax: "0",
         discount: "0",
         total: "0",
-        notes: ""
+        notes: "",
+        useFakturPajak: false,
+        taxRate: "11"
       },
       items: items
     }
@@ -359,6 +369,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         tax: invoiceData.tax.toString(),
         discount: invoiceData.discount.toString(),
         total: invoiceData.total.toString(),
+        useFakturPajak: invoiceData.useFakturPajak || false,
+        taxRate: invoiceData.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
       };
 
       form.setValue('invoice', invoice);
@@ -380,31 +392,54 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   }, [invoiceData, invoiceId, form]);
 
-  // Calculate totals whenever items change
+  // Watch faktur pajak toggle
+  const watchUseFakturPajak = form.watch('invoice.useFakturPajak');
+  const watchTaxRate = form.watch('invoice.taxRate');
+  const watchDiscount = form.watch('invoice.discount');
+
+  // Calculate totals whenever items or tax settings change
   useEffect(() => {
     if (items.length > 0) {
-      // Calculate subtotal, tax, and total
-      let subtotal = 0;
-      let tax = 0;
-
+      // Sum up all item totals (these are the full prices including tax if applicable)
+      let itemsTotal = 0;
       items.forEach(item => {
-        subtotal += parseFloat(item.subtotal || "0");
-        tax += parseFloat(item.tax || "0");
+        itemsTotal += parseFloat(item.subtotal || "0");
       });
 
       // Apply discount
-      const discountValue = parseFloat(form.getValues('invoice.discount') || "0");
-      const total = subtotal + tax - discountValue;
+      const discountValue = parseFloat(watchDiscount || "0");
+
+      // Get tax rate from user settings or form
+      const taxRate = parseFloat(watchTaxRate || currentUser?.defaultTaxRate || "11") || 11;
+      const taxMultiplier = 1 + (taxRate / 100);
+
+      let subtotal: number;
+      let taxAmount: number;
+      let total: number;
+
+      if (watchUseFakturPajak) {
+        // When using faktur pajak, prices are tax-inclusive
+        // Calculate base subtotal by dividing by tax multiplier
+        subtotal = itemsTotal / taxMultiplier;
+        taxAmount = itemsTotal - subtotal;
+        total = itemsTotal - discountValue;
+      } else {
+        // No tax - subtotal equals items total, no separate tax
+        subtotal = itemsTotal;
+        taxAmount = 0;
+        total = subtotal - discountValue;
+      }
 
       // Update form values
       form.setValue('invoice.subtotal', subtotal.toFixed(2));
-      form.setValue('invoice.tax', tax.toFixed(2));
+      form.setValue('invoice.tax', taxAmount.toFixed(2));
+      form.setValue('invoice.taxRate', taxRate.toString());
       form.setValue('invoice.total', total.toFixed(2));
 
       // Update items in the form
       form.setValue('items', items);
     }
-  }, [items, form]);
+  }, [items, form, watchUseFakturPajak, watchTaxRate, watchDiscount, currentUser]);
 
   // Add a new invoice item
   const addItem = () => {
@@ -771,11 +806,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }, 500);
   };
 
-  // Fetch current user for default notes
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ['/api/user'],
-  });
-
   // Handle invoice PDF generation
   const handleGeneratePDF = async () => {
     if (!form.formState.isValid) {
@@ -992,6 +1022,30 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                     )}
                   />
                 </div>
+
+                {/* Faktur Pajak Toggle */}
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="invoice.useFakturPajak"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Faktur Pajak</FormLabel>
+                          <FormDescription>
+                            Gunakan faktur pajak dengan PPN {currentUser?.defaultTaxRate || "11"}%
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               {/* Client Section */}
@@ -1140,13 +1194,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 <div className="sm:w-1/2 ml-auto">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-700">Subtotal:</span>
+                      <span className="font-medium text-gray-700">
+                        {watchUseFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}
+                      </span>
                       <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.subtotal') || '0'))}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-700">Tax:</span>
-                      <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.tax') || '0'))}</span>
-                    </div>
+                    {watchUseFakturPajak && (
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium text-gray-700">
+                          PPN ({currentUser?.defaultTaxRate || "11"}%):
+                        </span>
+                        <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.tax') || '0'))}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Discount:</span>
                       <div className="flex items-center space-x-2">
