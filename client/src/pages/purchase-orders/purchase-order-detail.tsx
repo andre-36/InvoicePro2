@@ -146,7 +146,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Purchase Order {purchaseOrder.purchaseOrderNumber}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Created {formatDate(purchaseOrder.createdAt)} • Due {formatDate(purchaseOrder.expectedDeliveryDate)}
+            Created {formatDate(purchaseOrder.createdAt)} • Order Date {formatDate(purchaseOrder.orderDate)}
           </p>
         </div>
         
@@ -235,11 +235,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
             <div>
               <label className="text-sm font-medium text-gray-500">Order Date</label>
               <p className="text-base" data-testid="text-order-date">{formatDate(purchaseOrder.orderDate)}</p>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-500">Expected Delivery</label>
-              <p className="text-base" data-testid="text-expected-delivery">{purchaseOrder.expectedDeliveryDate ? formatDate(purchaseOrder.expectedDeliveryDate) : 'Not specified'}</p>
             </div>
             
             {purchaseOrder.deliveredDate && (

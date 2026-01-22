@@ -672,25 +672,6 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="purchaseOrder.expectedDeliveryDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expected Delivery Date</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                        data-testid="input-expected-delivery-date"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}

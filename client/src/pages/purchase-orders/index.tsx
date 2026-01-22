@@ -44,7 +44,6 @@ type PurchaseOrder = {
   purchaseOrderNumber: string;
   supplierName: string;
   orderDate: string;
-  expectedDeliveryDate: string;
   totalAmount: string;
   status: 'pending' | 'partial' | 'received' | 'cancelled';
 };
@@ -228,7 +227,6 @@ export default function PurchaseOrdersPage() {
                     </TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead>Order Date</TableHead>
-                    <TableHead>Expected Date</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -246,7 +244,6 @@ export default function PurchaseOrdersPage() {
                       </TableCell>
                       <TableCell data-testid={`text-supplier-${purchaseOrder.id}`}>{purchaseOrder.supplierName}</TableCell>
                       <TableCell data-testid={`text-order-date-${purchaseOrder.id}`}>{formatDate(purchaseOrder.orderDate)}</TableCell>
-                      <TableCell data-testid={`text-expected-date-${purchaseOrder.id}`}>{formatDate(purchaseOrder.expectedDeliveryDate)}</TableCell>
                       <TableCell className="font-medium" data-testid={`text-amount-${purchaseOrder.id}`}>{formatCurrency(purchaseOrder.totalAmount)}</TableCell>
                       <TableCell data-testid={`status-${purchaseOrder.id}`}>{getStatusBadge(purchaseOrder.status)}</TableCell>
                       <TableCell className="text-right">
