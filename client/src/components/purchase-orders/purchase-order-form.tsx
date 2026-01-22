@@ -513,7 +513,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   };
 
   const onSubmit = (values: PurchaseOrderFormValues) => {
-    mutation.mutate(values);
+    // Use items from state, not from form values
+    const submitValues = {
+      ...values,
+      items: items
+    };
+    mutation.mutate(submitValues);
   };
 
   // Show loading state when fetching existing PO

@@ -1907,7 +1907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           z.object({
             id: z.number().optional(),
             description: z.string(),
-            productId: z.number(),
+            productId: z.number().nullable(),
             quantity: z.union([z.string(), z.number()]),
             unitCost: z.union([z.string(), z.number()]),
             taxRate: z.union([z.string(), z.number()]).optional(),
