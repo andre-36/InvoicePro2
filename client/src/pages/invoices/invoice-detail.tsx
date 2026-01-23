@@ -804,37 +804,32 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
-          {/* Header - 4 column: logo | bill-to | company | doc-details */}
+          {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">
-            {/* Logo column */}
-            <div className="print-header-logo">
+            {/* Left column: Logo + Bill To */}
+            <div className="print-header-left" style={{ flexDirection: 'column' }}>
               <div className="print-logo">
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
-                  <div className="print-logo-circle">
+                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
                     {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Bill To column */}
-            <div className="print-header-left">
               <div className="print-bill-to">
                 <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
                 <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
                 {client && (
                   <div className="print-bill-to-details">
-                    {client.email && <div>{client.email}</div>}
-                    {client.phone && <div>{client.phone}</div>}
                     {client.address && <div>{client.address}</div>}
+                    {client.phone && <div>Phone: {client.phone}</div>}
                   </div>
                 )}
               </div>
             </div>
             
-            {/* Company info column */}
+            {/* Center column: Company Info */}
             <div className="print-header-center">
               <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
               {currentUser?.companyTagline && (
@@ -842,58 +837,73 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               )}
               <div className="print-company-address">
                 {currentUser?.companyAddress || "Your Company Address"}
-                {currentUser?.companyPhone && <><br />Phone: {currentUser.companyPhone}</>}
+                {currentUser?.companyPhone && (
+                  <>
+                    <br />
+                    Phone: {currentUser.companyPhone}
+                  </>
+                )}
+                {currentUser?.companyEmail && (
+                  <>
+                    {currentUser?.companyPhone ? ' / ' : <br />}
+                    Email: {currentUser.companyEmail}
+                  </>
+                )}
               </div>
             </div>
             
-          {/* Document details column */}
-          <div className="print-header-right">
-            <div className="print-doc-type">Invoice</div>
-            <div className="print-doc-details">
-              <div className="print-doc-row">
-                <span className="print-doc-label">No.</span>
-                <span className="print-doc-value">{invoice.invoiceNumber}</span>
-              </div>
-              <div className="print-doc-row">
-                <span className="print-doc-label">Date</span>
-                <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
-              </div>
-              <div className="print-doc-row">
-                <span className="print-doc-label">Due</span>
-                <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
-              </div>
-              {printSettings?.showPONumber !== false && (
+            {/* Right column: Document Details */}
+            <div className="print-header-right">
+              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>INVOICE</div>
+              <div className="print-doc-details">
                 <div className="print-doc-row">
-                  <span className="print-doc-label">PO #</span>
-                  <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
+                  <span className="print-doc-label">No.</span>
+                  <span className="print-doc-value">{invoice.invoiceNumber}</span>
                 </div>
-              )}
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Date</span>
+                  <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
+                </div>
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Due Date</span>
+                  <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
+                </div>
+                {printSettings?.showPONumber !== false && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">PO Number</span>
+                    <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
+                  </div>
+                )}
+                {/* Page indicator */}
+                <div className="print-doc-row">
+                  <span className="print-doc-label">Page</span>
+                  <span className="print-doc-value">1/1</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-          {/* Page indicator */}
-          <div className="print-page-number">1/1</div>
 
           {/* Items Table */}
           <table className="print-items-table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Description</th>
-                <th>QTY</th>
-                <th>Rate</th>
-                <th>Total</th>
+                <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>Code</th>
+                <th style={{ width: '52%', textAlign: 'center' }}>Description</th>
+                <th style={{ width: '5%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>Rate</th>
+                <th style={{ width: '16%', textAlign: 'center' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
+                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
                   <td>{item.description}</td>
-                  <td className="print-text-right">{item.quantity}</td>
-                  <td className="print-text-right">{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td className="print-text-right">{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
                 </tr>
               ))}
             </tbody>
@@ -901,14 +911,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
           <div className="print-footer">
             <div className="print-footer-left">
-              <div className="print-notes-label">Notes:</div>
+              <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
                 {invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
               </div>
             </div>
             
             <div className="print-footer-right">
-              {(invoice as any).useFakturPajak && parseFloat(invoice.tax || '0') > 0 ? (
+              {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.tax || '0') > 0 ? (
                 <>
                   <div className="print-total-row">
                     <span className="print-total-label">DPP</span>
@@ -925,7 +935,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
                 </div>
               )}
-              {parseFloat(invoice.discount || '0') > 0 && (
+              {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
                   <span className="print-total-value">-{formatCurrency(parseFloat(invoice.discount))}</span>
@@ -937,8 +947,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
                 </div>
               )}
-              <div className="print-total-row print-total-final">
-                <span className="print-total-label">Total</span>
+              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                <span className="print-total-label">TOTAL</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
               </div>
             </div>
