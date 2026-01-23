@@ -1085,14 +1085,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       <Card>
         <Tabs defaultValue="details" className="w-full">
           <div className="border-b px-6 pt-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={`grid w-full ${invoice?.deliveryType === 'self_pickup' ? 'grid-cols-2' : 'grid-cols-3'}`}>
               <TabsTrigger value="details">Invoice Details</TabsTrigger>
               <TabsTrigger value="payments">
                 Payments {invoicePayments.length > 0 && `(${invoicePayments.length})`}
               </TabsTrigger>
-              <TabsTrigger value="delivery">
-                Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
-              </TabsTrigger>
+              {invoice?.deliveryType !== 'self_pickup' && (
+                <TabsTrigger value="delivery">
+                  Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -1432,6 +1434,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </Dialog>
           </TabsContent>
 
+          {invoice?.deliveryType !== 'self_pickup' && (
           <TabsContent value="delivery" className="m-0 p-6">
             <div className="space-y-6">
               {/* Delivery Summary */}
@@ -1764,6 +1767,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               </DialogContent>
             </Dialog>
           </TabsContent>
+          )}
         </Tabs>
       </Card>
       </div>
