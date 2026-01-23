@@ -83,9 +83,9 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     queryKey: ['/api/clients'],
   });
 
-  // Fetch products for product selection
-  const { data: products } = useQuery({
-    queryKey: ['/api/products'],
+  // Fetch products with stock info for product selection
+  const { data: products } = useQuery<{ id: number; name: string; currentSellingPrice: string; currentStock?: number; unit?: string }[]>({
+    queryKey: ['/api/stores', 1, 'products', 'stock'],
   });
 
   // Fetch current user for default notes and tax rate

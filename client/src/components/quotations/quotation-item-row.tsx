@@ -24,6 +24,7 @@ interface Product {
   description: string;
   currentSellingPrice: string;
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
+  currentStock?: number;
 }
 
 interface QuotationItem {
@@ -164,9 +165,24 @@ export function QuotationItemRow({
               className="w-full justify-between text-sm"
               data-testid={`button-select-product-${index}`}
             >
-              <span className="truncate text-left">
-                {selectedProductName}
-              </span>
+              <div className="flex items-center justify-between w-full min-w-0">
+                <span className="truncate text-left">
+                  {selectedProductName}
+                </span>
+                {productId && productId !== "0" && (() => {
+                  const selectedProduct = products.find(p => p.id.toString() === productId);
+                  const stock = selectedProduct?.currentStock ?? 0;
+                  return (
+                    <span className={cn(
+                      "text-xs ml-1 whitespace-nowrap",
+                      stock === 0 ? "text-red-500" :
+                      stock <= 5 ? "text-orange-500" : "text-gray-500"
+                    )}>
+                      [{stock}]
+                    </span>
+                  );
+                })()}
+              </div>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -205,7 +221,16 @@ export function QuotationItemRow({
                         productId === product.id.toString() ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <span>{product.name}</span>
+                    <div className="flex justify-between items-center w-full">
+                      <span>{product.name}</span>
+                      <span className={cn(
+                        "text-xs ml-2",
+                        product.currentStock === 0 ? "text-red-500" :
+                        product.currentStock && product.currentStock <= 5 ? "text-orange-500" : "text-gray-500"
+                      )}>
+                        Stok: {product.currentStock ?? 0}
+                      </span>
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>
