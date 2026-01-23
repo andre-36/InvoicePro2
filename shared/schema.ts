@@ -12,6 +12,7 @@ export const productTypeEnum = pgEnum('product_type', ['standard', 'bundle']);
 export const cashAccountTypeEnum = pgEnum('cash_account_type', ['cash', 'bank_company', 'bank_personal', 'other']);
 export const goodsReceiptStatusEnum = pgEnum('goods_receipt_status', ['draft', 'confirmed', 'partial_paid', 'paid', 'cancelled']);
 export const returnStatusEnum = pgEnum('return_status', ['none', 'pending', 'returned']);
+export const deliveryTypeEnum = pgEnum('delivery_type', ['self_pickup', 'delivery', 'combination']);
 
 // Users table
 export const users = pgTable("users", {
@@ -241,6 +242,7 @@ export const invoices = pgTable("invoices", {
   dueDate: date("due_date").notNull(),
   status: invoiceStatusEnum("status").default("draft").notNull(),
   useFakturPajak: boolean("use_faktur_pajak").default(false).notNull(),
+  deliveryType: deliveryTypeEnum("delivery_type").default("delivery").notNull(),
   subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
   taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
   taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
