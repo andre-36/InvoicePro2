@@ -25,6 +25,7 @@ interface Product {
   currentSellingPrice: string;
   productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
+  currentStock?: number;
 }
 
 interface InvoiceItem {
@@ -244,11 +245,26 @@ export function InvoiceItemRow({
               aria-expanded={open}
               className="w-full justify-between text-sm h-8 px-2 border border-transparent hover:border-gray-300 hover:bg-gray-50"
             >
-              <span className="truncate text-left">
-                {productId && productId !== "0" 
-                  ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
-                  : "Select a product"}
-              </span>
+              <div className="flex items-center justify-between w-full min-w-0">
+                <span className="truncate text-left">
+                  {productId && productId !== "0" 
+                    ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
+                    : "Select a product"}
+                </span>
+                {productId && productId !== "0" && (() => {
+                  const selectedProduct = products.find(p => p.id.toString() === productId);
+                  const stock = selectedProduct?.currentStock ?? 0;
+                  return (
+                    <span className={cn(
+                      "text-xs ml-1 whitespace-nowrap",
+                      stock === 0 ? "text-red-500" :
+                      stock <= 5 ? "text-orange-500" : "text-gray-500"
+                    )}>
+                      [{stock}]
+                    </span>
+                  );
+                })()}
+              </div>
               <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -320,7 +336,16 @@ export function InvoiceItemRow({
                         productId === product.id.toString() ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {product.name}
+                    <div className="flex justify-between items-center w-full">
+                      <span>{product.name}</span>
+                      <span className={cn(
+                        "text-xs ml-2",
+                        product.currentStock === 0 ? "text-red-500" :
+                        product.currentStock && product.currentStock <= 5 ? "text-orange-500" : "text-gray-500"
+                      )}>
+                        Stok: {product.currentStock ?? 0}
+                      </span>
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>

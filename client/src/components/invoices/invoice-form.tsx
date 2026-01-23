@@ -117,9 +117,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     queryKey: ['/api/clients'],
   });
 
-  // Fetch all products for product selection
-  const { data: products } = useQuery({
-    queryKey: ['/api/products'],
+  // Fetch all products with stock info for product selection
+  const { data: products } = useQuery<(Product & { currentStock?: number })[]>({
+    queryKey: ['/api/stores', 1, 'products', 'stock'],
   });
 
   // Fetch payment terms from settings
