@@ -37,6 +37,7 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   total: z.string().optional(),
   useFakturPajak: z.boolean().optional(),
   taxRate: z.string().optional(),
+  deliveryType: z.enum(['self_pickup', 'delivery', 'combination']).optional(),
 });
 
 // For editing existing invoices, we need to include the invoice number for display
@@ -227,7 +228,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         total: "0",
         notes: "",
         useFakturPajak: false,
-        taxRate: "11"
+        taxRate: "11",
+        deliveryType: "delivery" as "self_pickup" | "delivery" | "combination"
       },
       items: items
     }
@@ -371,6 +373,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         total: invoiceData.total.toString(),
         useFakturPajak: invoiceData.useFakturPajak || false,
         taxRate: invoiceData.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
+        deliveryType: invoiceData.deliveryType || "delivery",
       };
 
       form.setValue('invoice', invoice);
@@ -1044,6 +1047,40 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Delivery Type Selection */}
+                <div className="mt-4">
+                  <FormField
+                    control={form.control}
+                    name="invoice.deliveryType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipe Pengambilan</FormLabel>
+                        <Select
+                          value={field.value || "delivery"}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih tipe pengambilan" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="self_pickup">Self Pickup (Ambil Sendiri)</SelectItem>
+                            <SelectItem value="delivery">Delivery (Pengiriman)</SelectItem>
+                            <SelectItem value="combination">Combination (Sebagian Ambil, Sebagian Kirim)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {field.value === 'self_pickup' 
+                            ? 'Customer mengambil barang sendiri, tidak perlu surat jalan' 
+                            : 'Perlu membuat surat jalan (delivery note)'}
+                        </FormDescription>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
