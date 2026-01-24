@@ -178,7 +178,7 @@
     line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.15cm 0.15cm 0.15cm 0.15cm;
+    padding: 0.5cm 0.5cm 0.3cm 0.5cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -230,8 +230,8 @@
   /* Header - Optimized Layout */
   .print-header {
     display: grid;
-    grid-template-columns: auto 1fr 4.8cm;
-    gap: 0.2cm;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.3cm;
     margin-bottom: 0.15cm;
     position: relative;
     align-items: start;
@@ -253,9 +253,9 @@
   .print-header-right {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: stretch;
     margin-right: 0;
-    min-width: 4.8cm;
+    min-width: 5cm;
   }
 
   /* Logo */
@@ -409,12 +409,13 @@
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1fr 7.5cm;
-    gap: 0.3cm;
+    grid-template-columns: 1fr auto;
+    gap: 0.5cm;
     border-top: 2px solid #000;
     padding-top: 0.2cm;
     align-items: start;
     margin-top: auto;
+    width: 100%;
   }
 
   .print-footer-left {
@@ -438,7 +439,7 @@
   .print-footer-right {
     display: flex;
     flex-direction: column;
-    min-width: 7.5cm;
+    min-width: 6cm;
     margin-right: 0;
   }
 
