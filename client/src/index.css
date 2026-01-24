@@ -178,7 +178,7 @@
     line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.2cm 0.1cm 0.2cm 0.1cm;
+    padding: 0.2cm 0.3cm 0.2cm 0.3cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -254,7 +254,8 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    margin-right: 0.3cm;
+    margin-right: 0.1cm;
+    min-width: 4.5cm;
   }
 
   /* Logo */
@@ -379,12 +380,10 @@
 
   /* Items table */
   .print-items-table {
-    width: 95%;
+    width: 100%;
     border-collapse: collapse;
     margin-bottom: 0.25cm;
     flex-grow: 1;
-    margin-left: auto;
-    margin-right: auto;
   }
 
   .print-items-table th {
@@ -410,8 +409,8 @@
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.2cm;
+    grid-template-columns: 1fr 7cm;
+    gap: 0.5cm;
     border-top: 2px solid #000;
     padding-top: 0.2cm;
     align-items: start;
@@ -439,7 +438,8 @@
   .print-footer-right {
     display: flex;
     flex-direction: column;
-    min-width: 6.5cm;
+    min-width: 7cm;
+    margin-right: 0;
   }
 
   .print-total-row {
