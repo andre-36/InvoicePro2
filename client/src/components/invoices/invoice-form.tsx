@@ -961,7 +961,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <FormControl>
                           <Input 
                             type="date" 
-                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} 
+                            value={field.value instanceof Date && !isNaN(field.value.getTime()) ? format(field.value, 'yyyy-MM-dd') : ''} 
                             onChange={(e) => field.onChange(new Date(e.target.value))}
                           />
                         </FormControl>
@@ -1010,7 +1010,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <FormControl>
                           <Input 
                             type="date" 
-                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} 
+                            value={field.value instanceof Date && !isNaN(field.value.getTime()) ? format(field.value, 'yyyy-MM-dd') : ''} 
                             onChange={(e) => {
                               field.onChange(new Date(e.target.value));
                               // If user manually changes due date, switch to custom
