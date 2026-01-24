@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import InvoicesPage from "@/pages/invoices";
 import InvoiceDetailPage from "@/pages/invoices/invoice-detail";
 import CreateInvoicePage from "@/pages/invoices/create";
+import EditInvoicePage from "@/pages/invoices/edit";
 import QuotationsPage from "@/pages/quotations";
 import QuotationDetailPage from "@/pages/quotations/quotation-detail";
 import CreateQuotationPage from "@/pages/quotations/create";
@@ -147,6 +148,15 @@ function App() {
                 <Route path="/invoices" component={InvoicesPage} />
                 <Route path="/invoices/create" component={CreateInvoicePage} />
                 <Route path="/invoices/new" component={CreateInvoicePage} />
+                <Route path="/invoices/:id/edit">
+                  {params => {
+                    const id = parseInt(params.id);
+                    if (isNaN(id)) {
+                      return <CreateInvoicePage />;
+                    }
+                    return <EditInvoicePage id={id} />;
+                  }}
+                </Route>
                 <Route path="/invoices/:id">
                   {params => {
                     const id = parseInt(params.id);

@@ -9,8 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { InvoiceForm } from "@/components/invoices/invoice-form";
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +45,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [paymentForm, setPaymentForm] = useState({
@@ -1022,28 +1020,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           </Button>
           
           {isEditable && (
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="gap-1"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span>Edit</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl h-[90vh] p-0">
-                <div className="overflow-auto h-full">
-                  <InvoiceForm 
-                    invoiceId={id} 
-                    onSuccess={() => {
-                      setEditDialogOpen(false);
-                      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
-                    }}
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Link href={`/invoices/${id}/edit`}>
+              <Button
+                variant="outline"
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                <span>Edit</span>
+              </Button>
+            </Link>
           )}
           
           {invoice.status !== 'void' && (
