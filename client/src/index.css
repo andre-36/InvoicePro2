@@ -235,7 +235,8 @@
     margin-bottom: 0.15cm;
     position: relative;
     align-items: start;
-    width: 100%;
+    width: 100% !important;
+    min-width: 100% !important;
   }
 
   .print-header-left {
@@ -380,7 +381,9 @@
 
   /* Items table */
   .print-items-table {
-    width: 100%;
+    width: 100% !important;
+    min-width: 100% !important;
+    table-layout: fixed;
     border-collapse: collapse;
     margin-bottom: 0.25cm;
     flex-grow: 1;
@@ -409,13 +412,14 @@
   /* Footer */
   .print-footer {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.5cm;
+    grid-template-columns: 1fr 6.5cm;
+    gap: 0.3cm;
     border-top: 2px solid #000;
     padding-top: 0.2cm;
     align-items: start;
     margin-top: auto;
-    width: 100%;
+    width: 100% !important;
+    min-width: 100% !important;
   }
 
   .print-footer-left {
