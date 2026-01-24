@@ -367,11 +367,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const invoiceRecord = invoiceData.invoice || invoiceData;
       const itemsArray = invoiceData.items || [];
 
-      console.log('=== LOADING INVOICE DATA ===');
-      console.log('Invoice ID:', invoiceId);
-      console.log('Items from API:', itemsArray);
-      console.log('Items count:', itemsArray.length);
-
       // Populate form with existing invoice data
       const invoice = {
         ...invoiceRecord,
@@ -403,14 +398,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           productUnitId: item.productUnitId || null,
         }));
 
-        console.log('Formatted items:', formattedItems);
-        console.log('Formatted items count:', formattedItems.length);
-
         setItems(formattedItems);
         form.setValue('items', formattedItems);
       } else {
         // Reset to empty default item if no items
-        console.log('No items found, setting default item');
         setItems([{ ...defaultItem }]);
         form.setValue('items', [{ ...defaultItem }]);
       }
@@ -1221,8 +1212,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Debug: Log items array */}
-                      {console.log('=== RENDER ITEMS ===', 'count:', items.length, 'items:', items)}
                       {/* Only render items when not loading in edit mode */}
                       {(invoiceId && isLoadingInvoice) ? (
                         <tr>

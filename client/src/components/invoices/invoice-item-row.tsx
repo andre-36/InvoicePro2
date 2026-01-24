@@ -83,7 +83,6 @@ export function InvoiceItemRow({
   });
   
   useEffect(() => {
-    console.log('InvoiceItemRow sync effect triggered for item:', item.id, item.description);
     setDescription(item.description || "");
     setQuantity(item.quantity || "1");
     setPrice(item.price || "0");
@@ -270,8 +269,8 @@ export function InvoiceItemRow({
               <div className="flex items-center justify-between w-full min-w-0">
                 <span className="truncate text-left">
                   {productId && productId !== "0" 
-                    ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
-                    : "Select a product"}
+                    ? products.find(product => product.id.toString() === productId)?.name || description || "Enter manually"
+                    : description || "Select a product"}
                 </span>
                 {productId && productId !== "0" && (() => {
                   const selectedProduct = products.find(p => p.id.toString() === productId);
