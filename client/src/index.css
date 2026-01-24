@@ -178,7 +178,8 @@
     line-height: 1.15;
     color: #000;
     margin: 0;
-    padding: 0.5cm 0.5cm 0.3cm 0.5cm;
+    padding: 0.5cm;
+    padding-bottom: 0.3cm;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -186,6 +187,12 @@
     transform-origin: top left;
     position: relative;
     overflow: hidden;
+  }
+  
+  .print-invoice-template > * {
+    width: 20.7cm !important;
+    max-width: 20.7cm !important;
+    min-width: 20.7cm !important;
   }
 
   /* Watermark - repeating pattern */
@@ -235,8 +242,9 @@
     margin-bottom: 0.15cm;
     position: relative;
     align-items: start;
-    width: 100% !important;
-    min-width: 100% !important;
+    width: 20.7cm !important;
+    min-width: 20.7cm !important;
+    max-width: 20.7cm !important;
   }
 
   .print-header-left {
@@ -381,8 +389,9 @@
 
   /* Items table */
   .print-items-table {
-    width: 100% !important;
-    min-width: 100% !important;
+    width: 20.7cm !important;
+    min-width: 20.7cm !important;
+    max-width: 20.7cm !important;
     table-layout: fixed;
     border-collapse: collapse;
     margin-bottom: 0.25cm;
@@ -418,8 +427,9 @@
     padding-top: 0.2cm;
     align-items: start;
     margin-top: auto;
-    width: 100% !important;
-    min-width: 100% !important;
+    width: 20.7cm !important;
+    min-width: 20.7cm !important;
+    max-width: 20.7cm !important;
   }
 
   .print-footer-left {
