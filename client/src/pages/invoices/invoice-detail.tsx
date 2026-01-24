@@ -1114,6 +1114,40 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       <span className="text-sm font-medium text-gray-500 md:mb-1">Due Date:</span>
                       <span className="text-sm">{formatDate(invoice.dueDate)}</span>
                     </div>
+                    <div className="flex justify-between md:justify-end md:flex-col">
+                      <span className="text-sm font-medium text-gray-500 md:mb-1">Delivery Type:</span>
+                      <span className="text-sm">
+                        {invoice.deliveryType === 'self_pickup' ? 'Self Pickup' : 
+                         invoice.deliveryType === 'delivery' ? 'Delivery' : 
+                         invoice.deliveryType === 'combination' ? 'Combination' : 
+                         invoice.deliveryType || 'Delivery'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between md:justify-end md:flex-col">
+                      <span className="text-sm font-medium text-gray-500 md:mb-1">Payment Terms:</span>
+                      <span className="text-sm">
+                        {invoice.paymentTerms === 'cod' ? 'COD (Cash on Delivery)' :
+                         invoice.paymentTerms === 'net_7' ? 'Net 7 Days' : 
+                         invoice.paymentTerms === 'net_14' ? 'Net 14 Days' : 
+                         invoice.paymentTerms === 'net_30' ? 'Net 30 Days' : 
+                         invoice.paymentTerms === 'custom' ? 'Custom' :
+                         invoice.paymentTerms || 'Custom'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between md:justify-end md:flex-col">
+                      <span className="text-sm font-medium text-gray-500 md:mb-1">Faktur Pajak:</span>
+                      <span className="text-sm">
+                        {invoice.useFakturPajak ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            Active ({invoice.taxRate || 11}% PPN)
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                            Inactive
+                          </Badge>
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

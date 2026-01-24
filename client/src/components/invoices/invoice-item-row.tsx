@@ -70,6 +70,16 @@ export function InvoiceItemRow({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const commandRef = useRef<HTMLDivElement>(null);
 
+  // Sync local state when item prop changes (e.g., when loading from API)
+  useEffect(() => {
+    setDescription(item.description || "");
+    setQuantity(item.quantity || "1");
+    setPrice(item.price || "0");
+    setTaxRate(item.taxRate || "0");
+    setProductId(item.productId?.toString() || "");
+    setProductUnitId(item.productUnitId?.toString() || "");
+  }, [item.id, item.description, item.quantity, item.price, item.taxRate, item.productId, item.productUnitId]);
+
   // Fetch product units when product changes
   useEffect(() => {
     if (productId && productId !== "0") {

@@ -76,23 +76,25 @@ interface InvoiceFormProps {
   onSuccess?: () => void;
 }
 
+const defaultItem: InvoiceItem = {
+  id: undefined,
+  description: "",
+  quantity: "1",
+  price: "0",
+  taxRate: "0",
+  subtotal: "0",
+  tax: "0",
+  total: "0",
+  productId: null,
+  productUnitId: null
+};
+
 export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [items, setItems] = useState<InvoiceItem[]>([
-    {
-      id: undefined,
-      description: "",
-      quantity: "1",
-      price: "0",
-      taxRate: "0",
-      subtotal: "0",
-      tax: "0",
-      total: "0",
-      productId: null,
-      productUnitId: null
-    }
-  ]);
+  // Start with empty array for edit mode (items will be loaded from API)
+  // Start with default item for new invoice mode
+  const [items, setItems] = useState<InvoiceItem[]>(invoiceId ? [] : [defaultItem]);
 
   // Payment dialog state
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -360,7 +362,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
   // Set up the form when data is loaded  
   useEffect(() => {
-    if (invoiceData) {
+    if (invoiceData && invoiceId) {
       // API returns { invoice: {...}, items: [...], client: {...} }
       const invoiceRecord = invoiceData.invoice || invoiceData;
       const itemsArray = invoiceData.items || [];
@@ -384,17 +386,24 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       if (itemsArray && itemsArray.length > 0) {
         const formattedItems = itemsArray.map((item: any) => ({
-          ...item,
+          id: item.id,
+          description: item.description || "",
           quantity: (item.quantity ?? 1).toString(),
           price: (item.unitPrice ?? item.price ?? 0).toString(),
           taxRate: (item.taxRate ?? 0).toString(),
           subtotal: (item.subtotal ?? 0).toString(),
           tax: (item.taxAmount ?? item.tax ?? 0).toString(),
           total: (item.totalAmount ?? item.total ?? 0).toString(),
+          productId: item.productId || null,
+          productUnitId: item.productUnitId || null,
         }));
 
         setItems(formattedItems);
         form.setValue('items', formattedItems);
+      } else {
+        // Reset to empty default item if no items
+        setItems([{ ...defaultItem }]);
+        form.setValue('items', [{ ...defaultItem }]);
       }
     }
   }, [invoiceData, invoiceId, form]);
@@ -1203,9 +1212,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item, index) => (
+                      {/* Only render items when not loading in edit mode */}
+                      {(invoiceId && isLoadingInvoice) ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                            Loading items...
+                          </td>
+                        </tr>
+                      ) : items.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                            No items yet. Click "Add New Row" to add items.
+                          </td>
+                        </tr>
+                      ) : items.map((item, index) => (
                         <InvoiceItemRow
-                          key={index}
+                          key={item.id ? `item-${item.id}` : `new-${index}`}
                           index={index}
                           item={item}
                           products={(products || []).filter(p => p.isActive !== false)}
