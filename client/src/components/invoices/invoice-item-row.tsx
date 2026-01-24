@@ -71,14 +71,26 @@ export function InvoiceItemRow({
   const commandRef = useRef<HTMLDivElement>(null);
 
   // Sync local state when item prop changes (e.g., when loading from API)
+  // Use JSON stringified item as dependency to catch all changes
+  const itemKey = JSON.stringify({
+    id: item.id,
+    description: item.description,
+    quantity: item.quantity,
+    price: item.price,
+    taxRate: item.taxRate,
+    productId: item.productId,
+    productUnitId: item.productUnitId
+  });
+  
   useEffect(() => {
+    console.log('InvoiceItemRow sync effect triggered for item:', item.id, item.description);
     setDescription(item.description || "");
     setQuantity(item.quantity || "1");
     setPrice(item.price || "0");
     setTaxRate(item.taxRate || "0");
     setProductId(item.productId?.toString() || "");
     setProductUnitId(item.productUnitId?.toString() || "");
-  }, [item.id, item.description, item.quantity, item.price, item.taxRate, item.productId, item.productUnitId]);
+  }, [itemKey]);
 
   // Fetch product units when product changes
   useEffect(() => {
