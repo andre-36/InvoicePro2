@@ -361,25 +361,29 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Set up the form when data is loaded  
   useEffect(() => {
     if (invoiceData) {
+      // API returns { invoice: {...}, items: [...], client: {...} }
+      const invoiceRecord = invoiceData.invoice || invoiceData;
+      const itemsArray = invoiceData.items || [];
+
       // Populate form with existing invoice data
       const invoice = {
-        ...invoiceData,
-        paymentTerms: invoiceData.paymentTerms || 'custom', // Default to custom for existing invoices without paymentTerms
-        issueDate: new Date(invoiceData.issueDate),
-        dueDate: new Date(invoiceData.dueDate),
-        subtotal: (invoiceData.subtotal ?? 0).toString(),
-        tax: (invoiceData.tax ?? 0).toString(),
-        discount: (invoiceData.discount ?? 0).toString(),
-        total: (invoiceData.total ?? 0).toString(),
-        useFakturPajak: invoiceData.useFakturPajak || false,
-        taxRate: invoiceData.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
-        deliveryType: invoiceData.deliveryType || "delivery",
+        ...invoiceRecord,
+        paymentTerms: invoiceRecord.paymentTerms || 'custom', // Default to custom for existing invoices without paymentTerms
+        issueDate: new Date(invoiceRecord.issueDate),
+        dueDate: new Date(invoiceRecord.dueDate),
+        subtotal: (invoiceRecord.subtotal ?? 0).toString(),
+        tax: (invoiceRecord.tax ?? 0).toString(),
+        discount: (invoiceRecord.discount ?? 0).toString(),
+        total: (invoiceRecord.total ?? 0).toString(),
+        useFakturPajak: invoiceRecord.useFakturPajak || false,
+        taxRate: invoiceRecord.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
+        deliveryType: invoiceRecord.deliveryType || "delivery",
       };
 
       form.setValue('invoice', invoice);
 
-      if (invoiceData.items && invoiceData.items.length > 0) {
-        const formattedItems = invoiceData.items.map(item => ({
+      if (itemsArray && itemsArray.length > 0) {
+        const formattedItems = itemsArray.map((item: any) => ({
           ...item,
           quantity: (item.quantity ?? 1).toString(),
           price: (item.price ?? 0).toString(),
@@ -850,10 +854,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         taxNumber: client.taxNumber,
       };
 
+      const parseDate = (dateVal: any): Date => {
+        if (dateVal instanceof Date && !isNaN(dateVal.getTime())) return dateVal;
+        if (typeof dateVal === 'string' && dateVal) {
+          const parsed = new Date(dateVal);
+          if (!isNaN(parsed.getTime())) return parsed;
+        }
+        return new Date();
+      };
+
       const safeInvoice = {
         invoiceNumber: values.invoice.invoiceNumber || `INV-${Date.now()}`,
-        issueDate: format(values.invoice.issueDate || new Date(), 'MMM dd, yyyy'),
-        dueDate: format(values.invoice.dueDate || new Date(), 'MMM dd, yyyy'),
+        issueDate: format(parseDate(values.invoice.issueDate), 'MMM dd, yyyy'),
+        dueDate: format(parseDate(values.invoice.dueDate), 'MMM dd, yyyy'),
         status: values.invoice.status || "draft",
         subtotal: values.invoice.subtotal || "0",
         tax: values.invoice.tax || "0",
@@ -944,7 +957,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                     <FormLabel>Invoice Number</FormLabel>
                     <FormControl>
                       <Input 
-                        value={invoiceId ? (invoiceData?.invoiceNumber || "") : (nextInvoiceNumber || generateFallbackInvoiceNumber())}
+                        value={invoiceId ? (invoiceData?.invoice?.invoiceNumber || "") : (nextInvoiceNumber || generateFallbackInvoiceNumber())}
                         readOnly 
                         className="bg-gray-50 dark:bg-gray-800" 
                         data-testid="input-invoice-number"
