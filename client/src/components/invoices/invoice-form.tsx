@@ -386,11 +386,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         const formattedItems = itemsArray.map((item: any) => ({
           ...item,
           quantity: (item.quantity ?? 1).toString(),
-          price: (item.price ?? 0).toString(),
+          price: (item.unitPrice ?? item.price ?? 0).toString(),
           taxRate: (item.taxRate ?? 0).toString(),
           subtotal: (item.subtotal ?? 0).toString(),
-          tax: (item.tax ?? 0).toString(),
-          total: (item.total ?? 0).toString(),
+          tax: (item.taxAmount ?? item.tax ?? 0).toString(),
+          total: (item.totalAmount ?? item.total ?? 0).toString(),
         }));
 
         setItems(formattedItems);
