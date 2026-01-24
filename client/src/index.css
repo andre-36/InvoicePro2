@@ -100,10 +100,10 @@
   }
 }
 
-/* Print styles for Half Size PRS Paper (13.8cm x 21.7cm) */
+/* Print styles for Half Size PRS Paper (24cm x 14cm actual size) */
 @media print {
   @page {
-    size: 21.7cm 13.8cm landscape;
+    size: 24cm 14cm landscape;
     margin: 0;
   }
 
@@ -117,8 +117,8 @@
     color: black !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 21.7cm !important;
-    height: 13.8cm !important;
+    width: 24cm !important;
+    height: 14cm !important;
     overflow: visible !important;
   }
 
@@ -129,8 +129,8 @@
   main {
     margin: 0 !important;
     padding: 0 !important;
-    width: 21.7cm !important;
-    max-width: 21.7cm !important;
+    width: 24cm !important;
+    max-width: 24cm !important;
     margin-left: 0 !important;
     padding-left: 0 !important;
   }
@@ -153,6 +153,21 @@
   .bg-gray-900 {
     display: none !important;
   }
+  
+  /* Hide toast notifications during print */
+  [data-sonner-toaster],
+  [data-radix-toast-viewport],
+  .toast,
+  .toaster,
+  [role="status"],
+  .fixed.bottom-0,
+  .fixed.top-0.right-0,
+  [data-state="open"][role="alertdialog"],
+  div[class*="toast"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
 
   /* Hide screen-only content */
   .screen-only {
@@ -165,14 +180,14 @@
     visibility: visible !important;
     opacity: 1 !important;
     position: static !important;
-    width: 21.7cm !important;
-    height: 13.8cm !important;
+    width: 24cm !important;
+    height: 14cm !important;
   }
 
   /* Print template layout - scaled up to fill page */
   .print-invoice-template {
-    width: 21.7cm;
-    height: 13.8cm;
+    width: 24cm;
+    height: 14cm;
     font-family: 'Times New Roman', serif;
     font-size: 13pt;
     line-height: 1.15;
@@ -190,9 +205,9 @@
   }
   
   .print-invoice-template > * {
-    width: 20.7cm !important;
-    max-width: 20.7cm !important;
-    min-width: 20.7cm !important;
+    width: 23cm !important;
+    max-width: 23cm !important;
+    min-width: 23cm !important;
   }
 
   /* Watermark - repeating pattern */
@@ -200,8 +215,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 21.7cm;
-    height: 13.8cm;
+    width: 24cm;
+    height: 14cm;
     overflow: hidden;
     pointer-events: none;
     z-index: 0;
@@ -242,9 +257,9 @@
     margin-bottom: 0.15cm;
     position: relative;
     align-items: start;
-    width: 20.7cm !important;
-    min-width: 20.7cm !important;
-    max-width: 20.7cm !important;
+    width: 23cm !important;
+    min-width: 23cm !important;
+    max-width: 23cm !important;
   }
 
   .print-header-left {
@@ -389,9 +404,9 @@
 
   /* Items table */
   .print-items-table {
-    width: 20.7cm !important;
-    min-width: 20.7cm !important;
-    max-width: 20.7cm !important;
+    width: 23cm !important;
+    min-width: 23cm !important;
+    max-width: 23cm !important;
     table-layout: fixed;
     border-collapse: collapse;
     margin-bottom: 0.25cm;
@@ -427,9 +442,9 @@
     padding-top: 0.2cm;
     align-items: start;
     margin-top: auto;
-    width: 20.7cm !important;
-    min-width: 20.7cm !important;
-    max-width: 20.7cm !important;
+    width: 23cm !important;
+    min-width: 23cm !important;
+    max-width: 23cm !important;
   }
 
   .print-footer-left {
