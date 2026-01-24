@@ -837,7 +837,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               )}
               <div className="print-company-address">
                 {currentUser?.companyAddress || "Your Company Address"}
-                {currentUser?.companyPhone && ` | Phone: ${currentUser.companyPhone}`}
+                {currentUser?.companyPhone && (
+                  <>
+                    <br />
+                    Phone: {currentUser.companyPhone}
+                  </>
+                )}
+                {currentUser?.companyEmail && (
+                  <>
+                    {currentUser?.companyPhone ? ' / ' : <br />}
+                    Email: {currentUser.companyEmail}
+                  </>
+                )}
               </div>
             </div>
             
@@ -857,6 +868,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <span className="print-doc-label">Due Date</span>
                   <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
                 </div>
+                {printSettings?.showPONumber !== false && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">PO Number</span>
+                    <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
+                  </div>
+                )}
                 {/* Page indicator */}
                 <div className="print-doc-row">
                   <span className="print-doc-label">Page</span>
@@ -879,32 +896,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => {
-                const qty = parseFloat(item.quantity);
-                const formattedQty = Number.isInteger(qty) ? qty.toString() : qty.toFixed(2);
-                const unitPrice = parseFloat(item.unitPrice);
-                const totalAmount = parseFloat(item.totalAmount);
-                return (
-                  <tr key={index}>
-                    <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                    <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
-                    <td>{item.description}</td>
-                    <td style={{ textAlign: 'center' }}>{formattedQty}</td>
-                    <td>
-                      <div className="print-currency">
-                        <span className="print-currency-symbol">Rp</span>
-                        <span className="print-currency-value">{unitPrice.toLocaleString('id-ID')}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="print-currency">
-                        <span className="print-currency-symbol">Rp</span>
-                        <span className="print-currency-value">{totalAmount.toLocaleString('id-ID')}</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
+                  <td>{item.description}</td>
+                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
@@ -921,64 +922,34 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 <>
                   <div className="print-total-row">
                     <span className="print-total-label">DPP</span>
-                    <span className="print-total-value">
-                      <div className="print-currency">
-                        <span className="print-currency-symbol">Rp</span>
-                        <span className="print-currency-value">{parseFloat(invoice.subtotal).toLocaleString('id-ID')}</span>
-                      </div>
-                    </span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
                   </div>
                   <div className="print-total-row">
                     <span className="print-total-label">PPN ({(invoice as any).taxRate || 11}%)</span>
-                    <span className="print-total-value">
-                      <div className="print-currency">
-                        <span className="print-currency-symbol">Rp</span>
-                        <span className="print-currency-value">{parseFloat(invoice.tax).toLocaleString('id-ID')}</span>
-                      </div>
-                    </span>
+                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.tax))}</span>
                   </div>
                 </>
               ) : (
                 <div className="print-total-row">
                   <span className="print-total-label">Subtotal</span>
-                  <span className="print-total-value">
-                    <div className="print-currency">
-                      <span className="print-currency-symbol">Rp</span>
-                      <span className="print-currency-value">{parseFloat(invoice.subtotal).toLocaleString('id-ID')}</span>
-                    </div>
-                  </span>
+                  <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
                 </div>
               )}
               {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
-                  <span className="print-total-value">
-                    <div className="print-currency">
-                      <span className="print-currency-symbol">-Rp</span>
-                      <span className="print-currency-value">{parseFloat(invoice.discount).toLocaleString('id-ID')}</span>
-                    </div>
-                  </span>
+                  <span className="print-total-value">-{formatCurrency(parseFloat(invoice.discount))}</span>
                 </div>
               )}
               {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Shipping</span>
-                  <span className="print-total-value">
-                    <div className="print-currency">
-                      <span className="print-currency-symbol">Rp</span>
-                      <span className="print-currency-value">{parseFloat((invoice as any).shipping).toLocaleString('id-ID')}</span>
-                    </div>
-                  </span>
+                  <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
                 </div>
               )}
               <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
                 <span className="print-total-label">TOTAL</span>
-                <span className="print-total-value">
-                  <div className="print-currency">
-                    <span className="print-currency-symbol">Rp</span>
-                    <span className="print-currency-value">{parseFloat(invoice.totalAmount).toLocaleString('id-ID')}</span>
-                  </div>
-                </span>
+                <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
               </div>
             </div>
           </div>
