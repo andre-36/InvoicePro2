@@ -367,10 +367,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         paymentTerms: invoiceData.paymentTerms || 'custom', // Default to custom for existing invoices without paymentTerms
         issueDate: new Date(invoiceData.issueDate),
         dueDate: new Date(invoiceData.dueDate),
-        subtotal: invoiceData.subtotal.toString(),
-        tax: invoiceData.tax.toString(),
-        discount: invoiceData.discount.toString(),
-        total: invoiceData.total.toString(),
+        subtotal: (invoiceData.subtotal ?? 0).toString(),
+        tax: (invoiceData.tax ?? 0).toString(),
+        discount: (invoiceData.discount ?? 0).toString(),
+        total: (invoiceData.total ?? 0).toString(),
         useFakturPajak: invoiceData.useFakturPajak || false,
         taxRate: invoiceData.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
         deliveryType: invoiceData.deliveryType || "delivery",
@@ -381,12 +381,12 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       if (invoiceData.items && invoiceData.items.length > 0) {
         const formattedItems = invoiceData.items.map(item => ({
           ...item,
-          quantity: item.quantity.toString(),
-          price: item.price.toString(),
-          taxRate: item.taxRate.toString(),
-          subtotal: item.subtotal.toString(),
-          tax: item.tax.toString(),
-          total: item.total.toString(),
+          quantity: (item.quantity ?? 1).toString(),
+          price: (item.price ?? 0).toString(),
+          taxRate: (item.taxRate ?? 0).toString(),
+          subtotal: (item.subtotal ?? 0).toString(),
+          tax: (item.tax ?? 0).toString(),
+          total: (item.total ?? 0).toString(),
         }));
 
         setItems(formattedItems);
