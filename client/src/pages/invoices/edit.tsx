@@ -8,8 +8,8 @@ interface EditInvoicePageProps {
 export default function EditInvoicePage({ id }: EditInvoicePageProps) {
   const [, navigate] = useLocation();
   
-  const handleSuccess = () => {
-    navigate(`/invoices/${id}`);
+  const handleSuccess = (invoiceId: number) => {
+    navigate(`/invoices/${invoiceId}`);
   };
   
   return (

@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -73,7 +74,7 @@ type InvoiceItem = z.infer<typeof invoiceItemSchema>;
 
 interface InvoiceFormProps {
   invoiceId?: number;
-  onSuccess?: () => void;
+  onSuccess?: (savedInvoiceId: number) => void;
 }
 
 const defaultItem: InvoiceItem = {
@@ -92,6 +93,7 @@ const defaultItem: InvoiceItem = {
 export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   // Start with empty array for edit mode (items will be loaded from API)
   // Start with default item for new invoice mode
   const [items, setItems] = useState<InvoiceItem[]>(invoiceId ? [] : [defaultItem]);
@@ -113,6 +115,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState<number | null>(null);
+  
+  // Track if initial data has loaded (to prevent false hasUnsavedChanges)
+  // Use a ref to suppress unsaved changes detection during data loading
+  // The ref provides synchronous access and is more reliable than state for guards
+  const isDataHydratingRef = useRef(!!invoiceId);
+  // Track number of pending item syncs to know when all rows have settled
+  const pendingItemSyncsRef = useRef(0);
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(!invoiceId);
 
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
@@ -287,13 +297,25 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       };
 
       const currentId = invoiceId || savedInvoiceId;
+      let response: Response;
       if (currentId) {
-        return apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
+        response = await apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
       } else {
-        return apiRequest('POST', '/api/invoices', formattedValues);
+        response = await apiRequest('POST', '/api/invoices', formattedValues);
       }
+      // Parse response to get invoice data with ID (handle empty/non-JSON responses)
+      let data = {};
+      try {
+        const text = await response.text();
+        if (text) {
+          data = JSON.parse(text);
+        }
+      } catch (e) {
+        console.warn('Could not parse response as JSON:', e);
+      }
+      return { ...data, existingId: currentId };
     },
-    onSuccess: async () => {
+    onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
       setHasUnsavedChanges(false);
@@ -301,9 +323,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         title: invoiceId ? "Invoice updated" : "Invoice created",
         description: invoiceId ? "Your invoice has been updated successfully." : "Your invoice has been created successfully.",
       });
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-      }, 100);
+      // Navigate to the invoice detail page
+      const resultId = result.existingId || result.id;
+      if (onSuccess && resultId) {
+        onSuccess(resultId);
+      } else if (onSuccess && invoiceId) {
+        onSuccess(invoiceId);
+      }
     },
     onError: (error) => {
       toast({
@@ -330,20 +356,33 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       };
 
       const currentId = invoiceId || savedInvoiceId;
+      let response: Response;
       if (currentId) {
-        return apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
+        response = await apiRequest('PUT', `/api/invoices/${currentId}`, formattedValues);
       } else {
-        return apiRequest('POST', '/api/invoices', formattedValues);
+        response = await apiRequest('POST', '/api/invoices', formattedValues);
       }
+      // Parse response to get invoice data with ID (handle empty/non-JSON responses)
+      let data: any = {};
+      try {
+        const text = await response.text();
+        if (text) {
+          data = JSON.parse(text);
+        }
+      } catch (e) {
+        console.warn('Could not parse response as JSON:', e);
+      }
+      return { ...data, existingId: currentId };
     },
-    onSuccess: async (response: any) => {
+    onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
       setHasUnsavedChanges(false);
       
       // If this was a new invoice, store the ID so subsequent saves update the same invoice
-      if (!invoiceId && !savedInvoiceId && response?.id) {
-        setSavedInvoiceId(response.id);
+      const newId = result?.id;
+      if (!invoiceId && !savedInvoiceId && newId) {
+        setSavedInvoiceId(newId);
       }
       
       toast({
@@ -405,6 +444,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         setItems([{ ...defaultItem }]);
         form.setValue('items', [{ ...defaultItem }]);
       }
+      
+      // Mark initial load as complete after a longer delay to allow all item rows to sync
+      // This delay is defensive - item rows may trigger updateItem during their initial sync
+      // A 1 second delay is generous and should handle any practical load scenario
+      const hydrateTimeout = setTimeout(() => {
+        isDataHydratingRef.current = false;
+        setIsInitialLoadComplete(true);
+      }, 1000);
+      
+      return () => clearTimeout(hydrateTimeout);
     }
   }, [invoiceData, invoiceId, form]);
 
@@ -473,7 +522,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     };
 
     setItems([...items, newItem]);
-    setHasUnsavedChanges(true);
+    if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
   };
 
   // Remove an invoice item
@@ -482,7 +531,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const newItems = [...items];
       newItems.splice(index, 1);
       setItems(newItems);
-      setHasUnsavedChanges(true);
+      if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
     } else {
       toast({
         title: "Error",
@@ -518,7 +567,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       return newItems;
     });
-    setHasUnsavedChanges(true);
+    if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
   };
 
   // Handle product selection
@@ -543,7 +592,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           newItems[index] = updatedItem;
           return newItems;
         });
-        setHasUnsavedChanges(true);
+        if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
       }
       return;
     }
@@ -584,7 +633,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         newItems[index] = updatedItem;
         return newItems;
       });
-      setHasUnsavedChanges(true);
+      if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
 
     } catch (error) {
       console.error("Error updating item:", error);
@@ -743,12 +792,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     if (hasUnsavedChanges && hasMeaningfulData) {
       setShowBackConfirmDialog(true);
     } else {
-      onSuccess?.();
+      // Navigate back to invoice list or detail page
+      navigate(invoiceId ? `/invoices/${invoiceId}` : '/invoices');
     }
   };
 
-  // Save as draft without navigating away
-  const saveDraft = async () => {
+  // Save as draft without navigating away - returns the invoice ID if saved
+  const saveDraft = async (): Promise<number | null> => {
     try {
       const invoiceData = form.getValues('invoice');
 
@@ -767,7 +817,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           description: "Please add a client or at least one item before saving.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
       // Transform items to match database schema (same as saveAndSend)
@@ -794,7 +844,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         items: transformedItems
       };
 
-      saveDraftMutation.mutate(formData);
+      const result = await saveDraftMutation.mutateAsync(formData);
+      return result.existingId || result.id || null;
     } catch (error) {
       console.error('Error saving draft:', error);
       toast({
@@ -802,6 +853,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         description: `An error occurred while saving: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
+      return null;
     }
   };
 
@@ -809,17 +861,20 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const discardAndGoBack = () => {
     setShowBackConfirmDialog(false);
     setHasUnsavedChanges(false);
-    onSuccess?.();
+    // Navigate back to invoice list or detail page
+    navigate(invoiceId ? `/invoices/${invoiceId}` : '/invoices');
   };
 
   // Save and go back
   const saveAndGoBack = async () => {
     setShowBackConfirmDialog(false);
-    await saveDraft();
-    // Wait a bit then navigate
-    setTimeout(() => {
-      onSuccess?.();
-    }, 500);
+    const savedId = await saveDraft();
+    // Navigate to saved invoice detail or back to list
+    if (savedId) {
+      navigate(`/invoices/${savedId}`);
+    } else {
+      navigate('/invoices');
+    }
   };
 
   // Handle invoice PDF generation
@@ -1237,7 +1292,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                               newItems[idx] = updatedItem;
                               return newItems;
                             });
-                            setHasUnsavedChanges(true);
+                            if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
                           }}
                           removeItem={removeItem}
                           onProductSelect={handleProductSelect}
@@ -1555,27 +1610,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             </Button>
             <Button
               type="button"
-              variant="secondary"
               onClick={(e) => {
                 e.preventDefault();
-                saveDraft();
-              }}
-              disabled={mutation.isPending || saveDraftMutation.isPending}
-            >
-              <Save className="mr-1.5 h-4 w-4" />
-              <span>Save Draft</span>
-            </Button>
-            <Button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                console.log('Create Invoice button clicked');
                 saveAndSend();
               }}
               disabled={mutation.isPending || saveDraftMutation.isPending}
             >
               <Check className="mr-1.5 h-4 w-4" />
-              <span>{invoiceId || savedInvoiceId ? 'Update & Send' : 'Create & Send'}</span>
+              <span>{invoiceId || savedInvoiceId ? 'Update' : 'Create'}</span>
             </Button>
           </CardFooter>
 

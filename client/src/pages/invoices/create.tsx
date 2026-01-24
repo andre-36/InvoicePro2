@@ -4,8 +4,8 @@ import { useLocation } from "wouter";
 export default function CreateInvoicePage() {
   const [, navigate] = useLocation();
   
-  const handleSuccess = () => {
-    navigate("/invoices");
+  const handleSuccess = (invoiceId: number) => {
+    navigate(`/invoices/${invoiceId}`);
   };
   
   return (
