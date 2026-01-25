@@ -153,7 +153,7 @@ export function QuotationItemRow({
   };
 
   const selectedProductName = productId && productId !== "0" 
-    ? products.find(product => product.id.toString() === productId)?.name || "Enter manually"
+    ? products.find(product => product.id.toString() === productId)?.name || description || "Enter manually"
     : "Select a product";
 
   return (
