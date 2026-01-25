@@ -50,7 +50,7 @@ type Quotation = {
   convertedToInvoiceId?: number;
 };
 
-type QuotationStatus = 'all' | 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+type QuotationStatus = 'all' | 'draft' | 'sent' | 'converted' | 'rejected' | 'expired';
 
 export default function QuotationsPage() {
   const [, navigate] = useLocation();
@@ -108,14 +108,13 @@ export default function QuotationsPage() {
     },
   });
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string, convertedToInvoiceId?: number | null) => {
+    if (convertedToInvoiceId || status === 'accepted') return 'success';
     switch (status) {
       case 'draft':
         return 'secondary';
       case 'sent':
         return 'default';
-      case 'accepted':
-        return 'success';
       case 'rejected':
         return 'destructive';
       case 'expired':
@@ -124,22 +123,34 @@ export default function QuotationsPage() {
         return 'secondary';
     }
   };
+  
+  const getStatusLabel = (status: string, convertedToInvoiceId?: number | null) => {
+    if (convertedToInvoiceId || status === 'accepted') return 'Converted';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
 
   const filteredQuotations = quotations?.filter((quotation) => {
     const matchesSearch = 
       quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (quotation.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
+    let matchesStatus = statusFilter === 'all';
+    if (!matchesStatus) {
+      if (statusFilter === 'converted') {
+        matchesStatus = !!quotation.convertedToInvoiceId || quotation.status === 'accepted';
+      } else {
+        matchesStatus = quotation.status === statusFilter && !quotation.convertedToInvoiceId && quotation.status !== 'accepted';
+      }
+    }
     return matchesSearch && matchesStatus;
   }) || [];
 
   const stats = {
     total: quotations?.length || 0,
-    draft: quotations?.filter(q => q.status === 'draft').length || 0,
-    sent: quotations?.filter(q => q.status === 'sent').length || 0,
-    accepted: quotations?.filter(q => q.status === 'accepted').length || 0,
+    draft: quotations?.filter(q => q.status === 'draft' && !q.convertedToInvoiceId).length || 0,
+    sent: quotations?.filter(q => q.status === 'sent' && !q.convertedToInvoiceId).length || 0,
+    converted: quotations?.filter(q => q.convertedToInvoiceId || q.status === 'accepted').length || 0,
     rejected: quotations?.filter(q => q.status === 'rejected').length || 0,
-    expired: quotations?.filter(q => q.status === 'expired').length || 0,
+    expired: quotations?.filter(q => q.status === 'expired' && !q.convertedToInvoiceId).length || 0,
   };
 
   return (
@@ -185,10 +196,10 @@ export default function QuotationsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Accepted</CardTitle>
+            <CardTitle className="text-sm font-medium">Converted</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-accepted">{stats.accepted}</div>
+            <div className="text-2xl font-bold" data-testid="stat-converted">{stats.converted}</div>
           </CardContent>
         </Card>
         <Card>
@@ -237,7 +248,7 @@ export default function QuotationsPage() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="converted">Converted</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
               </SelectContent>
@@ -285,14 +296,9 @@ export default function QuotationsPage() {
                         {formatCurrency(parseFloat(quotation.totalAmount))}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(quotation.status) as any}>
-                          {quotation.status}
+                        <Badge variant={getStatusBadgeVariant(quotation.status, quotation.convertedToInvoiceId) as any}>
+                          {getStatusLabel(quotation.status, quotation.convertedToInvoiceId)}
                         </Badge>
-                        {quotation.convertedToInvoiceId && (
-                          <Badge variant="outline" className="ml-1">
-                            Converted
-                          </Badge>
-                        )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

@@ -372,7 +372,7 @@ export const quotations = pgTable("quotations", {
   quotationNumber: varchar("quotation_number", { length: 50 }).notNull().unique(),
   clientId: integer("client_id").references(() => clients.id),
   issueDate: date("issue_date").notNull(),
-  expiryDate: date("expiry_date").notNull(),
+  expiryDate: date("expiry_date"),
   status: quotationStatusEnum("status").default("draft").notNull(),
   useFakturPajak: boolean("use_faktur_pajak").default(false).notNull(),
   subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),

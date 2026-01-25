@@ -192,14 +192,13 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     },
   });
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string, convertedToInvoiceId?: number | null) => {
+    if (convertedToInvoiceId || status === 'accepted') return 'success';
     switch (status) {
       case 'draft':
         return 'secondary';
       case 'sent':
         return 'default';
-      case 'accepted':
-        return 'success';
       case 'rejected':
         return 'destructive';
       case 'expired':
@@ -207,6 +206,11 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       default:
         return 'secondary';
     }
+  };
+  
+  const getStatusLabel = (status: string, convertedToInvoiceId?: number | null) => {
+    if (convertedToInvoiceId || status === 'accepted') return 'Converted';
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   if (isLoading) {
@@ -445,18 +449,13 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               {quotation.quotationNumber}
             </h1>
             <div className="flex items-center space-x-2">
-              <Badge variant={getStatusBadgeVariant(quotation.status) as any}>
-                {quotation.status}
+              <Badge variant={getStatusBadgeVariant(quotation.status, quotation.convertedToInvoiceId) as any}>
+                {getStatusLabel(quotation.status, quotation.convertedToInvoiceId)}
               </Badge>
               {quotation.status === 'rejected' && quotation.rejectionReason && (
                 <span className="text-sm text-muted-foreground italic">
                   Reason: {quotation.rejectionReason}
                 </span>
-              )}
-              {quotation.convertedToInvoiceId && (
-                <Badge variant="outline">
-                  Converted to Invoice
-                </Badge>
               )}
             </div>
           </div>

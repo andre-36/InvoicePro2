@@ -2243,11 +2243,10 @@ export class DatabaseStorage implements IStorage {
           });
       }
 
-      // Update the quotation to mark it as converted
+      // Update the quotation to mark it as converted (only set convertedToInvoiceId, not status)
       await tx
         .update(quotations)
         .set({ 
-          status: 'accepted',
           convertedToInvoiceId: newInvoice.id,
           updatedAt: new Date()
         })
