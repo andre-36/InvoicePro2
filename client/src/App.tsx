@@ -36,6 +36,8 @@ import PrintSettingsPage from "@/pages/print-settings";
 import PaymentMethodsPage from "@/pages/payment-methods";
 import PaymentTypesPage from "@/pages/payment-types";
 import PaymentTermsPage from "@/pages/payment-terms";
+import DeliveryNotesPage from "@/pages/delivery-notes";
+import DeliveryPlanningPage from "@/pages/delivery-notes/planning";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -174,6 +176,8 @@ function App() {
                 <Route path="/quotations/:id">
                   {params => <QuotationDetailPage id={parseInt(params.id)} />}
                 </Route>
+                <Route path="/delivery-notes" component={DeliveryNotesPage} />
+                <Route path="/delivery-notes/planning" component={DeliveryPlanningPage} />
                 <Route path="/purchase-orders" component={PurchaseOrdersPage} />
                 <Route path="/purchase-orders/create" component={CreatePurchaseOrderPage} />
                 <Route path="/purchase-orders/:id/edit">
