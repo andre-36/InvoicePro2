@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, MapPin, Package, Filter } from "lucide-react";
+import { ArrowLeft, Printer, MapPin, Package, Filter, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import type { DeliveryNote, Invoice, Client, DeliveryNoteItem, InvoiceItem, Product, Category } from "@shared/schema";
+
+const STORAGE_KEY = "delivery_planning_categories";
 
 type DeliveryNoteWithDetails = DeliveryNote & { 
   invoice: Invoice & { client: Client | null };
@@ -46,7 +48,7 @@ type ClientDelivery = {
 export default function DeliveryPlanningPage() {
   const [, navigate] = useLocation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
   const { data: deliveryNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
@@ -61,6 +63,24 @@ export default function DeliveryPlanningPage() {
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['/api/categories']
   });
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const ids = JSON.parse(saved) as number[];
+        setSelectedCategoryIds(new Set(ids));
+      } catch (e) {
+        console.error('Failed to parse saved categories:', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategoryIds.size > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedCategoryIds)));
+    }
+  }, [selectedCategoryIds]);
 
   const categoryMap = new Map(categories?.map(c => [c.id, c.name]) || []);
 
@@ -83,6 +103,27 @@ export default function DeliveryPlanningPage() {
     }
   };
 
+  const toggleCategorySelection = (categoryId: number) => {
+    const newSet = new Set(selectedCategoryIds);
+    if (newSet.has(categoryId)) {
+      newSet.delete(categoryId);
+    } else {
+      newSet.add(categoryId);
+    }
+    setSelectedCategoryIds(newSet);
+  };
+
+  const selectAllCategories = () => {
+    if (categories) {
+      setSelectedCategoryIds(new Set(categories.map(c => c.id)));
+    }
+  };
+
+  const clearCategorySelection = () => {
+    setSelectedCategoryIds(new Set());
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
   const getDeliveryAddress = (note: DeliveryNoteWithDetails) => {
     if (note.invoice?.deliveryAddress) {
       return note.invoice.deliveryAddress;
@@ -102,6 +143,15 @@ export default function DeliveryPlanningPage() {
       toast({
         title: "Error",
         description: "Pilih minimal satu surat jalan untuk dicetak",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (selectedCategoryIds.size === 0) {
+      toast({
+        title: "Error",
+        description: "Pilih minimal satu kategori untuk ditampilkan",
         variant: "destructive"
       });
       return;
@@ -152,16 +202,13 @@ export default function DeliveryPlanningPage() {
 
       let clientDeliveries = Array.from(clientMap.values());
 
-      if (selectedCategoryId !== "all") {
-        const filterCategoryId = parseInt(selectedCategoryId);
-        clientDeliveries = clientDeliveries.map(client => ({
-          ...client,
-          deliveryNotes: client.deliveryNotes.map(dn => ({
-            ...dn,
-            items: dn.items.filter(item => item.categoryId === filterCategoryId)
-          })).filter(dn => dn.items.length > 0)
-        })).filter(client => client.deliveryNotes.length > 0);
-      }
+      clientDeliveries = clientDeliveries.map(client => ({
+        ...client,
+        deliveryNotes: client.deliveryNotes.map(dn => ({
+          ...dn,
+          items: dn.items.filter(item => selectedCategoryIds.has(item.categoryId))
+        })).filter(dn => dn.items.length > 0)
+      })).filter(client => client.deliveryNotes.length > 0);
 
       if (clientDeliveries.length === 0) {
         toast({
@@ -179,9 +226,10 @@ export default function DeliveryPlanningPage() {
         day: 'numeric' 
       });
 
-      const filterLabel = selectedCategoryId === "all" 
-        ? "Semua Kategori" 
-        : categoryMap.get(parseInt(selectedCategoryId)) || "Kategori";
+      const selectedCategoryNames = Array.from(selectedCategoryIds)
+        .map(id => categoryMap.get(id))
+        .filter(Boolean)
+        .join(', ');
 
       const printContent = `
         <!DOCTYPE html>
@@ -308,7 +356,7 @@ export default function DeliveryPlanningPage() {
             <h1>DAFTAR PENGIRIMAN</h1>
             <p>${today}</p>
             <p style="margin-top: 5px;">${clientDeliveries.length} Tujuan | ${selectedIds.size} Surat Jalan</p>
-            <div class="filter-badge">Filter: ${filterLabel}</div>
+            <div class="filter-badge">Kategori: ${selectedCategoryNames}</div>
           </div>
 
           ${clientDeliveries.map((client, idx) => {
@@ -446,25 +494,57 @@ export default function DeliveryPlanningPage() {
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Kategori</SelectItem>
-                    {categories?.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[220px] justify-start">
+                    <Filter className="h-4 w-4 mr-2" />
+                    {selectedCategoryIds.size === 0 
+                      ? "Pilih Kategori" 
+                      : `${selectedCategoryIds.size} kategori dipilih`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-2" align="end">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center pb-2 border-b">
+                      <span className="text-sm font-medium">Filter Kategori</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAllCategories}>
+                          Semua
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearCategorySelection}>
+                          Hapus
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto space-y-1">
+                      {categories?.map(cat => (
+                        <div
+                          key={cat.id}
+                          className="flex items-center gap-2 p-2 rounded hover:bg-accent cursor-pointer"
+                          onClick={() => toggleCategorySelection(cat.id)}
+                        >
+                          <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                            selectedCategoryIds.has(cat.id) ? 'bg-primary border-primary' : 'border-input'
+                          }`}>
+                            {selectedCategoryIds.has(cat.id) && (
+                              <Check className="h-3 w-3 text-primary-foreground" />
+                            )}
+                          </div>
+                          <span className="text-sm">{cat.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedCategoryIds.size > 0 && (
+                      <div className="pt-2 border-t text-xs text-muted-foreground">
+                        Pilihan akan tersimpan sebagai default
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Button 
                 onClick={handlePrint} 
-                disabled={selectedIds.size === 0}
+                disabled={selectedIds.size === 0 || selectedCategoryIds.size === 0}
               >
                 <Printer className="h-4 w-4 mr-2" />
                 Print Daftar Pengiriman ({selectedIds.size})
