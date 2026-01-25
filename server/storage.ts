@@ -128,6 +128,7 @@ export interface IStorage {
   getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[] } | undefined>;
   getDeliveryNotesByInvoice(invoiceId: number): Promise<DeliveryNote[]>;
   getDeliveryNotes(storeId: number): Promise<DeliveryNote[]>;
+  getDeliveryNotesWithDetails(storeId: number, status?: string): Promise<(DeliveryNote & { invoice: Invoice & { client: Client | null }, itemCount: number })[]>;
   getInvoiceDeliveryStatus(invoiceId: number): Promise<{ orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[]; fullyDelivered: boolean }>;
   createDeliveryNote(deliveryNote: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote>;
   updateDeliveryNote(id: number, deliveryNote: Partial<InsertDeliveryNote>): Promise<DeliveryNote>;
@@ -1697,6 +1698,48 @@ export class DatabaseStorage implements IStorage {
       .from(deliveryNotes)
       .where(eq(deliveryNotes.storeId, storeId))
       .orderBy(desc(deliveryNotes.deliveryDate));
+  }
+
+  async getDeliveryNotesWithDetails(storeId: number, status?: string): Promise<(DeliveryNote & { invoice: Invoice & { client: Client | null }, itemCount: number })[]> {
+    const conditions = [eq(deliveryNotes.storeId, storeId)];
+    if (status) {
+      conditions.push(eq(deliveryNotes.status, status as "pending" | "delivered" | "cancelled"));
+    }
+    
+    const notes = await db
+      .select()
+      .from(deliveryNotes)
+      .where(and(...conditions))
+      .orderBy(desc(deliveryNotes.deliveryDate));
+    
+    const result = await Promise.all(notes.map(async (note) => {
+      const [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, note.invoiceId));
+      
+      let client: Client | null = null;
+      if (invoice?.clientId) {
+        const [clientResult] = await db
+          .select()
+          .from(clients)
+          .where(eq(clients.id, invoice.clientId));
+        client = clientResult || null;
+      }
+      
+      const [itemCountResult] = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(deliveryNoteItems)
+        .where(eq(deliveryNoteItems.deliveryNoteId, note.id));
+      
+      return {
+        ...note,
+        invoice: { ...invoice, client },
+        itemCount: Number(itemCountResult?.count || 0)
+      };
+    }));
+    
+    return result;
   }
 
   async getInvoiceDeliveryStatus(invoiceId: number): Promise<{ orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[]; fullyDelivered: boolean }> {

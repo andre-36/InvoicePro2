@@ -1411,6 +1411,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delivery note routes
+  app.get("/api/stores/:storeId/delivery-notes", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const status = req.query.status as string | undefined;
+      const deliveryNotes = await storage.getDeliveryNotesWithDetails(storeId, status);
+      res.json(deliveryNotes);
+    } catch (error) {
+      console.error("Error getting delivery notes:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/delivery-notes/:id/status", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      if (!['pending', 'delivered', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const updatedDeliveryNote = await storage.updateDeliveryNote(deliveryNoteId, { status });
+      res.json(updatedDeliveryNote);
+    } catch (error) {
+      console.error("Error updating delivery note status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/invoices/:invoiceId/delivery-notes", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId);
