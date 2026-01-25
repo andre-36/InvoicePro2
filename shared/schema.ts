@@ -253,6 +253,8 @@ export const invoices = pgTable("invoices", {
   termsAndConditions: text("terms_and_conditions"),
   paperSize: paperSizeEnum("paper_size").default("a4"),
   notes: text("notes"),
+  deliveryAddress: text("delivery_address"),
+  deliveryAddressLink: text("delivery_address_link"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
