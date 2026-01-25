@@ -463,12 +463,14 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
         </div>
         
         <div className="flex items-center space-x-2">
-          <Link href={`/quotations/${quotation.id}/edit`}>
-            <Button variant="outline" data-testid="button-edit-quotation">
-              <Edit className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-          </Link>
+          {!quotation.convertedToInvoiceId && (
+            <Link href={`/quotations/${quotation.id}/edit`}>
+              <Button variant="outline" data-testid="button-edit-quotation">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            </Link>
+          )}
           
           <Button
             variant="outline"

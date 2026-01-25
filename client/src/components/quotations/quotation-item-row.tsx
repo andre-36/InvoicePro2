@@ -66,6 +66,16 @@ export function QuotationItemRow({
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
 
+  // Sync state when item prop changes (e.g., when loading data from API)
+  useEffect(() => {
+    setDescription(item.description || "");
+    setQuantity(item.quantity || "1");
+    setUnitPrice(item.unitPrice || "0");
+    setTaxRate(item.taxRate || "0");
+    setProductId(item.productId?.toString() || "");
+    setProductUnitId(item.productUnitId?.toString() || "");
+  }, [item.id, item.description, item.quantity, item.unitPrice, item.taxRate, item.productId, item.productUnitId]);
+
   // Fetch product units when product changes
   useEffect(() => {
     if (productId && productId !== "0") {

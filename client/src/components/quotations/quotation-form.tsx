@@ -161,13 +161,13 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   });
 
   // If editing an existing quotation, fetch its data
-  const { data: quotationData, isLoading: isLoadingQuotation } = useQuery({
+  const { data: quotationData, isLoading: isLoadingQuotation } = useQuery<{ quotation: any; items: any[]; client?: any }>({
     queryKey: ['/api/quotations', quotationId],
     enabled: !!quotationId,
   });
 
   // For new quotations, fetch the next quotation number preview with fallback
-  const { data: nextQuotationNumberData, isError: isNumberError } = useQuery({
+  const { data: nextQuotationNumberData, isError: isNumberError } = useQuery<{ quotationNumber: string }>({
     queryKey: ['/api/quotations/next-number'],
     enabled: !quotationId, // Only for new quotations
   });
@@ -257,6 +257,17 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     if (quotationData && quotationId && typeof quotationData === 'object' && 'quotation' in quotationData) {
       const { quotation, items: quotationItems } = quotationData;
       
+      // If quotation has been converted to invoice, redirect to detail page (read-only)
+      if (quotation.convertedToInvoiceId) {
+        toast({
+          title: "Cannot edit",
+          description: "This quotation has been converted to an invoice and cannot be edited.",
+          variant: "destructive",
+        });
+        navigate(`/quotations/${quotationId}`);
+        return;
+      }
+      
       // Set quotation data
       form.reset({
         quotation: {
@@ -308,7 +319,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         expiryDate: quotation.expiryDate ? new Date(quotation.expiryDate) : null,
       }, loadedItems as any);
     }
-  }, [quotationData, quotationId, form]);
+  }, [quotationData, quotationId, form, toast, navigate]);
 
   const addItem = () => {
     const newItem: QuotationItem = {
