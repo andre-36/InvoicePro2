@@ -172,7 +172,7 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   "mr-3 h-5 w-5",
                   isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
-                <span>Surat Jalan</span>
+                <span>Delivery Notes</span>
               </Link>
               
               <Link 
