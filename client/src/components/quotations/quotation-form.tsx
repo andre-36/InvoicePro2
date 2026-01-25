@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save, Check, Plus, Trash2, ChevronsUpDown } from "lucide-react";
+import { useLocation } from "wouter";
+import { X, Save, Check, Plus, Trash2, ChevronsUpDown, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertQuotationSchema } from "@shared/schema";
@@ -17,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -61,6 +63,7 @@ interface QuotationFormProps {
 export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [items, setItems] = useState<QuotationItem[]>([
     {
       id: undefined,
@@ -77,6 +80,70 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   
   // Client combobox state
   const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
+  
+  // Back confirmation dialog state
+  const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
+  
+  // Store original loaded data for comparison-based change detection
+  const originalDataRef = useRef<string | null>(null);
+  
+  // Helper function to create a comparable snapshot of form data
+  const createFormSnapshot = (quotationValues: any, itemsArray: QuotationItem[]): string => {
+    const snapshot = {
+      clientId: quotationValues?.clientId,
+      issueDate: quotationValues?.issueDate?.toISOString?.() || quotationValues?.issueDate,
+      expiryDate: quotationValues?.expiryDate?.toISOString?.() || quotationValues?.expiryDate,
+      notes: quotationValues?.notes || '',
+      useFakturPajak: quotationValues?.useFakturPajak || false,
+      items: itemsArray.map(item => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      }))
+    };
+    return JSON.stringify(snapshot);
+  };
+  
+  // Function to check if there are unsaved changes by comparing with original
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalDataRef.current) {
+      // For new quotations, check if any meaningful data has been entered
+      if (!quotationId) {
+        const hasItems = items.some(item => 
+          item.productId || (item.description && item.description.trim() !== '')
+        );
+        const quotationValues = form.getValues('quotation');
+        const hasClient = !!quotationValues?.clientId;
+        const hasNotes = !!(quotationValues?.notes && quotationValues.notes.trim() !== '');
+        return hasItems || hasClient || hasNotes;
+      }
+      return false;
+    }
+    
+    const currentSnapshot = createFormSnapshot(form.getValues('quotation'), items);
+    return currentSnapshot !== originalDataRef.current;
+  };
+  
+  // Handle back button with confirmation
+  const handleBack = () => {
+    const quotationValues = form.getValues('quotation');
+    const hasClient = quotationValues.clientId && quotationValues.clientId !== 0;
+    const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+    const hasMeaningfulData = hasClient || hasNonEmptyItems;
+    
+    if (hasUnsavedChanges() && hasMeaningfulData) {
+      setShowBackConfirmDialog(true);
+    } else {
+      navigate(quotationId ? `/quotations/${quotationId}` : '/quotations');
+    }
+  };
+  
+  // Discard changes and go back
+  const discardAndGoBack = () => {
+    setShowBackConfirmDialog(false);
+    navigate(quotationId ? `/quotations/${quotationId}` : '/quotations');
+  };
 
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
@@ -225,6 +292,21 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         totalAmount: item.totalAmount,
         productId: item.productId
       })));
+      
+      // Store original data snapshot for comparison-based change detection
+      // Create snapshot immediately from the API data (not from state)
+      const loadedItems = quotationItems.map((item: any) => ({
+        productId: item.productId || null,
+        description: item.description || "",
+        quantity: item.quantity || "1",
+        unitPrice: item.unitPrice || "0",
+      }));
+      
+      originalDataRef.current = createFormSnapshot({
+        ...quotation,
+        issueDate: new Date(quotation.issueDate),
+        expiryDate: quotation.expiryDate ? new Date(quotation.expiryDate) : null,
+      }, loadedItems as any);
     }
   }, [quotationData, quotationId, form]);
 
@@ -331,7 +413,33 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
             {quotationId ? "Update quotation details" : "Create a new quotation for your client"}
           </p>
         </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" type="button" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
       </div>
+      
+      {/* Back Confirmation Dialog */}
+      <AlertDialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowBackConfirmDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={discardAndGoBack}>
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

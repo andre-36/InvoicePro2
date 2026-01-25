@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -234,6 +236,7 @@ function PurchaseOrderItemRow({
 export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [items, setItems] = useState<PurchaseOrderItem[]>([
     {
       id: undefined,
@@ -250,6 +253,70 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   
   // Supplier combobox state
   const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
+  
+  // Back confirmation dialog state
+  const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
+  
+  // Store original loaded data for comparison-based change detection
+  const originalDataRef = useRef<string | null>(null);
+  
+  // Helper function to create a comparable snapshot of form data
+  const createFormSnapshot = (poValues: any, itemsArray: PurchaseOrderItem[]): string => {
+    const snapshot = {
+      supplierName: poValues?.supplierName,
+      orderDate: poValues?.orderDate?.toISOString?.() || poValues?.orderDate,
+      expectedDeliveryDate: poValues?.expectedDeliveryDate?.toISOString?.() || poValues?.expectedDeliveryDate,
+      notes: poValues?.notes || '',
+      useFakturPajak: poValues?.useFakturPajak || false,
+      items: itemsArray.map(item => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+      }))
+    };
+    return JSON.stringify(snapshot);
+  };
+  
+  // Function to check if there are unsaved changes by comparing with original
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalDataRef.current) {
+      // For new POs, check if any meaningful data has been entered
+      if (!purchaseOrderId) {
+        const hasItems = items.some(item => 
+          item.productId || (item.description && item.description.trim() !== '')
+        );
+        const poValues = form.getValues('purchaseOrder');
+        const hasSupplier = !!poValues?.supplierName;
+        const hasNotes = !!(poValues?.notes && poValues.notes.trim() !== '');
+        return hasItems || hasSupplier || hasNotes;
+      }
+      return false;
+    }
+    
+    const currentSnapshot = createFormSnapshot(form.getValues('purchaseOrder'), items);
+    return currentSnapshot !== originalDataRef.current;
+  };
+  
+  // Handle back button with confirmation
+  const handleBack = () => {
+    const poValues = form.getValues('purchaseOrder');
+    const hasSupplier = poValues.supplierName && poValues.supplierName.trim() !== '';
+    const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+    const hasMeaningfulData = hasSupplier || hasNonEmptyItems;
+    
+    if (hasUnsavedChanges() && hasMeaningfulData) {
+      setShowBackConfirmDialog(true);
+    } else {
+      navigate(purchaseOrderId ? `/purchase-orders/${purchaseOrderId}` : '/purchase-orders');
+    }
+  };
+  
+  // Discard changes and go back
+  const discardAndGoBack = () => {
+    setShowBackConfirmDialog(false);
+    navigate(purchaseOrderId ? `/purchase-orders/${purchaseOrderId}` : '/purchase-orders');
+  };
 
   // Fetch suppliers for the dropdown
   const { data: suppliers } = useQuery<any[]>({
@@ -366,6 +433,23 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         }));
         setItems(loadedItems);
         setItemsLoaded(true);
+        
+        // Store original data snapshot for comparison-based change detection
+        // Create snapshot immediately from the API data (not from state)
+        const snapshotItems = loadedItems.map((item: any) => ({
+          productId: item.productId || null,
+          description: item.description || "",
+          quantity: item.quantity || "1",
+          unitCost: item.unitCost || "0",
+        }));
+        
+        originalDataRef.current = createFormSnapshot({
+          supplierName: existingPO.supplierName || '',
+          orderDate: existingPO.orderDate ? new Date(existingPO.orderDate) : new Date(),
+          expectedDeliveryDate: existingPO.expectedDeliveryDate ? new Date(existingPO.expectedDeliveryDate) : null,
+          notes: existingPO.notes || '',
+          useFakturPajak: existingPO.useFakturPajak || false,
+        }, snapshotItems as any);
       } else {
         // Keep the default empty item
         setItemsLoaded(true);
@@ -593,12 +677,32 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         </div>
         
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button variant="outline" type="button" onClick={handleBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
         </div>
       </div>
+      
+      {/* Back Confirmation Dialog */}
+      <AlertDialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowBackConfirmDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={discardAndGoBack}>
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -936,7 +1040,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
           {/* Actions */}
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={() => window.history.back()}>
+            <Button type="button" variant="outline" onClick={handleBack}>
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending} data-testid="button-save">

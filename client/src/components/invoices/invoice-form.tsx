@@ -112,17 +112,54 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
   
   // Track if user has made changes (for back confirmation)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState<number | null>(null);
   
-  // Track if initial data has loaded (to prevent false hasUnsavedChanges)
-  // Use a ref to suppress unsaved changes detection during data loading
-  // The ref provides synchronous access and is more reliable than state for guards
-  const isDataHydratingRef = useRef(!!invoiceId);
-  // Track number of pending item syncs to know when all rows have settled
-  const pendingItemSyncsRef = useRef(0);
-  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(!invoiceId);
+  // Store original loaded data for comparison-based change detection
+  // This is more reliable than timing-based approaches
+  const originalDataRef = useRef<string | null>(null);
+  
+  // Helper function to create a comparable snapshot of form data
+  const createFormSnapshot = (invoiceValues: any, itemsArray: InvoiceItem[]): string => {
+    // Only compare fields that represent actual user changes
+    const snapshot = {
+      clientId: invoiceValues?.clientId,
+      issueDate: invoiceValues?.issueDate?.toISOString?.() || invoiceValues?.issueDate,
+      dueDate: invoiceValues?.dueDate?.toISOString?.() || invoiceValues?.dueDate,
+      paymentTerms: invoiceValues?.paymentTerms,
+      notes: invoiceValues?.notes || '',
+      useFakturPajak: invoiceValues?.useFakturPajak || false,
+      deliveryType: invoiceValues?.deliveryType || 'delivery',
+      items: itemsArray.map(item => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price,
+      }))
+    };
+    return JSON.stringify(snapshot);
+  };
+  
+  // Function to check if there are unsaved changes by comparing with original
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalDataRef.current) {
+      // For new invoices, check if any meaningful data has been entered
+      if (!invoiceId) {
+        const currentItems = items;
+        const hasItems = currentItems.some(item => 
+          item.productId || (item.description && item.description.trim() !== '')
+        );
+        const invoiceValues = form.getValues('invoice');
+        const hasClient = !!invoiceValues?.clientId;
+        const hasNotes = !!(invoiceValues?.notes && invoiceValues.notes.trim() !== '');
+        return hasItems || hasClient || hasNotes;
+      }
+      return false;
+    }
+    
+    const currentSnapshot = createFormSnapshot(form.getValues('invoice'), items);
+    return currentSnapshot !== originalDataRef.current;
+  };
 
   // Fetch clients for the dropdown
   const { data: clients } = useQuery({
@@ -318,7 +355,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
-      setHasUnsavedChanges(false);
       toast({
         title: invoiceId ? "Invoice updated" : "Invoice created",
         description: invoiceId ? "Your invoice has been updated successfully." : "Your invoice has been created successfully.",
@@ -377,8 +413,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
-      setHasUnsavedChanges(false);
-      
       // If this was a new invoice, store the ID so subsequent saves update the same invoice
       const newId = result?.id;
       if (!invoiceId && !savedInvoiceId && newId) {
@@ -445,15 +479,18 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         form.setValue('items', [{ ...defaultItem }]);
       }
       
-      // Mark initial load as complete after a longer delay to allow all item rows to sync
-      // This delay is defensive - item rows may trigger updateItem during their initial sync
-      // A 1 second delay is generous and should handle any practical load scenario
-      const hydrateTimeout = setTimeout(() => {
-        isDataHydratingRef.current = false;
-        setIsInitialLoadComplete(true);
-      }, 1000);
+      // Store original data snapshot for comparison-based change detection
+      // Create snapshot immediately from the API data (not from state)
+      const loadedItems = itemsArray && itemsArray.length > 0 
+        ? itemsArray.map((item: any) => ({
+            productId: item.productId || null,
+            description: item.description || "",
+            quantity: (item.quantity ?? 1).toString(),
+            price: (item.unitPrice ?? item.price ?? 0).toString(),
+          }))
+        : [{ productId: null, description: "", quantity: "1", price: "0" }];
       
-      return () => clearTimeout(hydrateTimeout);
+      originalDataRef.current = createFormSnapshot(invoice, loadedItems as any);
     }
   }, [invoiceData, invoiceId, form]);
 
@@ -522,7 +559,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     };
 
     setItems([...items, newItem]);
-    if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
   };
 
   // Remove an invoice item
@@ -531,7 +567,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const newItems = [...items];
       newItems.splice(index, 1);
       setItems(newItems);
-      if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
     } else {
       toast({
         title: "Error",
@@ -567,7 +602,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
       return newItems;
     });
-    if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
   };
 
   // Handle product selection
@@ -592,7 +626,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           newItems[index] = updatedItem;
           return newItems;
         });
-        if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
       }
       return;
     }
@@ -633,7 +666,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         newItems[index] = updatedItem;
         return newItems;
       });
-      if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
 
     } catch (error) {
       console.error("Error updating item:", error);
@@ -789,7 +821,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     const hasMeaningfulData = hasClient || hasNonEmptyItems;
     
     // Show confirmation only if there are unsaved changes AND meaningful data entered
-    if (hasUnsavedChanges && hasMeaningfulData) {
+    if (hasUnsavedChanges() && hasMeaningfulData) {
       setShowBackConfirmDialog(true);
     } else {
       // Navigate back to invoice list or detail page
@@ -860,7 +892,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Discard changes and go back
   const discardAndGoBack = () => {
     setShowBackConfirmDialog(false);
-    setHasUnsavedChanges(false);
     // Navigate back to invoice list or detail page
     navigate(invoiceId ? `/invoices/${invoiceId}` : '/invoices');
   };
@@ -1292,7 +1323,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                               newItems[idx] = updatedItem;
                               return newItems;
                             });
-                            if (!isDataHydratingRef.current) setHasUnsavedChanges(true);
                           }}
                           removeItem={removeItem}
                           onProductSelect={handleProductSelect}
