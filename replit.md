@@ -10,6 +10,32 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 25, 2026 - Delivery Notes Management and Planning
+- **Feature**: Implemented comprehensive delivery note management with status tracking
+  - New "Surat Jalan" menu in sidebar navigation
+  - Delivery notes list page showing pending/delivered/cancelled counts
+  - Search and filter by status (pending, delivered, cancelled)
+  - Mark single or multiple delivery notes as "done" (delivered)
+  - Display client info, delivery address (including alternate delivery address)
+- **Feature**: Delivery Planning List Generator
+  - Select pending delivery notes for batch delivery planning
+  - Preview grouped by client and destination address
+  - Items grouped by category (prioritizing Glass and ACP categories)
+  - Print A4 format delivery planning list with:
+    - Client list with addresses
+    - Categorized items per client
+    - Checkboxes for tracking
+    - Category summary totals
+- **API Updates**: 
+  - GET /api/stores/:storeId/delivery-notes - List all delivery notes with status filter
+  - PATCH /api/delivery-notes/:id/status - Update delivery note status
+
+### January 25, 2026 - Alternate Delivery Address Support
+- **Feature**: Added alternate delivery address fields to invoices
+  - deliveryAddress and deliveryAddressLink fields for optional different delivery locations
+  - Shown in invoice form, detail view, print templates, and PDF output
+  - Google Maps link support for delivery addresses
+
 ### January 22, 2026 - Global Tax Rate and Faktur Pajak Support
 - **Feature**: Implemented global tax rate settings with Indonesian faktur pajak support
   - Added `defaultTaxRate` field to users table (default 11% for Indonesia's PPN)
