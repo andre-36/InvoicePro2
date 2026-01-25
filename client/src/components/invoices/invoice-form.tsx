@@ -39,6 +39,8 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   useFakturPajak: z.boolean().optional(),
   taxRate: z.string().optional(),
   deliveryType: z.enum(['self_pickup', 'delivery', 'combination']).optional(),
+  deliveryAddress: z.string().optional(),
+  deliveryAddressLink: z.string().optional(),
 });
 
 // For editing existing invoices, we need to include the invoice number for display
@@ -130,6 +132,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       notes: invoiceValues?.notes || '',
       useFakturPajak: invoiceValues?.useFakturPajak || false,
       deliveryType: invoiceValues?.deliveryType || 'delivery',
+      deliveryAddress: invoiceValues?.deliveryAddress || '',
+      deliveryAddressLink: invoiceValues?.deliveryAddressLink || '',
       items: itemsArray.map(item => ({
         productId: item.productId,
         description: item.description,
@@ -278,7 +282,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         notes: "",
         useFakturPajak: false,
         taxRate: "11",
-        deliveryType: "delivery" as "self_pickup" | "delivery" | "combination"
+        deliveryType: "delivery" as "self_pickup" | "delivery" | "combination",
+        deliveryAddress: "",
+        deliveryAddressLink: ""
       },
       items: items
     }
@@ -453,6 +459,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         useFakturPajak: invoiceRecord.useFakturPajak || false,
         taxRate: invoiceRecord.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
         deliveryType: invoiceRecord.deliveryType || "delivery",
+        deliveryAddress: invoiceRecord.deliveryAddress || "",
+        deliveryAddressLink: invoiceRecord.deliveryAddressLink || "",
       };
 
       form.setValue('invoice', invoice);
@@ -1187,6 +1195,51 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           {field.value === 'self_pickup' 
                             ? 'Customer mengambil barang sendiri, tidak perlu surat jalan' 
                             : 'Perlu membuat surat jalan (delivery note)'}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Delivery Address Section - for alternate delivery location */}
+                <div className="mt-4 space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="invoice.deliveryAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Alamat Pengiriman (Opsional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Masukkan alamat pengiriman jika berbeda dengan alamat client..."
+                            className="resize-none"
+                            rows={2}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Isi jika barang dikirim ke alamat berbeda (contoh: lokasi proyek)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="invoice.deliveryAddressLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Link Google Maps (Opsional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="https://maps.google.com/..."
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Link lokasi pengiriman di Google Maps
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
