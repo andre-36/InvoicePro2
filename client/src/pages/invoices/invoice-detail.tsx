@@ -595,6 +595,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <h3>Kepada:</h3>
             <p><strong>${client?.name || ''}</strong></p>
             ${client?.address ? `<p>${client.address}</p>` : ''}
+            ${invoice?.deliveryAddress ? `
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc;">
+                <p style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">Alamat Pengiriman:</p>
+                <p>${invoice.deliveryAddress}</p>
+              </div>
+            ` : ''}
           </div>
 
           <p><strong>Invoice: ${invoice?.invoiceNumber || ''}</strong></p>
@@ -822,6 +828,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <div className="print-bill-to-details">
                     {client.address && <div>{client.address}</div>}
                     {client.phone && <div>Phone: {client.phone}</div>}
+                  </div>
+                )}
+                {invoice.deliveryAddress && (
+                  <div className="print-bill-to-details" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ccc' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '10px' }}>Alamat Pengiriman:</div>
+                    <div>{invoice.deliveryAddress}</div>
                   </div>
                 )}
               </div>
@@ -1096,6 +1108,22 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     )}
                     {client?.address && (
                       <p className="text-sm text-gray-600 whitespace-pre-line">{client?.address}</p>
+                    )}
+                    {invoice.deliveryAddress && (
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-500 mb-1">Alamat Pengiriman:</p>
+                        <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.deliveryAddress}</p>
+                        {invoice.deliveryAddressLink && (
+                          <a 
+                            href={invoice.deliveryAddressLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                          >
+                            Lihat di Google Maps
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

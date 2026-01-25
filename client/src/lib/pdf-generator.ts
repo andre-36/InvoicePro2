@@ -35,6 +35,8 @@ interface Invoice {
   notes?: string;
   useFakturPajak?: boolean;
   taxRate?: string | number;
+  deliveryAddress?: string;
+  deliveryAddressLink?: string;
 }
 
 interface PDFData {
@@ -137,6 +139,21 @@ export async function generatePDF(data: PDFData) {
     
     if (client.taxNumber) {
       doc.text(`Tax Number: ${client.taxNumber}`, 20, yPosition);
+      yPosition += 5;
+    }
+    
+    // Add delivery address if different from client address
+    if (invoice.deliveryAddress) {
+      yPosition += 3;
+      doc.setFont("helvetica", "bold");
+      doc.text("Alamat Pengiriman:", 20, yPosition);
+      doc.setFont("helvetica", "normal");
+      yPosition += 5;
+      const deliveryAddressLines = invoice.deliveryAddress.split("\n");
+      deliveryAddressLines.forEach(line => {
+        doc.text(line, 20, yPosition);
+        yPosition += 5;
+      });
     }
     
     // Add invoice items table
