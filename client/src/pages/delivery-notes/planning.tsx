@@ -394,12 +394,25 @@ export default function DeliveryPlanningPage() {
         frameDoc.write(printContent);
         frameDoc.close();
 
-        printFrame.onload = () => {
-          printFrame.contentWindow?.print();
+        setTimeout(() => {
+          try {
+            printFrame.contentWindow?.print();
+          } catch (e) {
+            console.error('Print failed:', e);
+          }
           setTimeout(() => {
-            document.body.removeChild(printFrame);
-          }, 1000);
-        };
+            if (printFrame.parentNode) {
+              document.body.removeChild(printFrame);
+            }
+          }, 2000);
+        }, 250);
+      } else {
+        document.body.removeChild(printFrame);
+        toast({
+          title: "Error",
+          description: "Tidak dapat membuka jendela cetak",
+          variant: "destructive"
+        });
       }
 
     } catch (error) {
