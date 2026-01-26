@@ -170,10 +170,13 @@ export default function ReturnDetailPage() {
         <div className="flex gap-2">
           {returnData.status === 'pending' && (
             <>
-              <Button variant="outline" onClick={() => updateStatusMutation.mutate('completed')}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Selesaikan
-              </Button>
+              {/* For refunds only - credit notes complete automatically when balance is used up */}
+              {returnData.returnType === 'refund' && (
+                <Button variant="outline" onClick={() => updateStatusMutation.mutate('completed')}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Selesaikan
+                </Button>
+              )}
               <Button variant="outline" className="text-red-600" onClick={() => updateStatusMutation.mutate('cancelled')}>
                 <XCircle className="h-4 w-4 mr-2" />
                 Batalkan

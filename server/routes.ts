@@ -1095,6 +1095,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/stores/:storeId/invoices/returnable", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const invoices = await storage.getReturnableInvoices(storeId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error getting returnable invoices:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // General invoices endpoint
   app.get("/api/invoices", requireAuth, async (req, res) => {
     try {

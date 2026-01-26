@@ -75,7 +75,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
   });
 
   const { data: invoices, isLoading: invoicesLoading } = useQuery<(Invoice & { clientName: string | null })[]>({
-    queryKey: ['/api/stores/1/invoices'],
+    queryKey: ['/api/stores/1/invoices/returnable'],
     staleTime: Infinity
   });
 

@@ -114,6 +114,7 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
   getOpenInvoices(storeId: number): Promise<Invoice[]>;
+  getReturnableInvoices(storeId: number): Promise<(Invoice & { clientName: string | null; lastPaymentDate: Date | null })[]>;
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
@@ -1237,6 +1238,54 @@ export class DatabaseStorage implements IStorage {
     
     // Apply overdue check
     return Promise.all(results.map(inv => this.checkAndUpdateOverdueStatus(inv)));
+  }
+
+  async getReturnableInvoices(storeId: number): Promise<(Invoice & { clientName: string | null; lastPaymentDate: Date | null })[]> {
+    // Get paid invoices where the last payment was within 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    // First, get all paid invoices with their last payment date
+    const results = await db
+      .select({
+        id: invoices.id,
+        storeId: invoices.storeId,
+        invoiceNumber: invoices.invoiceNumber,
+        clientId: invoices.clientId,
+        issueDate: invoices.issueDate,
+        dueDate: invoices.dueDate,
+        status: invoices.status,
+        subtotal: invoices.subtotal,
+        taxRate: invoices.taxRate,
+        taxAmount: invoices.taxAmount,
+        discount: invoices.discount,
+        shipping: invoices.shipping,
+        totalAmount: invoices.totalAmount,
+        totalProfit: invoices.totalProfit,
+        termsAndConditions: invoices.termsAndConditions,
+        paperSize: invoices.paperSize,
+        notes: invoices.notes,
+        createdAt: invoices.createdAt,
+        updatedAt: invoices.updatedAt,
+        clientName: clients.name,
+        lastPaymentDate: sql<Date>`(SELECT MAX(payment_date) FROM invoice_payments WHERE invoice_id = ${invoices.id})`.as('lastPaymentDate')
+      })
+      .from(invoices)
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
+      .where(
+        and(
+          eq(invoices.storeId, storeId),
+          eq(invoices.status, 'paid')
+        )
+      )
+      .orderBy(desc(invoices.id));
+    
+    // Filter to only include invoices with last payment within 7 days
+    return results.filter(inv => {
+      if (!inv.lastPaymentDate) return false;
+      const paymentDate = new Date(inv.lastPaymentDate);
+      return paymentDate >= sevenDaysAgo;
+    }) as (Invoice & { clientName: string | null; lastPaymentDate: Date | null })[];
   }
 
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
@@ -4009,6 +4058,12 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(returns.id, returnId));
 
+      // Check if credit note is fully used and auto-complete it
+      const [updated] = await tx.select().from(returns).where(eq(returns.id, returnId));
+      if (updated && parseFloat(updated.usedAmount || '0') >= parseFloat(updated.totalAmount || '0')) {
+        await tx.update(returns).set({ status: 'completed', updatedAt: new Date() }).where(eq(returns.id, returnId));
+      }
+
       return usage;
     });
   }
@@ -4032,6 +4087,12 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(returns.id, returnId));
+
+      // Check if credit note is fully used and auto-complete it
+      const [updated] = await tx.select().from(returns).where(eq(returns.id, returnId));
+      if (updated && parseFloat(updated.usedAmount || '0') >= parseFloat(updated.totalAmount || '0')) {
+        await tx.update(returns).set({ status: 'completed', updatedAt: new Date() }).where(eq(returns.id, returnId));
+      }
 
       return usage;
     });
