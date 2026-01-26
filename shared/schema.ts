@@ -665,6 +665,70 @@ export const importExportLogs = pgTable("import_export_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 
+// Returns/Credit Notes enums and tables
+export const returnTypeEnum = pgEnum('return_type', ['credit_note', 'refund']);
+export const returnDocStatusEnum = pgEnum('return_doc_status', ['pending', 'completed', 'cancelled']);
+
+// Returns table (Retur)
+export const returns = pgTable("returns", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  returnNumber: varchar("return_number", { length: 50 }).notNull().unique(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  returnDate: date("return_date").notNull(),
+  returnType: returnTypeEnum("return_type").notNull(),
+  status: returnDocStatusEnum("status").default("pending").notNull(),
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
+  usedAmount: numeric("used_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("returns_store_id_idx").on(table.storeId),
+    invoiceIdIdx: index("returns_invoice_id_idx").on(table.invoiceId),
+    clientIdIdx: index("returns_client_id_idx").on(table.clientId),
+    returnTypeIdx: index("returns_return_type_idx").on(table.returnType),
+    statusIdx: index("returns_status_idx").on(table.status)
+  };
+});
+
+// Return Items table
+export const returnItems = pgTable("return_items", {
+  id: serial("id").primaryKey(),
+  returnId: integer("return_id").references(() => returns.id, { onDelete: 'cascade' }).notNull(),
+  invoiceItemId: integer("invoice_item_id").references(() => invoiceItems.id, { onDelete: 'cascade' }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  price: numeric("price", { precision: 15, scale: 2 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    returnIdIdx: index("return_items_return_id_idx").on(table.returnId),
+    invoiceItemIdIdx: index("return_items_invoice_item_id_idx").on(table.invoiceItemId)
+  };
+});
+
+// Credit Note Usages table (tracking how credit notes are spent)
+export const creditNoteUsages = pgTable("credit_note_usages", {
+  id: serial("id").primaryKey(),
+  returnId: integer("return_id").references(() => returns.id, { onDelete: 'cascade' }).notNull(),
+  invoicePaymentId: integer("invoice_payment_id").references(() => invoicePayments.id, { onDelete: 'cascade' }),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  usageType: varchar("usage_type", { length: 20 }).default("payment").notNull(), // payment, refund
+  notes: text("notes"),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    returnIdIdx: index("credit_note_usages_return_id_idx").on(table.returnId),
+    invoicePaymentIdIdx: index("credit_note_usages_invoice_payment_id_idx").on(table.invoicePaymentId)
+  };
+});
+
 // Define the insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 
@@ -721,6 +785,9 @@ export const insertPaymentTypeSchema = createInsertSchema(paymentTypes).omit({ i
 export const insertPaymentTermSchema = createInsertSchema(paymentTermsConfig).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDeliveryNoteSchema = createInsertSchema(deliveryNotes).omit({ id: true, deliveryNumber: true, createdAt: true, updatedAt: true });
 export const insertDeliveryNoteItemSchema = createInsertSchema(deliveryNoteItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertReturnSchema = createInsertSchema(returns).omit({ id: true, returnNumber: true, createdAt: true, updatedAt: true });
+export const insertReturnItemSchema = createInsertSchema(returnItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCreditNoteUsageSchema = createInsertSchema(creditNoteUsages).omit({ id: true, createdAt: true });
 export const insertGoodsReceiptSchema = createInsertSchema(goodsReceipts).omit({ id: true, receiptNumber: true, createdAt: true, updatedAt: true });
 export const insertGoodsReceiptItemSchema = createInsertSchema(goodsReceiptItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertGoodsReceiptPaymentSchema = createInsertSchema(goodsReceiptPayments).omit({ id: true, createdAt: true, updatedAt: true });
@@ -803,6 +870,15 @@ export type InsertDeliveryNote = z.infer<typeof insertDeliveryNoteSchema>;
 
 export type DeliveryNoteItem = typeof deliveryNoteItems.$inferSelect;
 export type InsertDeliveryNoteItem = z.infer<typeof insertDeliveryNoteItemSchema>;
+
+export type Return = typeof returns.$inferSelect;
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+
+export type ReturnItem = typeof returnItems.$inferSelect;
+export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;
+
+export type CreditNoteUsage = typeof creditNoteUsages.$inferSelect;
+export type InsertCreditNoteUsage = z.infer<typeof insertCreditNoteUsageSchema>;
 
 export type ImportExportLog = typeof importExportLogs.$inferSelect;
 export type InsertImportExportLog = z.infer<typeof insertImportExportLogSchema>;
@@ -944,4 +1020,22 @@ export const goodsReceiptItemsRelations = relations(goodsReceiptItems, ({ one })
 
 export const goodsReceiptPaymentsRelations = relations(goodsReceiptPayments, ({ one }) => ({
   goodsReceipt: one(goodsReceipts, { fields: [goodsReceiptPayments.goodsReceiptId], references: [goodsReceipts.id] })
+}));
+
+export const returnsRelations = relations(returns, ({ one, many }) => ({
+  store: one(stores, { fields: [returns.storeId], references: [stores.id] }),
+  invoice: one(invoices, { fields: [returns.invoiceId], references: [invoices.id] }),
+  client: one(clients, { fields: [returns.clientId], references: [clients.id] }),
+  items: many(returnItems),
+  usages: many(creditNoteUsages)
+}));
+
+export const returnItemsRelations = relations(returnItems, ({ one }) => ({
+  return: one(returns, { fields: [returnItems.returnId], references: [returns.id] }),
+  invoiceItem: one(invoiceItems, { fields: [returnItems.invoiceItemId], references: [invoiceItems.id] })
+}));
+
+export const creditNoteUsagesRelations = relations(creditNoteUsages, ({ one }) => ({
+  return: one(returns, { fields: [creditNoteUsages.returnId], references: [returns.id] }),
+  invoicePayment: one(invoicePayments, { fields: [creditNoteUsages.invoicePaymentId], references: [invoicePayments.id] })
 }));
