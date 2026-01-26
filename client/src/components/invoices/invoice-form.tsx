@@ -187,16 +187,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
-  // Watch clientId to fetch credit notes
-  const watchedClientId = form.watch('invoice.clientId');
   
-  // Fetch client credit notes for payment options
-  type CreditNoteWithBalance = Return & { remainingBalance: number };
-  const { data: clientCreditNotes = [] } = useQuery<CreditNoteWithBalance[]>({
-    queryKey: ['/api/clients', watchedClientId, 'credit-notes'],
-    enabled: !!watchedClientId && paymentDialogOpen,
-  });
-
   // Fetch current user for default notes and tax rate
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
@@ -299,6 +290,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       },
       items: items
     }
+  });
+
+  // Watch clientId to fetch credit notes
+  const watchedClientId = form.watch('invoice.clientId');
+  
+  // Fetch client credit notes for payment options
+  type CreditNoteWithBalance = Return & { remainingBalance: number };
+  const { data: clientCreditNotes = [] } = useQuery<CreditNoteWithBalance[]>({
+    queryKey: ['/api/clients', watchedClientId, 'credit-notes'],
+    enabled: !!watchedClientId && paymentDialogOpen,
   });
 
   // Helper function to calculate due date based on payment terms
