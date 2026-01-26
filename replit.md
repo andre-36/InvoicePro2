@@ -10,6 +10,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 26, 2026 - Delivery Planning Enhancements and UI Improvements
+- **Feature**: Google Maps Route Generator for Delivery Planning
+  - "Generate Route" button added next to print button on delivery planning page
+  - Creates multi-point route link from selected delivery addresses
+  - Popup dialog shows generated link with:
+    - Copy to clipboard button
+    - "Buka di Google Maps" button to open in new tab
+  - Supports both coordinate-based links and address-based links
+  - Deduplicates destinations when multiple delivery notes go to same address
+- **UI**: Invoice form column width adjustments
+  - Product column: Widened to 40% with min-width 220px for longer product names
+  - Unit column: Narrowed from 100px to 65px
+  - Total column: Widened from 120px to 150px with whitespace-nowrap
+  - Column now shows Total (subtotal + tax) instead of just Subtotal
+
 ### January 26, 2026 - Performance Optimization
 - **Performance**: Optimized delivery notes list query
   - Replaced N+1 query pattern with single JOIN query in `getDeliveryNotesWithDetails`
