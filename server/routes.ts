@@ -2297,6 +2297,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns/Credit Note routes
+  app.get("/api/stores/:storeId/returns", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const returns = await storage.getReturnsWithDetails(storeId);
+      res.json(returns);
+    } catch (error) {
+      console.error("Error getting returns:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/returns/:id", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.id);
+      const returnData = await storage.getReturnWithItems(returnId);
+      
+      if (!returnData) {
+        return res.status(404).json({ error: "Return not found" });
+      }
+      
+      res.json(returnData);
+    } catch (error) {
+      console.error("Error getting return:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/returns/:id/next-number", requireAuth, async (req, res) => {
+    try {
+      const dateParam = req.query.date as string;
+      const date = dateParam ? new Date(dateParam) : undefined;
+      const nextNumber = await storage.getNextReturnNumber(date);
+      res.json({ returnNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next return number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/next-return-number", requireAuth, async (req, res) => {
+    try {
+      const dateParam = req.query.date as string;
+      const date = dateParam ? new Date(dateParam) : undefined;
+      const nextNumber = await storage.getNextReturnNumber(date);
+      res.json({ returnNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next return number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/credit-notes", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      const creditNotes = await storage.getClientCreditNotes(clientId);
+      res.json(creditNotes);
+    } catch (error) {
+      console.error("Error getting client credit notes:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/stores/:storeId/returns", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const schema = z.object({
+        returnNumber: z.string(),
+        invoiceId: z.number(),
+        clientId: z.number(),
+        returnDate: z.string(),
+        returnType: z.enum(['credit_note', 'refund']),
+        totalAmount: z.union([z.string(), z.number()]),
+        notes: z.string().optional(),
+        items: z.array(z.object({
+          invoiceItemId: z.number(),
+          quantity: z.union([z.string(), z.number()]),
+          price: z.union([z.string(), z.number()]),
+          subtotal: z.union([z.string(), z.number()]),
+          reason: z.string().optional()
+        }))
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const { items, ...returnData } = validatedData;
+      
+      const newReturn = await storage.createReturn(
+        {
+          ...returnData,
+          storeId,
+          status: validatedData.returnType === 'refund' ? 'completed' : 'pending'
+        },
+        items
+      );
+      
+      // If it's a refund, mark it as completed immediately
+      if (validatedData.returnType === 'refund') {
+        await storage.updateReturnStatus(newReturn.id, 'completed');
+      }
+      
+      res.status(201).json(newReturn);
+    } catch (error) {
+      console.error("Error creating return:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/returns/:id/status", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.id);
+      const schema = z.object({
+        status: z.enum(['pending', 'completed', 'cancelled'])
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const updatedReturn = await storage.updateReturnStatus(returnId, validatedData.status);
+      res.json(updatedReturn);
+    } catch (error) {
+      console.error("Error updating return status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/returns/:id", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.id);
+      await storage.deleteReturn(returnId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting return:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Credit Note Usage routes
+  app.get("/api/returns/:returnId/usages", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.returnId);
+      const usages = await storage.getCreditNoteUsages(returnId);
+      res.json(usages);
+    } catch (error) {
+      console.error("Error getting credit note usages:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/returns/:returnId/apply-to-payment", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.returnId);
+      const schema = z.object({
+        invoicePaymentId: z.number(),
+        amount: z.union([z.string(), z.number()])
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const usage = await storage.applyCreditNoteToPayment(
+        returnId,
+        validatedData.invoicePaymentId,
+        typeof validatedData.amount === 'string' ? parseFloat(validatedData.amount) : validatedData.amount
+      );
+      
+      res.status(201).json(usage);
+    } catch (error) {
+      console.error("Error applying credit note to payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/returns/:returnId/convert-to-refund", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.returnId);
+      const schema = z.object({
+        amount: z.union([z.string(), z.number()])
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const usage = await storage.convertCreditNoteToRefund(
+        returnId,
+        typeof validatedData.amount === 'string' ? parseFloat(validatedData.amount) : validatedData.amount
+      );
+      
+      res.status(201).json(usage);
+    } catch (error) {
+      console.error("Error converting credit note to refund:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Settings routes
   app.get("/api/stores/:storeId/settings", requireAuth, async (req, res) => {
     try {
