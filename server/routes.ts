@@ -2435,14 +2435,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/returns/:id", requireAuth, async (req, res) => {
+    try {
+      const returnId = parseInt(req.params.id);
+      const { notes, items } = req.body;
+      const updatedReturn = await storage.updateReturn(returnId, { notes }, items);
+      res.json(updatedReturn);
+    } catch (error: any) {
+      console.error("Error updating return:", error);
+      res.status(400).json({ error: error.message || "Server error" });
+    }
+  });
+
   app.delete("/api/returns/:id", requireAuth, async (req, res) => {
     try {
       const returnId = parseInt(req.params.id);
       await storage.deleteReturn(returnId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting return:", error);
-      res.status(500).json({ error: "Server error" });
+      if (error.message?.includes("Cannot delete")) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
     }
   });
 

@@ -250,6 +250,7 @@ export interface IStorage {
   getReturnsWithDetails(storeId: number): Promise<(Return & { invoice: Invoice, client: Client })[]>;
   getClientCreditNotes(clientId: number): Promise<(Return & { remainingBalance: number })[]>;
   createReturn(returnData: InsertReturn, items: InsertReturnItem[]): Promise<Return>;
+  updateReturn(id: number, returnData: Partial<InsertReturn>, items?: InsertReturnItem[]): Promise<Return>;
   updateReturnStatus(id: number, status: string): Promise<Return>;
   deleteReturn(id: number): Promise<void>;
   getNextReturnNumber(returnDate?: Date): Promise<string>;
@@ -3997,6 +3998,53 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async updateReturn(id: number, returnData: Partial<InsertReturn>, items?: InsertReturnItem[]): Promise<Return> {
+    return withTransaction(async (tx) => {
+      // Check if return has usages - if so, only allow updating notes
+      const [existingReturn] = await tx.select().from(returns).where(eq(returns.id, id));
+      if (!existingReturn) {
+        throw new Error("Return not found");
+      }
+      
+      const hasUsages = parseFloat(existingReturn.usedAmount || '0') > 0;
+      
+      if (hasUsages) {
+        // Only allow updating notes if there are usages
+        const [updated] = await tx
+          .update(returns)
+          .set({ notes: returnData.notes, updatedAt: new Date() })
+          .where(eq(returns.id, id))
+          .returning();
+        return updated;
+      }
+      
+      // Full update allowed if no usages
+      const [updated] = await tx
+        .update(returns)
+        .set({ ...returnData, updatedAt: new Date() })
+        .where(eq(returns.id, id))
+        .returning();
+      
+      // Update items if provided
+      if (items && items.length > 0) {
+        await tx.delete(returnItems).where(eq(returnItems.returnId, id));
+        await tx.insert(returnItems).values(
+          items.map(item => ({
+            ...item,
+            returnId: id
+          }))
+        );
+        
+        // Recalculate total amount
+        const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.subtotal as string), 0);
+        await tx.update(returns).set({ totalAmount: totalAmount.toString() }).where(eq(returns.id, id));
+      }
+      
+      const [finalReturn] = await tx.select().from(returns).where(eq(returns.id, id));
+      return finalReturn;
+    });
+  }
+
   async updateReturnStatus(id: number, status: string): Promise<Return> {
     const [updated] = await db
       .update(returns)
@@ -4007,6 +4055,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteReturn(id: number): Promise<void> {
+    // Check if return has usages before deleting
+    const [existingReturn] = await db.select().from(returns).where(eq(returns.id, id));
+    if (existingReturn && parseFloat(existingReturn.usedAmount || '0') > 0) {
+      throw new Error("Cannot delete return with existing usages");
+    }
+    
     await db.delete(returnItems).where(eq(returnItems.returnId, id));
     await db.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
     await db.delete(returns).where(eq(returns.id, id));

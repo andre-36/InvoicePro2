@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, CreditCard, Banknote, Clock, CheckCircle, XCircle, RotateCcw, ExternalLink, DollarSign } from "lucide-react";
+import { ArrowLeft, CreditCard, Banknote, Clock, CheckCircle, XCircle, RotateCcw, ExternalLink, DollarSign, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,9 @@ export default function ReturnDetailPage() {
   
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
 
   const { data, isLoading, error } = useQuery<ReturnWithDetails>({
     queryKey: ['/api/returns', returnId],
@@ -79,6 +82,49 @@ export default function ReturnDetailPage() {
       toast({
         title: "Error",
         description: error.message || "Gagal mengkonversi ke refund.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', `/api/returns/${returnId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      toast({
+        title: "Berhasil",
+        description: "Retur berhasil dihapus.",
+      });
+      navigate('/returns');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal menghapus retur.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      return apiRequest('PUT', `/api/returns/${returnId}`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/returns', returnId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      setEditDialogOpen(false);
+      toast({
+        title: "Berhasil",
+        description: "Retur berhasil diperbarui.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal memperbarui retur.",
         variant: "destructive",
       });
     },
@@ -168,6 +214,23 @@ export default function ReturnDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/* Edit button - always available */}
+          <Button variant="outline" onClick={() => {
+            setEditNotes(returnData.notes || '');
+            setEditDialogOpen(true);
+          }}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+          
+          {/* Delete button - only if no usages */}
+          {Number(returnData.usedAmount || 0) === 0 && (
+            <Button variant="outline" className="text-red-600" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Hapus
+            </Button>
+          )}
+          
           {returnData.status === 'pending' && (
             <>
               {/* For refunds only - credit notes complete automatically when balance is used up */}
@@ -355,6 +418,54 @@ export default function ReturnDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Retur</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus retur {returnData.returnNumber}? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
+            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Retur</DialogTitle>
+            <DialogDescription>
+              {Number(returnData.usedAmount || 0) > 0 
+                ? "Hanya catatan yang dapat diubah karena credit note sudah digunakan."
+                : "Perbarui catatan retur ini."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Catatan</Label>
+              <Input
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Catatan retur..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Batal</Button>
+            <Button onClick={() => updateMutation.mutate(editNotes)} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
