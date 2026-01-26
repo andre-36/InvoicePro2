@@ -38,6 +38,9 @@ import PaymentTypesPage from "@/pages/payment-types";
 import PaymentTermsPage from "@/pages/payment-terms";
 import DeliveryNotesPage from "@/pages/delivery-notes";
 import DeliveryPlanningPage from "@/pages/delivery-notes/planning";
+import ReturnsPage from "@/pages/returns";
+import CreateReturnPage from "@/pages/returns/create";
+import ReturnDetailPage from "@/pages/returns/detail";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -190,6 +193,9 @@ function App() {
                 <Route path="/goods-receipts/create" component={CreateGoodsReceiptPage} />
                 <Route path="/goods-receipts/:id/edit" component={GoodsReceiptDetailPage} />
                 <Route path="/goods-receipts/:id" component={GoodsReceiptDetailPage} />
+                <Route path="/returns" component={ReturnsPage} />
+                <Route path="/returns/create" component={CreateReturnPage} />
+                <Route path="/returns/:id" component={ReturnDetailPage} />
                 <Route path="/clients" component={ClientsPage} />
                 <Route path="/clients/create" component={CreateClientPage} />
                 <Route path="/clients/:id" component={ClientDetailPage} />

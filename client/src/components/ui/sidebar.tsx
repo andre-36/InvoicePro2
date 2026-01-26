@@ -17,6 +17,7 @@ import {
   Package,
   Building2,
   Truck,
+  RotateCcw,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -173,6 +174,22 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
                   isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
                 <span>Delivery Notes</span>
+              </Link>
+              
+              <Link 
+                href="/returns"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/returns") 
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                <RotateCcw className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/returns") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>Retur</span>
               </Link>
               
               <Link 
