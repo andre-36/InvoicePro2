@@ -204,7 +204,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
         quantity: item.quantity.toString(),
         price: item.price.toString(),
         subtotal: item.subtotal.toString(),
-        reason: item.reason || null,
+        reason: item.reason || undefined,
       })),
     };
 
