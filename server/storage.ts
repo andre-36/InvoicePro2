@@ -6,6 +6,7 @@ import {
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
+  returns, returnItems, creditNoteUsages,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -24,7 +25,9 @@ import {
   type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm,
   type CashAccount, type InsertCashAccount, type AccountTransfer, type InsertAccountTransfer,
   type GoodsReceipt, type InsertGoodsReceipt, type GoodsReceiptItem, type InsertGoodsReceiptItem,
-  type GoodsReceiptPayment, type InsertGoodsReceiptPayment
+  type GoodsReceiptPayment, type InsertGoodsReceiptPayment,
+  type Return, type InsertReturn, type ReturnItem, type InsertReturnItem,
+  type CreditNoteUsage, type InsertCreditNoteUsage
 } from "../shared/schema";
 
 import session from "express-session";
@@ -238,6 +241,23 @@ export interface IStorage {
   createGoodsReceiptPayment(payment: InsertGoodsReceiptPayment): Promise<GoodsReceiptPayment>;
   updateGoodsReceiptPayment(id: number, payment: Partial<InsertGoodsReceiptPayment>): Promise<GoodsReceiptPayment>;
   deleteGoodsReceiptPayment(id: number): Promise<void>;
+
+  // Returns/Credit Note methods
+  getReturn(id: number): Promise<Return | undefined>;
+  getReturnWithItems(id: number): Promise<{ return: Return, items: (ReturnItem & { invoiceItem: InvoiceItem & { product: Product } })[], usages: CreditNoteUsage[], invoice: Invoice, client: Client } | undefined>;
+  getReturns(storeId: number): Promise<Return[]>;
+  getReturnsWithDetails(storeId: number): Promise<(Return & { invoice: Invoice, client: Client })[]>;
+  getClientCreditNotes(clientId: number): Promise<(Return & { remainingBalance: number })[]>;
+  createReturn(returnData: InsertReturn, items: InsertReturnItem[]): Promise<Return>;
+  updateReturnStatus(id: number, status: string): Promise<Return>;
+  deleteReturn(id: number): Promise<void>;
+  getNextReturnNumber(returnDate?: Date): Promise<string>;
+
+  // Credit Note Usage methods
+  getCreditNoteUsages(returnId: number): Promise<CreditNoteUsage[]>;
+  createCreditNoteUsage(usage: InsertCreditNoteUsage): Promise<CreditNoteUsage>;
+  applyCreditNoteToPayment(returnId: number, invoicePaymentId: number, amount: number): Promise<CreditNoteUsage>;
+  convertCreditNoteToRefund(returnId: number, amount: number): Promise<CreditNoteUsage>;
 
   // Dashboard metrics
   getDashboardStats(storeId: number): Promise<DashboardStats>;
@@ -3836,6 +3856,185 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in getNextPurchaseOrderNumber:', error);
       throw error;
     }
+  }
+
+  // Returns/Credit Note methods
+  async getReturn(id: number): Promise<Return | undefined> {
+    const [result] = await db.select().from(returns).where(eq(returns.id, id));
+    return result;
+  }
+
+  async getReturnWithItems(id: number): Promise<{ return: Return, items: (ReturnItem & { invoiceItem: InvoiceItem & { product: Product } })[], usages: CreditNoteUsage[], invoice: Invoice, client: Client } | undefined> {
+    const [returnData] = await db.select().from(returns).where(eq(returns.id, id));
+    if (!returnData) return undefined;
+
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, returnData.invoiceId));
+    if (!invoice) return undefined;
+
+    const [client] = await db.select().from(clients).where(eq(clients.id, returnData.clientId));
+    if (!client) return undefined;
+
+    const rawItems = await db
+      .select()
+      .from(returnItems)
+      .innerJoin(invoiceItems, eq(returnItems.invoiceItemId, invoiceItems.id))
+      .innerJoin(products, eq(invoiceItems.productId, products.id))
+      .where(eq(returnItems.returnId, id));
+
+    const items = rawItems.map(row => ({
+      ...row.return_items,
+      invoiceItem: {
+        ...row.invoice_items,
+        product: row.products
+      }
+    }));
+
+    const usages = await db.select().from(creditNoteUsages).where(eq(creditNoteUsages.returnId, id)).orderBy(desc(creditNoteUsages.usedAt));
+
+    return { return: returnData, items, usages, invoice, client };
+  }
+
+  async getReturns(storeId: number): Promise<Return[]> {
+    return db.select().from(returns).where(eq(returns.storeId, storeId)).orderBy(desc(returns.returnDate));
+  }
+
+  async getReturnsWithDetails(storeId: number): Promise<(Return & { invoice: Invoice, client: Client })[]> {
+    const results = await db
+      .select()
+      .from(returns)
+      .innerJoin(invoices, eq(returns.invoiceId, invoices.id))
+      .innerJoin(clients, eq(returns.clientId, clients.id))
+      .where(eq(returns.storeId, storeId))
+      .orderBy(desc(returns.returnDate));
+
+    return results.map(row => ({
+      ...row.returns,
+      invoice: row.invoices,
+      client: row.clients
+    }));
+  }
+
+  async getClientCreditNotes(clientId: number): Promise<(Return & { remainingBalance: number })[]> {
+    const creditNotes = await db
+      .select()
+      .from(returns)
+      .where(and(
+        eq(returns.clientId, clientId),
+        eq(returns.returnType, 'credit_note'),
+        eq(returns.status, 'completed')
+      ))
+      .orderBy(desc(returns.returnDate));
+
+    return creditNotes.map(cn => ({
+      ...cn,
+      remainingBalance: Number(cn.totalAmount) - Number(cn.usedAmount)
+    })).filter(cn => cn.remainingBalance > 0);
+  }
+
+  async createReturn(returnData: InsertReturn, items: InsertReturnItem[]): Promise<Return> {
+    return withTransaction(async (tx) => {
+      const [newReturn] = await tx.insert(returns).values(returnData).returning();
+      
+      if (items.length > 0) {
+        await tx.insert(returnItems).values(
+          items.map(item => ({
+            ...item,
+            returnId: newReturn.id
+          }))
+        );
+      }
+
+      return newReturn;
+    });
+  }
+
+  async updateReturnStatus(id: number, status: string): Promise<Return> {
+    const [updated] = await db
+      .update(returns)
+      .set({ status: status as "pending" | "completed" | "cancelled", updatedAt: new Date() })
+      .where(eq(returns.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteReturn(id: number): Promise<void> {
+    await db.delete(returnItems).where(eq(returnItems.returnId, id));
+    await db.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
+    await db.delete(returns).where(eq(returns.id, id));
+  }
+
+  async getNextReturnNumber(returnDate?: Date): Promise<string> {
+    try {
+      const currentDate = returnDate || new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearMonth = year + month;
+
+      return withTransaction(async (tx) => {
+        return await generateNextNumber("RTN", yearMonth, returns, returns.returnNumber, tx);
+      });
+    } catch (error) {
+      console.error('Error in getNextReturnNumber:', error);
+      throw error;
+    }
+  }
+
+  // Credit Note Usage methods
+  async getCreditNoteUsages(returnId: number): Promise<CreditNoteUsage[]> {
+    return db.select().from(creditNoteUsages).where(eq(creditNoteUsages.returnId, returnId)).orderBy(desc(creditNoteUsages.usedAt));
+  }
+
+  async createCreditNoteUsage(usage: InsertCreditNoteUsage): Promise<CreditNoteUsage> {
+    const [newUsage] = await db.insert(creditNoteUsages).values(usage).returning();
+    return newUsage;
+  }
+
+  async applyCreditNoteToPayment(returnId: number, invoicePaymentId: number, amount: number): Promise<CreditNoteUsage> {
+    return withTransaction(async (tx) => {
+      // Create the usage record
+      const [usage] = await tx.insert(creditNoteUsages).values({
+        returnId,
+        invoicePaymentId,
+        amount: amount.toString(),
+        usageType: 'payment',
+        notes: 'Applied to invoice payment'
+      }).returning();
+
+      // Update the return's used amount
+      await tx
+        .update(returns)
+        .set({ 
+          usedAmount: sql`${returns.usedAmount} + ${amount}`,
+          updatedAt: new Date()
+        })
+        .where(eq(returns.id, returnId));
+
+      return usage;
+    });
+  }
+
+  async convertCreditNoteToRefund(returnId: number, amount: number): Promise<CreditNoteUsage> {
+    return withTransaction(async (tx) => {
+      // Create the usage record for refund conversion
+      const [usage] = await tx.insert(creditNoteUsages).values({
+        returnId,
+        invoicePaymentId: null,
+        amount: amount.toString(),
+        usageType: 'refund',
+        notes: 'Converted to cash refund'
+      }).returning();
+
+      // Update the return's used amount
+      await tx
+        .update(returns)
+        .set({ 
+          usedAmount: sql`${returns.usedAmount} + ${amount}`,
+          updatedAt: new Date()
+        })
+        .where(eq(returns.id, returnId));
+
+      return usage;
+    });
   }
 }
 
