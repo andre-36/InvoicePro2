@@ -1724,6 +1724,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: deliveryNotes.createdAt,
         updatedAt: deliveryNotes.updatedAt,
         // Invoice fields
+        invoiceStoreId: invoices.storeId,
         invoiceNumber: invoices.invoiceNumber,
         invoiceClientId: invoices.clientId,
         invoiceIssueDate: invoices.issueDate,
@@ -1785,7 +1786,7 @@ export class DatabaseStorage implements IStorage {
       updatedAt: row.updatedAt,
       invoice: {
         id: row.invoiceId,
-        storeId: row.storeId,
+        storeId: row.invoiceStoreId,
         invoiceNumber: row.invoiceNumber,
         clientId: row.invoiceClientId,
         issueDate: row.invoiceIssueDate,
