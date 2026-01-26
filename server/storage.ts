@@ -3965,13 +3965,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientCreditNotes(clientId: number): Promise<(Return & { remainingBalance: number })[]> {
+    // Credit notes with 'pending' status have available balance
+    // 'completed' status means fully used, so we filter for 'pending'
     const creditNotes = await db
       .select()
       .from(returns)
       .where(and(
         eq(returns.clientId, clientId),
         eq(returns.returnType, 'credit_note'),
-        eq(returns.status, 'completed')
+        eq(returns.status, 'pending')
       ))
       .orderBy(desc(returns.returnDate));
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, CreditCard, Banknote, Clock, CheckCircle, XCircle, RotateCcw, ExternalLink, DollarSign, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, CreditCard, Banknote, Clock, CheckCircle, XCircle, RotateCcw, ExternalLink, DollarSign, Trash2, Pencil, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -214,23 +215,6 @@ export default function ReturnDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {/* Edit button - always available */}
-          <Button variant="outline" onClick={() => {
-            setEditNotes(returnData.notes || '');
-            setEditDialogOpen(true);
-          }}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          
-          {/* Delete button - only if no usages */}
-          {Number(returnData.usedAmount || 0) === 0 && (
-            <Button variant="outline" className="text-red-600" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Hapus
-            </Button>
-          )}
-          
           {returnData.status === 'pending' && (
             <>
               {/* For refunds only - credit notes complete automatically when balance is used up */}
@@ -246,6 +230,36 @@ export default function ReturnDetailPage() {
               </Button>
             </>
           )}
+          
+          {/* Quick actions dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+                setEditNotes(returnData.notes || '');
+                setEditDialogOpen(true);
+              }}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              {Number(returnData.usedAmount || 0) === 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-red-600"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Hapus
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
