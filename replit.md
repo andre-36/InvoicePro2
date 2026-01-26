@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 26, 2026 - Performance Optimization
+- **Performance**: Optimized delivery notes list query
+  - Replaced N+1 query pattern with single JOIN query in `getDeliveryNotesWithDetails`
+  - Previously made 3+ database calls per delivery note (invoice, client, item count)
+  - Now uses single query with JOINs and subquery for item count
+  - Significantly faster page load for Delivery Notes list
+- **Verified**: All database indexes already in place for frequently queried columns
+- **Verified**: TanStack Query cache already optimized with `staleTime: Infinity`
+
 ### January 25, 2026 - Delivery Notes Management and Planning
 - **Feature**: Implemented comprehensive delivery note management with status tracking
   - New "Surat Jalan" menu in sidebar navigation
