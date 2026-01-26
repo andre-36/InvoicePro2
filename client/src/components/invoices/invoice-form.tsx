@@ -8,7 +8,7 @@ import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Cal
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
-import type { InvoicePayment } from "@shared/schema";
+import type { InvoicePayment, Return } from "@shared/schema";
 import { InvoiceItemRow } from "@/components/invoices/invoice-item-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,7 +107,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     paymentDate: format(new Date(), 'yyyy-MM-dd'),
     paymentType: 'Cash',
     amount: '',
-    notes: ''
+    notes: '',
+    creditNoteId: null as number | null
   });
   
   // Client combobox state
@@ -186,6 +187,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     enabled: !!invoiceId,
   });
 
+  // Watch clientId to fetch credit notes
+  const watchedClientId = form.watch('invoice.clientId');
+  
+  // Fetch client credit notes for payment options
+  type CreditNoteWithBalance = Return & { remainingBalance: number };
+  const { data: clientCreditNotes = [] } = useQuery<CreditNoteWithBalance[]>({
+    queryKey: ['/api/clients', watchedClientId, 'credit-notes'],
+    enabled: !!watchedClientId && paymentDialogOpen,
+  });
+
   // Fetch current user for default notes and tax rate
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
@@ -200,7 +211,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
       toast({ title: "Success", description: "Payment added successfully" });
       setPaymentDialogOpen(false);
-      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '', creditNoteId: null });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: `Failed to add payment: ${error.message}`, variant: "destructive" });
@@ -217,7 +228,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       toast({ title: "Success", description: "Payment updated successfully" });
       setPaymentDialogOpen(false);
       setEditingPayment(null);
-      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+      setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '', creditNoteId: null });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: `Failed to update payment: ${error.message}`, variant: "destructive" });
@@ -696,7 +707,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       return;
     }
     setEditingPayment(null);
-    setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '' });
+    setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '', creditNoteId: null });
     setPaymentDialogOpen(true);
   };
 
@@ -717,7 +728,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     const paymentData = {
       paymentDate: paymentForm.paymentDate,
       paymentType: paymentForm.paymentType,
@@ -728,7 +739,30 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     if (editingPayment) {
       updatePaymentMutation.mutate({ id: editingPayment.id, payment: paymentData });
     } else {
-      createPaymentMutation.mutate(paymentData);
+      // For credit note payments, we need to also apply the credit note
+      if (paymentForm.paymentType === 'Credit Note' && paymentForm.creditNoteId) {
+        try {
+          // First create the payment
+          const paymentResponse = await apiRequest(`/api/invoices/${invoiceId}/payments`, 'POST', paymentData);
+          const newPayment = await paymentResponse.json();
+          
+          // Then apply the credit note to the payment
+          await apiRequest(`/api/returns/${paymentForm.creditNoteId}/apply-to-payment`, 'POST', {
+            invoicePaymentId: newPayment.id,
+            amount: paymentForm.amount
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/clients', watchedClientId, 'credit-notes'] });
+          toast({ title: "Success", description: "Credit note applied to payment" });
+          setPaymentDialogOpen(false);
+          setPaymentForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentType: 'Cash', amount: '', notes: '', creditNoteId: null });
+        } catch (error: any) {
+          toast({ title: "Error", description: `Failed to apply credit note: ${error.message}`, variant: "destructive" });
+        }
+      } else {
+        createPaymentMutation.mutate(paymentData);
+      }
     }
   };
 
@@ -1620,7 +1654,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Payment Type</label>
                         <Select
                           value={paymentForm.paymentType}
-                          onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value })}
+                          onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value, creditNoteId: null, amount: '' })}
                         >
                           <SelectTrigger data-testid="select-payment-type">
                             <SelectValue />
@@ -1630,10 +1664,40 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                             <SelectItem value="Check">Check</SelectItem>
                             <SelectItem value="Card">Card</SelectItem>
                             <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            {clientCreditNotes.length > 0 && (
+                              <SelectItem value="Credit Note">Credit Note</SelectItem>
+                            )}
                             <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+                      {paymentForm.paymentType === 'Credit Note' && clientCreditNotes.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Select Credit Note</label>
+                          <Select
+                            value={paymentForm.creditNoteId?.toString() || ''}
+                            onValueChange={(value) => {
+                              const selectedCN = clientCreditNotes.find(cn => cn.id === parseInt(value));
+                              setPaymentForm({ 
+                                ...paymentForm, 
+                                creditNoteId: parseInt(value),
+                                amount: selectedCN ? selectedCN.remainingBalance.toString() : ''
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih credit note..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {clientCreditNotes.map((cn) => (
+                                <SelectItem key={cn.id} value={cn.id.toString()}>
+                                  {cn.returnNumber} - Saldo: {formatCurrency(cn.remainingBalance)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                         <Input
