@@ -1706,40 +1706,125 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(deliveryNotes.status, status as "pending" | "delivered" | "cancelled"));
     }
     
-    const notes = await db
-      .select()
+    // Use a single query with JOINs and subquery for item count to avoid N+1
+    const results = await db
+      .select({
+        // Delivery note fields
+        id: deliveryNotes.id,
+        storeId: deliveryNotes.storeId,
+        invoiceId: deliveryNotes.invoiceId,
+        deliveryNumber: deliveryNotes.deliveryNumber,
+        deliveryDate: deliveryNotes.deliveryDate,
+        deliveryType: deliveryNotes.deliveryType,
+        status: deliveryNotes.status,
+        vehicleInfo: deliveryNotes.vehicleInfo,
+        driverName: deliveryNotes.driverName,
+        recipientName: deliveryNotes.recipientName,
+        notes: deliveryNotes.notes,
+        createdAt: deliveryNotes.createdAt,
+        updatedAt: deliveryNotes.updatedAt,
+        // Invoice fields
+        invoiceNumber: invoices.invoiceNumber,
+        invoiceClientId: invoices.clientId,
+        invoiceIssueDate: invoices.issueDate,
+        invoiceDueDate: invoices.dueDate,
+        invoiceStatus: invoices.status,
+        invoiceSubtotal: invoices.subtotal,
+        invoiceTaxRate: invoices.taxRate,
+        invoiceTaxAmount: invoices.taxAmount,
+        invoiceDiscount: invoices.discount,
+        invoiceShipping: invoices.shipping,
+        invoiceTotalAmount: invoices.totalAmount,
+        invoiceTotalProfit: invoices.totalProfit,
+        invoiceTermsAndConditions: invoices.termsAndConditions,
+        invoicePaperSize: invoices.paperSize,
+        invoiceNotes: invoices.notes,
+        invoiceCreatedAt: invoices.createdAt,
+        invoiceUpdatedAt: invoices.updatedAt,
+        invoiceDeliveryAddress: invoices.deliveryAddress,
+        invoiceDeliveryAddressLink: invoices.deliveryAddressLink,
+        invoicePaymentTerms: invoices.paymentTerms,
+        invoiceUseFakturPajak: invoices.useFakturPajak,
+        invoiceDeliveryType: invoices.deliveryType,
+        // Client fields
+        clientId: clients.id,
+        clientName: clients.name,
+        clientEmail: clients.email,
+        clientPhone: clients.phone,
+        clientAddress: clients.address,
+        clientAddressLink: clients.addressLink,
+        clientNumber: clients.clientNumber,
+        clientTaxNumber: clients.taxNumber,
+        clientNotes: clients.notes,
+        clientStoreId: clients.storeId,
+        clientCreatedAt: clients.createdAt,
+        clientUpdatedAt: clients.updatedAt,
+        // Item count via subquery
+        itemCount: sql<number>`(SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = ${deliveryNotes.id})`.as('itemCount')
+      })
       .from(deliveryNotes)
+      .innerJoin(invoices, eq(deliveryNotes.invoiceId, invoices.id))
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
       .where(and(...conditions))
       .orderBy(desc(deliveryNotes.deliveryDate));
     
-    const result = await Promise.all(notes.map(async (note) => {
-      const [invoice] = await db
-        .select()
-        .from(invoices)
-        .where(eq(invoices.id, note.invoiceId));
-      
-      let client: Client | null = null;
-      if (invoice?.clientId) {
-        const [clientResult] = await db
-          .select()
-          .from(clients)
-          .where(eq(clients.id, invoice.clientId));
-        client = clientResult || null;
-      }
-      
-      const [itemCountResult] = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(deliveryNoteItems)
-        .where(eq(deliveryNoteItems.deliveryNoteId, note.id));
-      
-      return {
-        ...note,
-        invoice: { ...invoice, client },
-        itemCount: Number(itemCountResult?.count || 0)
-      };
+    // Transform the flat results back into nested structure
+    return results.map(row => ({
+      id: row.id,
+      storeId: row.storeId,
+      invoiceId: row.invoiceId,
+      deliveryNumber: row.deliveryNumber,
+      deliveryDate: row.deliveryDate,
+      deliveryType: row.deliveryType,
+      status: row.status,
+      vehicleInfo: row.vehicleInfo,
+      driverName: row.driverName,
+      recipientName: row.recipientName,
+      notes: row.notes,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      invoice: {
+        id: row.invoiceId,
+        storeId: row.storeId,
+        invoiceNumber: row.invoiceNumber,
+        clientId: row.invoiceClientId,
+        issueDate: row.invoiceIssueDate,
+        dueDate: row.invoiceDueDate,
+        status: row.invoiceStatus,
+        subtotal: row.invoiceSubtotal,
+        taxRate: row.invoiceTaxRate,
+        taxAmount: row.invoiceTaxAmount,
+        discount: row.invoiceDiscount,
+        shipping: row.invoiceShipping,
+        totalAmount: row.invoiceTotalAmount,
+        totalProfit: row.invoiceTotalProfit,
+        termsAndConditions: row.invoiceTermsAndConditions,
+        paperSize: row.invoicePaperSize,
+        notes: row.invoiceNotes,
+        createdAt: row.invoiceCreatedAt,
+        updatedAt: row.invoiceUpdatedAt,
+        deliveryAddress: row.invoiceDeliveryAddress,
+        deliveryAddressLink: row.invoiceDeliveryAddressLink,
+        paymentTerms: row.invoicePaymentTerms,
+        useFakturPajak: row.invoiceUseFakturPajak,
+        deliveryType: row.invoiceDeliveryType,
+        client: row.clientId ? {
+          id: row.clientId,
+          storeId: row.clientStoreId!,
+          clientNumber: row.clientNumber!,
+          name: row.clientName!,
+          email: row.clientEmail,
+          phone: row.clientPhone,
+          address: row.clientAddress,
+          addressLink: row.clientAddressLink,
+          taxNumber: row.clientTaxNumber,
+          notes: row.clientNotes,
+          createdAt: row.clientCreatedAt!,
+          updatedAt: row.clientUpdatedAt!
+        } : null
+      },
+      itemCount: Number(row.itemCount || 0)
     }));
-    
-    return result;
   }
 
   async getInvoiceDeliveryStatus(invoiceId: number): Promise<{ orderedItems: { invoiceItemId: number; description: string; quantity: number; delivered: number; remaining: number }[]; fullyDelivered: boolean }> {
