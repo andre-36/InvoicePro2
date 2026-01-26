@@ -376,7 +376,7 @@ export function InvoiceItemRow({
       </td>
 
       {/* Unit selection (only show if product has units) */}
-      <td className="w-[100px]">
+      <td className="w-[65px]">
         {productUnits.length > 0 ? (
           <Select value={productUnitId || "base"} onValueChange={handleUnitChange}>
             <SelectTrigger className="h-8 text-sm">
@@ -479,9 +479,9 @@ export function InvoiceItemRow({
         </Select>
       </td>
 
-      {/* Subtotal */}
-      <td className="text-right text-sm font-medium text-gray-900">
-        {formatCurrency(item.subtotal || "0")}
+      {/* Total (subtotal + tax) */}
+      <td className="text-right text-sm font-medium text-gray-900 whitespace-nowrap">
+        {formatCurrency(item.total || item.subtotal || "0")}
       </td>
 
       {/* Actions */}

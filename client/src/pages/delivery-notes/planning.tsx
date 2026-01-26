@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer, MapPin, Package, Filter, Check } from "lucide-react";
+import { ArrowLeft, Printer, MapPin, Package, Filter, Check, Navigation, Copy, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { DeliveryNote, Invoice, Client, DeliveryNoteItem, InvoiceItem, Product, Category } from "@shared/schema";
 
@@ -49,6 +51,8 @@ export default function DeliveryPlanningPage() {
   const [, navigate] = useLocation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<number>>(new Set());
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [routeLink, setRouteLink] = useState("");
   const { toast } = useToast();
 
   const { data: deliveryNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
@@ -136,6 +140,97 @@ export default function DeliveryPlanningPage() {
       return note.invoice.deliveryAddressLink;
     }
     return note.invoice?.client?.addressLink || null;
+  };
+
+  const generateGoogleMapsRoute = () => {
+    if (selectedIds.size === 0 || !deliveryNotes) {
+      toast({
+        title: "Error",
+        description: "Pilih minimal satu surat jalan untuk membuat rute",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedNotes = deliveryNotes.filter(n => selectedIds.has(n.id));
+    
+    const uniqueDestinations = new Map<string, { address: string; link: string | null }>();
+    selectedNotes.forEach(note => {
+      const address = getDeliveryAddress(note);
+      const link = getAddressLink(note);
+      if (!uniqueDestinations.has(address)) {
+        uniqueDestinations.set(address, { address, link });
+      }
+    });
+
+    const destinations = Array.from(uniqueDestinations.values());
+    
+    if (destinations.length === 0) {
+      toast({
+        title: "Error",
+        description: "Tidak ada alamat pengiriman yang valid",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let mapsUrl: string;
+    
+    if (destinations.length === 1) {
+      const dest = destinations[0];
+      if (dest.link) {
+        mapsUrl = dest.link;
+      } else {
+        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest.address)}`;
+      }
+    } else {
+      const waypoints = destinations.map(d => {
+        if (d.link) {
+          const coordMatch = d.link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+          if (coordMatch) {
+            return `${coordMatch[1]},${coordMatch[2]}`;
+          }
+          const placeMatch = d.link.match(/place\/([^/@]+)/);
+          if (placeMatch) {
+            return decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+          }
+        }
+        return d.address;
+      });
+
+      const origin = waypoints[0];
+      const destination = waypoints[waypoints.length - 1];
+      const waypointsList = waypoints.slice(1, -1);
+
+      if (waypointsList.length > 0) {
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypointsList.join('|'))}&travelmode=driving`;
+      } else {
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+      }
+    }
+
+    setRouteLink(mapsUrl);
+    setRouteDialogOpen(true);
+  };
+
+  const copyRouteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(routeLink);
+      toast({
+        title: "Berhasil",
+        description: "Link rute berhasil disalin"
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Gagal menyalin link",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openRouteInNewTab = () => {
+    window.open(routeLink, '_blank');
   };
 
   const handlePrint = async () => {
@@ -543,6 +638,14 @@ export default function DeliveryPlanningPage() {
                 </PopoverContent>
               </Popover>
               <Button 
+                variant="outline"
+                onClick={generateGoogleMapsRoute} 
+                disabled={selectedIds.size === 0}
+              >
+                <Navigation className="h-4 w-4 mr-2" />
+                Generate Route
+              </Button>
+              <Button 
                 onClick={handlePrint} 
                 disabled={selectedIds.size === 0 || selectedCategoryIds.size === 0}
               >
@@ -606,6 +709,41 @@ export default function DeliveryPlanningPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Navigation className="h-5 w-5" />
+              Google Maps Route
+            </DialogTitle>
+            <DialogDescription>
+              Link rute pengiriman berdasarkan titik-titik yang dipilih
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input 
+                value={routeLink} 
+                readOnly 
+                className="flex-1 text-sm"
+              />
+              <Button variant="outline" size="icon" onClick={copyRouteLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRouteDialogOpen(false)}>
+                Tutup
+              </Button>
+              <Button onClick={openRouteInNewTab}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Buka di Google Maps
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

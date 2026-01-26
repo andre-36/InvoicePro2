@@ -1327,23 +1327,23 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <th scope="col" className="excel-header-cell text-center" style={{ width: '40px' }}>
                           #
                         </th>
-                        <th scope="col" className="excel-header-cell text-left" style={{ width: '35%' }}>
-                          Item / Description
+                        <th scope="col" className="excel-header-cell text-left" style={{ width: '40%', minWidth: '220px' }}>
+                          Product
                         </th>
-                        <th scope="col" className="excel-header-cell text-center" style={{ width: '100px' }}>
+                        <th scope="col" className="excel-header-cell text-center" style={{ width: '65px' }}>
                           Unit
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '80px' }}>
-                          Quantity
+                        <th scope="col" className="excel-header-cell text-right" style={{ width: '65px' }}>
+                          Qty
                         </th>
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
                           Unit Price
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '80px' }}>
-                          Tax (%)
+                        <th scope="col" className="excel-header-cell text-right" style={{ width: '65px' }}>
+                          Tax %
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
-                          Subtotal
+                        <th scope="col" className="excel-header-cell text-right" style={{ width: '150px' }}>
+                          Total
                         </th>
                         <th scope="col" className="excel-header-cell text-center" style={{ width: '50px' }}>
                           <span className="sr-only">Actions</span>
