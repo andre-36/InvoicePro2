@@ -743,16 +743,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       if (paymentForm.paymentType === 'Credit Note' && paymentForm.creditNoteId) {
         try {
           // First create the payment
-          const paymentResponse = await apiRequest(`/api/invoices/${invoiceId}/payments`, 'POST', paymentData);
+          const paymentResponse = await apiRequest('POST', `/api/invoices/${invoiceId}/payments`, paymentData);
           const newPayment = await paymentResponse.json();
           
           // Then apply the credit note to the payment
-          await apiRequest(`/api/returns/${paymentForm.creditNoteId}/apply-to-payment`, 'POST', {
+          await apiRequest('POST', `/api/returns/${paymentForm.creditNoteId}/apply-to-payment`, {
             invoicePaymentId: newPayment.id,
-            amount: paymentForm.amount
+            amount: parseFloat(paymentForm.amount)
           });
           
           queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId, 'payments'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/invoices', invoiceId] });
           queryClient.invalidateQueries({ queryKey: ['/api/clients', watchedClientId, 'credit-notes'] });
           toast({ title: "Success", description: "Credit note applied to payment" });
           setPaymentDialogOpen(false);
