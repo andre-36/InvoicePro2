@@ -1249,25 +1249,7 @@ export class DatabaseStorage implements IStorage {
     // First, get all paid invoices with their last payment date
     const results = await db
       .select({
-        id: invoices.id,
-        storeId: invoices.storeId,
-        invoiceNumber: invoices.invoiceNumber,
-        clientId: invoices.clientId,
-        issueDate: invoices.issueDate,
-        dueDate: invoices.dueDate,
-        status: invoices.status,
-        subtotal: invoices.subtotal,
-        taxRate: invoices.taxRate,
-        taxAmount: invoices.taxAmount,
-        discount: invoices.discount,
-        shipping: invoices.shipping,
-        totalAmount: invoices.totalAmount,
-        totalProfit: invoices.totalProfit,
-        termsAndConditions: invoices.termsAndConditions,
-        paperSize: invoices.paperSize,
-        notes: invoices.notes,
-        createdAt: invoices.createdAt,
-        updatedAt: invoices.updatedAt,
+        invoice: invoices,
         clientName: clients.name,
         lastPaymentDate: sql<Date>`(SELECT MAX(payment_date) FROM invoice_payments WHERE invoice_id = ${invoices.id})`.as('lastPaymentDate')
       })
@@ -1282,11 +1264,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(invoices.id));
     
     // Filter to only include invoices with last payment within 7 days
-    return results.filter(inv => {
-      if (!inv.lastPaymentDate) return false;
-      const paymentDate = new Date(inv.lastPaymentDate);
+    return results.filter(row => {
+      if (!row.lastPaymentDate) return false;
+      const paymentDate = new Date(row.lastPaymentDate);
       return paymentDate >= sevenDaysAgo;
-    }) as (Invoice & { clientName: string | null; lastPaymentDate: Date | null })[];
+    }).map(row => ({
+      ...row.invoice,
+      clientName: row.clientName,
+      lastPaymentDate: row.lastPaymentDate
+    }));
   }
 
   async createInvoice(invoiceData: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number; quantity: number | string }>): Promise<Invoice> {
