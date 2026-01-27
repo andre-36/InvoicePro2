@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckCircle, XCircle, Clock, RotateCcw, CreditCard, Banknote } from "lucide-react";
+import { Search, Plus, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckCircle, XCircle, Clock, RotateCcw, CreditCard, Banknote, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +45,10 @@ export default function ReturnsPage() {
   const [statusFilter, setStatusFilter] = useState<ReturnStatus>("all");
   const [typeFilter, setTypeFilter] = useState<ReturnTypeFilter>("all");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState<ReturnWithDetails | null>(null);
+  const [editNotes, setEditNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -77,6 +83,61 @@ export default function ReturnsPage() {
 
   const handleMarkAsCancelled = (id: number) => {
     updateStatusMutation.mutate({ id, status: 'cancelled' });
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/returns/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      setDeleteDialogOpen(false);
+      setSelectedReturn(null);
+      toast({
+        title: "Berhasil",
+        description: "Retur berhasil dihapus.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal menghapus retur.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
+      return apiRequest('PUT', `/api/returns/${id}`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      setEditDialogOpen(false);
+      setSelectedReturn(null);
+      toast({
+        title: "Berhasil",
+        description: "Retur berhasil diperbarui.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal memperbarui retur.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (ret: ReturnWithDetails) => {
+    setSelectedReturn(ret);
+    setEditNotes(ret.notes || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = (ret: ReturnWithDetails) => {
+    setSelectedReturn(ret);
+    setDeleteDialogOpen(true);
   };
 
   const filteredReturns = returns?.filter(ret => {
@@ -282,15 +343,30 @@ export default function ReturnsPage() {
                             <Eye className="h-4 w-4 mr-2" />
                             Lihat Detail
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(ret)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
                           {ret.status === 'pending' && (
                             <>
-                              <DropdownMenuItem onClick={() => handleMarkAsCompleted(ret.id)}>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Tandai Selesai
-                              </DropdownMenuItem>
+                              {ret.returnType === 'refund' && (
+                                <DropdownMenuItem onClick={() => handleMarkAsCompleted(ret.id)}>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Tandai Selesai
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleMarkAsCancelled(ret.id)} className="text-red-600">
                                 <XCircle className="h-4 w-4 mr-2" />
                                 Batalkan
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {Number(ret.usedAmount || 0) === 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(ret)} className="text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Hapus
                               </DropdownMenuItem>
                             </>
                           )}
@@ -304,6 +380,61 @@ export default function ReturnsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Retur</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus retur {selectedReturn?.returnNumber}? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Batal</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => selectedReturn && deleteMutation.mutate(selectedReturn.id)} 
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Retur</DialogTitle>
+            <DialogDescription>
+              {selectedReturn && Number(selectedReturn.usedAmount || 0) > 0 
+                ? "Hanya catatan yang dapat diubah karena credit note sudah digunakan."
+                : "Perbarui catatan retur ini."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Catatan</Label>
+              <Input
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Catatan retur..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Batal</Button>
+            <Button 
+              onClick={() => selectedReturn && updateMutation.mutate({ id: selectedReturn.id, notes: editNotes })} 
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
