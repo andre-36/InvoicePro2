@@ -296,11 +296,20 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const watchedClientId = form.watch('invoice.clientId');
   
   // Fetch client credit notes for payment options
+  // Always fetch when we have a valid clientId (not just when dialog is open) to ensure cache is populated
   type CreditNoteWithBalance = Return & { remainingBalance: number };
-  const { data: clientCreditNotes = [] } = useQuery<CreditNoteWithBalance[]>({
+  const { data: clientCreditNotes = [], refetch: refetchCreditNotes } = useQuery<CreditNoteWithBalance[]>({
     queryKey: ['/api/clients', watchedClientId, 'credit-notes'],
-    enabled: !!watchedClientId && paymentDialogOpen,
+    enabled: !!watchedClientId && watchedClientId !== 0,
+    staleTime: 0, // Always refetch to get latest credit notes
   });
+  
+  // Refetch credit notes when payment dialog opens
+  useEffect(() => {
+    if (paymentDialogOpen && watchedClientId && watchedClientId !== 0) {
+      refetchCreditNotes();
+    }
+  }, [paymentDialogOpen, watchedClientId, refetchCreditNotes]);
 
   // Helper function to calculate due date based on payment terms
   const calculateDueDate = (issueDate: Date, paymentTermsCode: string): Date => {
