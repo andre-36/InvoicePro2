@@ -1277,11 +1277,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertInvoicePaymentSchema, req, res);
       if (!validatedData) return;
 
+      // Handle creditNoteId from request body (not in schema validation)
+      const creditNoteId = req.body.creditNoteId ? parseInt(req.body.creditNoteId) : null;
+      
       // Ensure the invoiceId in the URL matches the one in the body
-      const paymentData = {
+      const paymentData: any = {
         ...validatedData,
         invoiceId: invoiceId
       };
+      
+      // Add creditNoteId to payment if provided
+      if (creditNoteId) {
+        paymentData.creditNoteId = creditNoteId;
+      }
       
       const newPayment = await storage.createInvoicePayment(paymentData);
       
@@ -1298,40 +1306,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateInvoice(invoiceId, { status: 'paid' });
         }
         
-        // Lookup payment type to get cash account and deduction percentage
-        const paymentType = await storage.getPaymentTypeByName(invoice.storeId, validatedData.paymentType);
-        
-        // Calculate net amount after deduction
-        const paymentAmount = parseFloat(validatedData.amount);
-        let netAmount = paymentAmount;
-        let deductionAmount = 0;
-        
-        if (paymentType?.deductionPercentage) {
-          const deductionPct = parseFloat(paymentType.deductionPercentage);
-          deductionAmount = paymentAmount * (deductionPct / 100);
-          netAmount = paymentAmount - deductionAmount;
+        // If payment is using a credit note, deduct from credit note balance
+        if (creditNoteId && validatedData.paymentType === 'Credit Note') {
+          await storage.applyCreditNoteToPayment(
+            creditNoteId, 
+            newPayment.id, 
+            parseFloat(validatedData.amount)
+          );
+        } else {
+          // Only create transaction for non-credit-note payments (actual cash receipts)
+          // Lookup payment type to get cash account and deduction percentage
+          const paymentType = await storage.getPaymentTypeByName(invoice.storeId, validatedData.paymentType);
+          
+          // Calculate net amount after deduction
+          const paymentAmount = parseFloat(validatedData.amount);
+          let netAmount = paymentAmount;
+          let deductionAmount = 0;
+          
+          if (paymentType?.deductionPercentage) {
+            const deductionPct = parseFloat(paymentType.deductionPercentage);
+            deductionAmount = paymentAmount * (deductionPct / 100);
+            netAmount = paymentAmount - deductionAmount;
+          }
+          
+          // Create a transaction entry for this payment as income
+          const transactionData: any = {
+            storeId: invoice.storeId,
+            type: 'income' as const,
+            category: 'invoice_payment',
+            amount: netAmount.toFixed(2),
+            date: validatedData.paymentDate,
+            description: deductionAmount > 0 
+              ? `Payment for invoice ${invoice.invoiceNumber} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
+              : `Payment received for invoice ${invoice.invoiceNumber}`,
+            referenceNumber: `Invoice #${invoice.invoiceNumber}`,
+          };
+          
+          // Link to cash account if payment type has one
+          if (paymentType?.cashAccountId) {
+            transactionData.accountId = paymentType.cashAccountId;
+          }
+          
+          console.log("Creating transaction with data:", transactionData);
+          await storage.createTransaction(transactionData);
         }
-        
-        // Create a transaction entry for this payment as income
-        const transactionData: any = {
-          storeId: invoice.storeId,
-          type: 'income' as const,
-          category: 'invoice_payment',
-          amount: netAmount.toFixed(2),
-          date: validatedData.paymentDate,
-          description: deductionAmount > 0 
-            ? `Payment for invoice ${invoice.invoiceNumber} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
-            : `Payment received for invoice ${invoice.invoiceNumber}`,
-          referenceNumber: `Invoice #${invoice.invoiceNumber}`,
-        };
-        
-        // Link to cash account if payment type has one
-        if (paymentType?.cashAccountId) {
-          transactionData.accountId = paymentType.cashAccountId;
-        }
-        
-        console.log("Creating transaction with data:", transactionData);
-        await storage.createTransaction(transactionData);
       }
       
       res.status(201).json(newPayment);

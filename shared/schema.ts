@@ -312,15 +312,17 @@ export const invoicePayments = pgTable("invoice_payments", {
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
   paymentDate: date("payment_date").notNull(),
-  paymentType: varchar("payment_type", { length: 50 }).notNull(), // Cash, Check, Card, Bank Transfer, etc.
+  paymentType: varchar("payment_type", { length: 50 }).notNull(), // Cash, Check, Card, Bank Transfer, Credit Note, etc.
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   notes: text("notes"),
+  creditNoteId: integer("credit_note_id").references(() => returns.id, { onDelete: 'set null' }), // Link to credit note if payment type is Credit Note
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
   return {
     invoiceIdIdx: index("invoice_payments_invoice_id_idx").on(table.invoiceId),
-    paymentDateIdx: index("invoice_payments_payment_date_idx").on(table.paymentDate)
+    paymentDateIdx: index("invoice_payments_payment_date_idx").on(table.paymentDate),
+    creditNoteIdIdx: index("invoice_payments_credit_note_id_idx").on(table.creditNoteId)
   };
 });
 

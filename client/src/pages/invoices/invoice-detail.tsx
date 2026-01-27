@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote, Return } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -52,6 +52,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     paymentType: 'Cash',
     amount: '',
     notes: '',
+    creditNoteId: null as number | null,
   });
 
   const { data: invoiceData, isLoading, error } = useQuery<InvoiceDetailResponse>({
@@ -87,6 +88,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   // Fetch payment types from settings
   const { data: paymentTypes } = useQuery<PaymentType[]>({
     queryKey: ['/api/stores/1/payment-types'],
+  });
+
+  // Fetch client credit notes for payment options
+  type CreditNoteWithBalance = Return & { remainingBalance: number };
+  const clientId = invoiceData?.invoice?.clientId;
+  const { data: clientCreditNotes = [], refetch: refetchCreditNotes } = useQuery<CreditNoteWithBalance[]>({
+    queryKey: ['/api/clients', clientId, 'credit-notes'],
+    enabled: !!clientId && clientId !== 0,
+    staleTime: 0, // Always refetch to get latest credit notes
   });
 
   // Fetch delivery notes for this invoice
@@ -247,7 +257,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         paymentType: getDefaultPaymentType(),
         amount: '',
         notes: '',
+        creditNoteId: null,
       });
+      // Refetch credit notes to update balances
+      refetchCreditNotes();
       toast({
         title: "Success",
         description: "Payment added successfully.",
@@ -276,7 +289,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         paymentType: getDefaultPaymentType(),
         amount: '',
         notes: '',
+        creditNoteId: null,
       });
+      // Refetch credit notes to update balances
+      refetchCreditNotes();
       toast({
         title: "Success",
         description: "Payment updated successfully.",
@@ -719,13 +735,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       return;
     }
 
-    const data = {
+    const data: any = {
       invoiceId: id,
       paymentDate: paymentForm.paymentDate,
       paymentType: paymentForm.paymentType,
       amount: paymentForm.amount,
       notes: paymentForm.notes,
     };
+    
+    // Include creditNoteId if using credit note payment
+    if (paymentForm.paymentType === 'Credit Note' && paymentForm.creditNoteId) {
+      data.creditNoteId = paymentForm.creditNoteId;
+    }
 
     if (editingPayment) {
       updatePaymentMutation.mutate(data);
@@ -1406,7 +1427,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Payment Type</label>
                     <Select
                       value={paymentForm.paymentType}
-                      onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value })}
+                      onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value, creditNoteId: null, amount: '' })}
                     >
                       <SelectTrigger data-testid="select-payment-type">
                         <SelectValue />
@@ -1425,9 +1446,39 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                             <SelectItem value="Other">Other</SelectItem>
                           </>
                         )}
+                        {clientCreditNotes.length > 0 && (
+                          <SelectItem value="Credit Note">Credit Note</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
+                  {paymentForm.paymentType === 'Credit Note' && clientCreditNotes.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Credit Note</label>
+                      <Select
+                        value={paymentForm.creditNoteId?.toString() || ''}
+                        onValueChange={(value) => {
+                          const selectedCN = clientCreditNotes.find(cn => cn.id === parseInt(value));
+                          setPaymentForm({ 
+                            ...paymentForm, 
+                            creditNoteId: parseInt(value),
+                            amount: selectedCN ? selectedCN.remainingBalance.toString() : ''
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih credit note..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clientCreditNotes.map((cn) => (
+                            <SelectItem key={cn.id} value={cn.id.toString()}>
+                              {cn.returnNumber} - Saldo: {formatCurrency(cn.remainingBalance)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                     <div className="flex gap-2">
