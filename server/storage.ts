@@ -111,6 +111,11 @@ export interface IStorage {
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
   getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
+  getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
+    clientName: string | null; 
+    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+    deliveryStatus: 'undelivered' | 'partial_delivered' | 'delivered';
+  })[]>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
   getOpenInvoices(storeId: number): Promise<Invoice[]>;
@@ -118,7 +123,10 @@ export interface IStorage {
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
+  voidInvoice(id: number): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
+  calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overdue'>;
+  calculateDeliveryStatus(invoiceId: number): Promise<'undelivered' | 'partial_delivered' | 'delivered'>;
 
   // Invoice payment methods
   getInvoicePayment(paymentId: number): Promise<InvoicePayment | undefined>;
@@ -1147,6 +1155,7 @@ export class DatabaseStorage implements IStorage {
         issueDate: invoices.issueDate,
         dueDate: invoices.dueDate,
         status: invoices.status,
+        isVoided: invoices.isVoided,
         subtotal: invoices.subtotal,
         taxRate: invoices.taxRate,
         taxAmount: invoices.taxAmount,
@@ -1610,6 +1619,29 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async voidInvoice(id: number): Promise<Invoice> {
+    const [invoice] = await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id));
+
+    if (!invoice) {
+      throw new Error(`Invoice with ID ${id} not found`);
+    }
+
+    const [updatedInvoice] = await db
+      .update(invoices)
+      .set({ 
+        isVoided: true,
+        status: 'void' as any,
+        updatedAt: new Date()
+      })
+      .where(eq(invoices.id, id))
+      .returning();
+
+    return updatedInvoice;
+  }
+
   async deleteInvoice(id: number): Promise<void> {
     return withTransaction(async (tx) => {
       const [invoice] = await tx
@@ -1920,6 +1952,98 @@ export class DatabaseStorage implements IStorage {
     const fullyDelivered = orderedItems.every(item => item.remaining <= 0);
 
     return { orderedItems, fullyDelivered };
+  }
+
+  // Calculate payment status for an invoice
+  async calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overdue'> {
+    const payments = await db
+      .select({ amount: invoicePayments.amount })
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, invoiceId));
+    
+    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+    const total = parseFloat(totalAmount || '0');
+    
+    if (totalPaid >= total) {
+      return 'paid';
+    }
+    
+    // Check if overdue (has due date and past due, but not fully paid)
+    if (dueDate) {
+      const due = new Date(dueDate);
+      due.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (due < today && totalPaid < total) {
+        return 'overdue';
+      }
+    }
+    
+    if (totalPaid > 0) {
+      return 'partial_paid';
+    }
+    
+    return 'unpaid';
+  }
+
+  // Calculate delivery status for an invoice
+  async calculateDeliveryStatus(invoiceId: number): Promise<'undelivered' | 'partial_delivered' | 'delivered'> {
+    const deliveryStatus = await this.getInvoiceDeliveryStatus(invoiceId);
+    
+    if (deliveryStatus.orderedItems.length === 0) {
+      return 'undelivered';
+    }
+    
+    const totalDelivered = deliveryStatus.orderedItems.reduce((sum, item) => sum + item.delivered, 0);
+    const totalOrdered = deliveryStatus.orderedItems.reduce((sum, item) => sum + item.quantity, 0);
+    
+    if (totalOrdered === 0) {
+      return 'undelivered';
+    }
+    
+    if (deliveryStatus.fullyDelivered) {
+      return 'delivered';
+    }
+    
+    if (totalDelivered > 0) {
+      return 'partial_delivered';
+    }
+    
+    return 'undelivered';
+  }
+
+  // Get invoices with calculated payment and delivery status
+  async getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
+    clientName: string | null; 
+    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+    deliveryStatus: 'undelivered' | 'partial_delivered' | 'delivered';
+  })[]> {
+    const baseInvoices = await this.getInvoices(storeId);
+    
+    const invoicesWithStatus = await Promise.all(
+      baseInvoices.map(async (invoice) => {
+        // If voided, set special status
+        if (invoice.isVoided) {
+          return {
+            ...invoice,
+            paymentStatus: 'unpaid' as const,
+            deliveryStatus: 'undelivered' as const
+          };
+        }
+        
+        const paymentStatus = await this.calculatePaymentStatus(invoice.id, invoice.totalAmount, invoice.dueDate);
+        const deliveryStatus = await this.calculateDeliveryStatus(invoice.id);
+        
+        return {
+          ...invoice,
+          paymentStatus,
+          deliveryStatus
+        };
+      })
+    );
+    
+    return invoicesWithStatus;
   }
 
   async createDeliveryNote(deliveryNoteData: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote> {
