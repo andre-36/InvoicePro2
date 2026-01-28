@@ -25,13 +25,13 @@ type SalesHistory = {
 
 type PurchaseHistory = {
   id: number;
-  purchaseOrderNumber: string;
+  receiptNumber: string;
   supplierName: string;
   quantity: number;
   unitCost: string;
   total: string;
   date: string;
-  status: 'received' | 'pending' | 'cancelled';
+  status: string;
 };
 
 type ProductStats = {
@@ -286,21 +286,21 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>PO #</TableHead>
+                      <TableHead>GR #</TableHead>
                       <TableHead>Supplier</TableHead>
                       <TableHead>Qty</TableHead>
-                      <TableHead>Cost</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {purchaseHistory.map((purchase) => (
                       <TableRow key={purchase.id}>
-                        <TableCell className="font-medium">{purchase.purchaseOrderNumber}</TableCell>
+                        <TableCell className="font-medium">{purchase.receiptNumber}</TableCell>
                         <TableCell>{purchase.supplierName}</TableCell>
                         <TableCell>{purchase.quantity}</TableCell>
-                        <TableCell>{formatCurrency(purchase.total)}</TableCell>
-                        <TableCell>{getStatusBadge(purchase.status, 'purchase')}</TableCell>
+                        <TableCell>{formatCurrency(purchase.unitCost)}</TableCell>
+                        <TableCell>{purchase.date}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

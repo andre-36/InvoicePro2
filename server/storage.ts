@@ -410,13 +410,13 @@ export type ProductSalesHistory = {
 
 export type ProductPurchaseHistory = {
   id: number;
-  purchaseOrderNumber: string;
+  receiptNumber: string;
   supplierName: string;
   quantity: number;
   unitCost: string;
   total: string;
   date: string;
-  status: 'received' | 'pending' | 'cancelled';
+  status: string;
 };
 
 // Helper function to generate unique numbers with retry logic for concurrency
@@ -923,9 +923,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]> {
-    // For now, return empty array since purchase orders are not implemented yet
-    // TODO: Implement when purchase orders feature is added
-    return [];
+    const result = await db
+      .select({
+        id: goodsReceiptItems.id,
+        receiptNumber: goodsReceipts.receiptNumber,
+        supplierName: goodsReceipts.supplierName,
+        quantity: goodsReceiptItems.quantity,
+        unitCost: goodsReceiptItems.unitCost,
+        totalAmount: goodsReceiptItems.totalAmount,
+        receiptDate: goodsReceipts.receiptDate,
+        status: goodsReceipts.status,
+      })
+      .from(goodsReceiptItems)
+      .innerJoin(goodsReceipts, eq(goodsReceiptItems.goodsReceiptId, goodsReceipts.id))
+      .where(eq(goodsReceiptItems.productId, productId))
+      .orderBy(desc(goodsReceipts.receiptDate));
+
+    return result.map(row => ({
+      id: row.id,
+      receiptNumber: row.receiptNumber,
+      supplierName: row.supplierName,
+      quantity: parseFloat(row.quantity),
+      unitCost: row.unitCost,
+      total: row.totalAmount,
+      date: row.receiptDate,
+      status: row.status,
+    }));
   }
 
   // Product batch methods
