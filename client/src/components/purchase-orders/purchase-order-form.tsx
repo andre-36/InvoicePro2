@@ -67,6 +67,7 @@ interface PurchaseOrderItemRowProps {
   removeItem: (index: number) => void;
   selectProduct: (index: number, productId: number) => void;
   canRemove: boolean;
+  showTaxColumn: boolean;
 }
 
 function PurchaseOrderItemRow({
@@ -76,7 +77,8 @@ function PurchaseOrderItemRow({
   updateItem,
   removeItem,
   selectProduct,
-  canRemove
+  canRemove,
+  showTaxColumn
 }: PurchaseOrderItemRowProps) {
   const [productOpen, setProductOpen] = useState(false);
 
@@ -202,22 +204,25 @@ function PurchaseOrderItemRow({
           className="h-8 text-sm text-right"
         />
       </td>
-      <td className="px-3 py-2">
-        <Select value={item.taxRate || "10"} onValueChange={(value) => updateItem(index, 'taxRate', value)}>
-          <SelectTrigger className="h-8 text-sm">
-            <SelectValue placeholder="10%" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">0%</SelectItem>
-            <SelectItem value="5">5%</SelectItem>
-            <SelectItem value="10">10%</SelectItem>
-            <SelectItem value="15">15%</SelectItem>
-            <SelectItem value="20">20%</SelectItem>
-          </SelectContent>
-        </Select>
-      </td>
+      {showTaxColumn && (
+        <td className="px-3 py-2">
+          <Select value={item.taxRate || "0"} onValueChange={(value) => updateItem(index, 'taxRate', value)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="0%" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">0%</SelectItem>
+              <SelectItem value="5">5%</SelectItem>
+              <SelectItem value="10">10%</SelectItem>
+              <SelectItem value="11">11%</SelectItem>
+              <SelectItem value="15">15%</SelectItem>
+              <SelectItem value="20">20%</SelectItem>
+            </SelectContent>
+          </Select>
+        </td>
+      )}
       <td className="px-3 py-2 text-right text-sm font-medium">
-        {formatCurrency(item.totalAmount || "0")}
+        {formatCurrency(showTaxColumn ? (item.totalAmount || "0") : (item.subtotal || "0"))}
       </td>
       <td className="px-3 py-2 text-center">
         {canRemove && (
@@ -246,7 +251,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       description: "",
       quantity: "1",
       unitCost: "0",
-      taxRate: "10",
+      taxRate: "0", // Default to 0%, will be set based on useFakturPajak
       subtotal: "0",
       taxAmount: "0",
       totalAmount: "0",
@@ -414,6 +419,38 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   // Track if we've already loaded items for this PO
   const [itemsLoaded, setItemsLoaded] = useState(false);
+  
+  // Track previous useFakturPajak value to detect actual changes
+  const prevUseFakturPajakRef = useRef(useFakturPajak);
+
+  // Update all items' tax rates when useFakturPajak toggle changes
+  useEffect(() => {
+    // Only run when useFakturPajak actually changes (not on initial render)
+    if (prevUseFakturPajakRef.current !== useFakturPajak) {
+      prevUseFakturPajakRef.current = useFakturPajak;
+      
+      const newTaxRate = useFakturPajak ? globalTaxRate.toString() : "0";
+      const updatedItems = items.map(item => {
+        const quantity = parseFloat(item.quantity || '1') || 1;
+        const unitCost = parseFloat(item.unitCost || '0') || 0;
+        const taxRateValue = parseFloat(newTaxRate) || 0;
+        const subtotal = quantity * unitCost;
+        const taxAmount = (subtotal * taxRateValue) / 100;
+        const totalAmount = subtotal + taxAmount;
+        
+        return {
+          ...item,
+          taxRate: newTaxRate,
+          subtotal: subtotal.toFixed(2),
+          taxAmount: taxAmount.toFixed(2),
+          totalAmount: totalAmount.toFixed(2)
+        };
+      });
+      setItems(updatedItems);
+      form.setValue('items', updatedItems);
+      updateTotals(updatedItems);
+    }
+  }, [useFakturPajak, globalTaxRate]);
 
   // Populate form with existing purchase order data when editing
   useEffect(() => {
@@ -535,12 +572,13 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   // Add new item
   const addItem = () => {
+    const isFakturPajak = form.getValues('purchaseOrder.useFakturPajak');
     const newItem: PurchaseOrderItem = {
       id: undefined,
       description: "",
       quantity: "1",
       unitCost: "0",
-      taxRate: "10",
+      taxRate: isFakturPajak ? globalTaxRate.toString() : "0",
       subtotal: "0",
       taxAmount: "0",
       totalAmount: "0",
@@ -1025,7 +1063,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '35%' }}>Product / Description</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '100px' }}>Qty</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '140px' }}>Unit Cost</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Tax %</th>
+                      {useFakturPajak && (
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Tax %</th>
+                      )}
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Total</th>
                       <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" style={{ width: '50px' }}></th>
                     </tr>
@@ -1041,6 +1081,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                         removeItem={removeItem}
                         selectProduct={selectProduct}
                         canRemove={items.length > 1}
+                        showTaxColumn={useFakturPajak || false}
                       />
                     ))}
                   </tbody>
