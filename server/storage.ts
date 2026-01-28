@@ -2260,6 +2260,53 @@ export class DatabaseStorage implements IStorage {
             ...item,
             goodsReceiptId: newReceipt.id
           });
+
+          // Update product stock by creating/updating product batch
+          const quantityReceived = parseFloat(String(item.quantity || 0));
+          if (quantityReceived > 0) {
+            const batchReference = `GR-${receiptNumber}-${item.productId}`;
+            const batchDescription = `Received from GR ${receiptNumber}`;
+            
+            // Get product info
+            const [product] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
+            
+            // Try to find existing batch for this GR item
+            const [existingBatch] = await tx
+              .select()
+              .from(productBatches)
+              .where(eq(productBatches.batchNumber, batchReference))
+              .limit(1);
+
+            if (existingBatch) {
+              // Update existing batch
+              const newQuantity = parseFloat(existingBatch.totalQuantity) + quantityReceived;
+              const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + quantityReceived;
+
+              await tx
+                .update(productBatches)
+                .set({
+                  totalQuantity: newQuantity.toString(),
+                  remainingQuantity: newRemainingQuantity.toString(),
+                  updatedAt: new Date()
+                })
+                .where(eq(productBatches.id, existingBatch.id));
+            } else {
+              // Create new batch
+              await tx
+                .insert(productBatches)
+                .values({
+                  productId: item.productId,
+                  storeId: goodsReceiptData.storeId,
+                  batchNumber: batchReference,
+                  purchaseDate: new Date(goodsReceiptData.receiptDate || new Date()),
+                  expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+                  totalQuantity: quantityReceived.toString(),
+                  remainingQuantity: quantityReceived.toString(),
+                  costPrice: String(item.unitCost || '0'),
+                  notes: batchDescription
+                });
+            }
+          }
         }
 
         if (hasReturns) {
