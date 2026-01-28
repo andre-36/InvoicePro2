@@ -67,7 +67,6 @@ interface PurchaseOrderItemRowProps {
   removeItem: (index: number) => void;
   selectProduct: (index: number, productId: number) => void;
   canRemove: boolean;
-  showTaxColumn: boolean;
 }
 
 function PurchaseOrderItemRow({
@@ -77,8 +76,7 @@ function PurchaseOrderItemRow({
   updateItem,
   removeItem,
   selectProduct,
-  canRemove,
-  showTaxColumn
+  canRemove
 }: PurchaseOrderItemRowProps) {
   const [productOpen, setProductOpen] = useState(false);
 
@@ -204,25 +202,8 @@ function PurchaseOrderItemRow({
           className="h-8 text-sm text-right"
         />
       </td>
-      {showTaxColumn && (
-        <td className="px-3 py-2">
-          <Select value={item.taxRate || "0"} onValueChange={(value) => updateItem(index, 'taxRate', value)}>
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue placeholder="0%" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">0%</SelectItem>
-              <SelectItem value="5">5%</SelectItem>
-              <SelectItem value="10">10%</SelectItem>
-              <SelectItem value="11">11%</SelectItem>
-              <SelectItem value="15">15%</SelectItem>
-              <SelectItem value="20">20%</SelectItem>
-            </SelectContent>
-          </Select>
-        </td>
-      )}
       <td className="px-3 py-2 text-right text-sm font-medium">
-        {formatCurrency(showTaxColumn ? (item.totalAmount || "0") : (item.subtotal || "0"))}
+        {formatCurrency(item.subtotal || "0")}
       </td>
       <td className="px-3 py-2 text-center">
         {canRemove && (
@@ -1063,9 +1044,6 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '35%' }}>Product / Description</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '100px' }}>Qty</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '140px' }}>Unit Cost</th>
-                      {useFakturPajak && (
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Tax %</th>
-                      )}
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Total</th>
                       <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" style={{ width: '50px' }}></th>
                     </tr>
@@ -1081,7 +1059,6 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                         removeItem={removeItem}
                         selectProduct={selectProduct}
                         canRemove={items.length > 1}
-                        showTaxColumn={useFakturPajak || false}
                       />
                     ))}
                   </tbody>
