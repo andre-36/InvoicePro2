@@ -4,6 +4,10 @@ import { z } from "zod";
 
 // Enums
 export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'sent', 'paid', 'overdue', 'cancelled', 'void']);
+// Payment status for invoices (calculated automatically)
+export const paymentStatusEnum = pgEnum('payment_status', ['unpaid', 'partial_paid', 'paid', 'overdue']);
+// Invoice delivery status (calculated automatically based on delivery notes)
+export const invoiceDeliveryStatusEnum = pgEnum('invoice_delivery_status', ['undelivered', 'partial_delivered', 'delivered']);
 export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 'accepted', 'rejected', 'expired']);
 export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['pending', 'partial', 'received', 'cancelled']);
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
@@ -241,6 +245,7 @@ export const invoices = pgTable("invoices", {
   issueDate: date("issue_date").notNull(),
   dueDate: date("due_date").notNull(),
   status: invoiceStatusEnum("status").default("draft").notNull(),
+  isVoided: boolean("is_voided").default(false).notNull(),
   useFakturPajak: boolean("use_faktur_pajak").default(false).notNull(),
   deliveryType: deliveryTypeEnum("delivery_type").default("delivery").notNull(),
   subtotal: numeric("subtotal", { precision: 15, scale: 2 }).notNull(),
