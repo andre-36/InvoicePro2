@@ -10,6 +10,26 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 28, 2026 - Prepaid Purchase Order Feature
+- **Feature**: Implemented prepaid PO functionality for handling upfront bulk purchases
+  - Added `isPrepaid` boolean field to purchase_orders table
+  - Created `purchase_order_payments` table for tracking prepaid payments
+  - PO form includes "Prepaid (Pembayaran di Muka)" toggle checkbox
+  - When Prepaid is enabled:
+    - Payments section appears below totals (after saving PO)
+    - Payment summary shows: Total PO, Paid amount, Remaining balance, Progress bar
+    - Status indicators: Lunas (fully paid), Sebagian Dibayar (partially paid), Belum Dibayar (not paid)
+    - Payment CRUD with date, type (Cash, Bank Transfer, Check, Other), amount, and notes
+  - Goods Receipt integration:
+    - PO dropdown shows "Prepaid" badge for prepaid POs
+    - Selected prepaid PO shows "PP" badge in item row
+- **API Updates**:
+  - GET /api/purchase-orders/:purchaseOrderId/payments - List PO payments
+  - POST /api/purchase-orders/:purchaseOrderId/payments - Add payment
+  - PUT /api/purchase-orders/:purchaseOrderId/payments/:paymentId - Update payment
+  - DELETE /api/purchase-orders/:purchaseOrderId/payments/:paymentId - Delete payment
+- **Business Use Case**: Addresses bulk purchases requiring upfront payment with partial deliveries (e.g., 1500 items paid upfront, delivered in batches based on supplier stock availability)
+
 ### January 26, 2026 - Delivery Planning Enhancements and UI Improvements
 - **Feature**: Google Maps Route Generator for Delivery Planning
   - "Generate Route" button added next to print button on delivery planning page

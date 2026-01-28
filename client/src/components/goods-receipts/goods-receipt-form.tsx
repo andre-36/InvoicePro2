@@ -61,7 +61,15 @@ interface PurchaseOrderWithItems {
   supplierId: number | null;
   status: string;
   useFakturPajak?: boolean;
+  isPrepaid?: boolean;
+  totalAmount?: string;
   items?: { productId: number; description: string; quantity: string; unitCost: string }[];
+}
+
+interface POPaymentSummary {
+  totalPaid: number;
+  totalAmount: number;
+  isFullyPaid: boolean;
 }
 
 interface GoodsReceiptData {
@@ -128,6 +136,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   const [productOpen, setProductOpen] = useState<number | null>(null);
   const [poOpen, setPOOpen] = useState<number | null>(null);
   const [poSearchQuery, setPOSearchQuery] = useState("");
+  const [prepaidPOPaymentStatus, setPrepaidPOPaymentStatus] = useState<Record<number, POPaymentSummary>>({});
 
   const form = useForm({
     resolver: zodResolver(extendedGoodsReceiptSchema),
@@ -181,6 +190,48 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     queryKey: ['/api/goods-receipts', goodsReceiptId, 'payments'],
     enabled: isEditing,
   });
+
+  // Fetch payment status for all prepaid POs (for dropdown and selected items)
+  useEffect(() => {
+    const fetchPrepaidPOStatus = async () => {
+      if (!purchaseOrders) return;
+      
+      // Get all prepaid PO IDs
+      const prepaidPOIds = purchaseOrders
+        .filter(po => po.isPrepaid === true)
+        .map(po => po.id);
+      
+      if (prepaidPOIds.length === 0) return;
+      
+      // Fetch payment status for each prepaid PO that hasn't been fetched
+      const statusMap: Record<number, POPaymentSummary> = {};
+      for (const poId of prepaidPOIds) {
+        if (prepaidPOPaymentStatus[poId]) continue; // Already fetched
+        try {
+          const response = await fetch(`/api/purchase-orders/${poId}/payments`);
+          if (response.ok) {
+            const payments = await response.json();
+            const po = purchaseOrders.find(p => p.id === poId);
+            const totalAmount = parseFloat(po?.totalAmount || '0');
+            const totalPaid = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+            statusMap[poId] = {
+              totalPaid,
+              totalAmount,
+              isFullyPaid: totalPaid >= totalAmount && totalAmount > 0
+            };
+          }
+        } catch (error) {
+          console.error(`Failed to fetch payments for PO ${poId}:`, error);
+        }
+      }
+      
+      if (Object.keys(statusMap).length > 0) {
+        setPrepaidPOPaymentStatus(prev => ({ ...prev, ...statusMap }));
+      }
+    };
+    
+    fetchPrepaidPOStatus();
+  }, [purchaseOrders]);
 
   useEffect(() => {
     if (existingReceipt) {
@@ -505,6 +556,22 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     return purchaseOrders?.find(po => po.id === poId)?.purchaseOrderNumber || null;
   };
 
+  const isPOPrepaid = (poId: number | null | undefined) => {
+    if (!poId) return false;
+    return purchaseOrders?.find(po => po.id === poId)?.isPrepaid || false;
+  };
+
+  const getPrepaidStatus = (poId: number | null | undefined): { isPrepaid: boolean; isFullyPaid: boolean } => {
+    if (!poId) return { isPrepaid: false, isFullyPaid: false };
+    const po = purchaseOrders?.find(p => p.id === poId);
+    if (!po?.isPrepaid) return { isPrepaid: false, isFullyPaid: false };
+    const status = prepaidPOPaymentStatus[poId];
+    return {
+      isPrepaid: true,
+      isFullyPaid: status?.isFullyPaid || false
+    };
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -733,7 +800,22 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                               <Popover open={poOpen === index} onOpenChange={(open) => { setPOOpen(open ? index : null); if (!open) setPOSearchQuery(""); }}>
                                 <PopoverTrigger asChild>
                                   <Button variant="ghost" role="combobox" className="w-full justify-start h-8 px-2 font-normal text-left" disabled={!item.productId || !form.watch("supplierId")}>
-                                    {getPOName(item.purchaseOrderId) || <span className="text-muted-foreground">-</span>}
+                                    {item.purchaseOrderId ? (
+                                      <div className="flex items-center gap-1">
+                                        <span>{getPOName(item.purchaseOrderId)}</span>
+                                        {(() => {
+                                          const status = getPrepaidStatus(item.purchaseOrderId);
+                                          if (status.isPrepaid && status.isFullyPaid) {
+                                            return <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-green-100 text-green-700">Lunas</Badge>;
+                                          } else if (status.isPrepaid) {
+                                            return <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-blue-100 text-blue-700">PP</Badge>;
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[250px] p-0" align="start">
@@ -746,15 +828,24 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                           <Check className={cn("mr-2 h-4 w-4", !item.purchaseOrderId ? "opacity-100" : "opacity-0")} />
                                           No PO Link
                                         </CommandItem>
-                                        {getFilteredPOs(item.productId).map((po) => (
-                                          <CommandItem key={po.id} value={po.purchaseOrderNumber} onSelect={() => selectPO(index, po)}>
-                                            <Check className={cn("mr-2 h-4 w-4", item.purchaseOrderId === po.id ? "opacity-100" : "opacity-0")} />
-                                            <div>
-                                              <div>{po.purchaseOrderNumber}</div>
-                                              {po.useFakturPajak && <Badge variant="outline" className="text-xs ml-1">PPN</Badge>}
-                                            </div>
-                                          </CommandItem>
-                                        ))}
+                                        {getFilteredPOs(item.productId).map((po) => {
+                                          const poStatus = getPrepaidStatus(po.id);
+                                          return (
+                                            <CommandItem key={po.id} value={po.purchaseOrderNumber} onSelect={() => selectPO(index, po)}>
+                                              <Check className={cn("mr-2 h-4 w-4", item.purchaseOrderId === po.id ? "opacity-100" : "opacity-0")} />
+                                              <div className="flex flex-wrap items-center gap-1">
+                                                <span>{po.purchaseOrderNumber}</span>
+                                                {po.useFakturPajak && <Badge variant="outline" className="text-xs">PPN</Badge>}
+                                                {poStatus.isPrepaid && poStatus.isFullyPaid && (
+                                                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Lunas</Badge>
+                                                )}
+                                                {poStatus.isPrepaid && !poStatus.isFullyPaid && (
+                                                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Prepaid</Badge>
+                                                )}
+                                              </div>
+                                            </CommandItem>
+                                          );
+                                        })}
                                       </CommandGroup>
                                     </CommandList>
                                   </Command>
