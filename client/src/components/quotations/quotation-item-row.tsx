@@ -343,23 +343,6 @@ export function QuotationItemRow({
         />
       </div>
 
-      {/* Tax Rate */}
-      <div className="col-span-6 md:col-span-1">
-        <label className="text-sm font-medium text-gray-700 mb-1 block">
-          Tax %
-        </label>
-        <Input
-          type="number"
-          min="0"
-          step="0.1"
-          placeholder="0"
-          value={taxRate}
-          onChange={(e) => setTaxRate(e.target.value)}
-          className="w-full"
-          data-testid={`input-tax-rate-${index}`}
-        />
-      </div>
-
       {/* Total */}
       <div className="col-span-6 md:col-span-1">
         <label className="text-sm font-medium text-gray-700 mb-1 block">
