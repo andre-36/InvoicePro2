@@ -141,14 +141,6 @@ function PurchaseOrderItemRow({
             </Command>
           </PopoverContent>
         </Popover>
-        {!selectedProduct && (
-          <Input
-            value={item.description}
-            onChange={(e) => updateItem(index, 'description', e.target.value)}
-            placeholder="Item description"
-            className="mt-1 h-8 text-sm"
-          />
-        )}
       </td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-1">
@@ -159,7 +151,7 @@ function PurchaseOrderItemRow({
             placeholder="1"
             min="0"
             step="any"
-            className="h-8 text-sm text-right flex-1"
+            className="h-8 text-sm text-right w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <div className="flex flex-col">
             <Button
@@ -190,6 +182,9 @@ function PurchaseOrderItemRow({
             </Button>
           </div>
         </div>
+      </td>
+      <td className="px-3 py-2 text-sm text-gray-600">
+        {selectedProduct?.unit || '-'}
       </td>
       <td className="px-3 py-2">
         <Input
@@ -1041,8 +1036,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '35%' }}>Product / Description</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '100px' }}>Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '45%' }}>Product</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Unit</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '140px' }}>Unit Cost</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Total</th>
                       <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" style={{ width: '50px' }}></th>
