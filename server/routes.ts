@@ -27,6 +27,7 @@ import {
   insertTransactionSchema,
   insertPurchaseOrderSchema,
   insertPurchaseOrderItemSchema,
+  insertPurchaseOrderPaymentSchema,
   insertSettingSchema,
   insertPrintSettingsSchema,
   insertPaymentTypeSchema,
@@ -2047,6 +2048,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error) {
       console.error("Error receiving purchase order items:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Purchase Order Payment routes (for prepaid POs)
+  app.get("/api/purchase-orders/:purchaseOrderId/payments", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.purchaseOrderId);
+      const payments = await storage.getPurchaseOrderPayments(purchaseOrderId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error getting purchase order payments:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:purchaseOrderId/paid-amount", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.purchaseOrderId);
+      const paidAmount = await storage.getPurchaseOrderPaidAmount(purchaseOrderId);
+      res.json({ paidAmount });
+    } catch (error) {
+      console.error("Error getting purchase order paid amount:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:purchaseOrderId/payments", requireAuth, async (req, res) => {
+    try {
+      const purchaseOrderId = parseInt(req.params.purchaseOrderId);
+      
+      const validatedData = validateRequestBody(insertPurchaseOrderPaymentSchema, req, res);
+      if (!validatedData) return;
+
+      const paymentData = {
+        ...validatedData,
+        purchaseOrderId: purchaseOrderId
+      };
+      
+      const newPayment = await storage.createPurchaseOrderPayment(paymentData);
+      res.status(201).json(newPayment);
+    } catch (error) {
+      console.error("Error creating purchase order payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/purchase-orders/:purchaseOrderId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      
+      const validatedData = validateRequestBody(insertPurchaseOrderPaymentSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedPayment = await storage.updatePurchaseOrderPayment(paymentId, validatedData);
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error("Error updating purchase order payment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:purchaseOrderId/payments/:paymentId", requireAuth, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.paymentId);
+      await storage.deletePurchaseOrderPayment(paymentId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting purchase order payment:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
