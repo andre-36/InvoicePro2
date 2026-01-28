@@ -1110,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/invoices", requireAuth, async (req, res) => {
     try {
       // Default to store 1 for general invoice listing
-      const invoices = await storage.getInvoices(1);
+      const invoices = await storage.getInvoicesWithStatus(1);
       res.json(invoices);
     } catch (error) {
       console.error("Error getting invoices:", error);
