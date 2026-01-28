@@ -347,9 +347,15 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   const selectPO = (index: number, po: PurchaseOrderWithItems | null) => {
     const updatedItems = [...items];
     if (po) {
+      // Find the unit cost for this product from the PO items
+      const productId = updatedItems[index].productId;
+      const poItem = po.items?.find(item => item.productId === productId);
+      const poUnitCost = poItem ? poItem.unitCost : updatedItems[index].unitCost;
+      
       updatedItems[index] = {
         ...updatedItems[index],
         purchaseOrderId: po.id,
+        unitCost: poUnitCost,
         taxRate: po.useFakturPajak ? "11" : "0" // 11% PPN if using Faktur Pajak
       };
     } else {
@@ -800,7 +806,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                 step="0.01" 
                                 value={item.unitCost} 
                                 onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
-                                className="h-8 text-right" 
+                                className={`h-8 text-right ${item.purchaseOrderId ? 'bg-muted' : ''}`}
+                                readOnly={!!item.purchaseOrderId}
                               />
                             </TableCell>
                             <TableCell className="p-1">
