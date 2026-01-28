@@ -477,6 +477,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   shipping: numeric("shipping", { precision: 15, scale: 2 }).default("0"),
   totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
   notes: text("notes"),
+  isPrepaid: boolean("is_prepaid").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
@@ -486,6 +487,23 @@ export const purchaseOrders = pgTable("purchase_orders", {
     statusIdx: index("purchase_orders_status_idx").on(table.status),
     orderDateIdx: index("purchase_orders_order_date_idx").on(table.orderDate),
     supplierNameIdx: index("purchase_orders_supplier_name_idx").on(table.supplierName)
+  };
+});
+
+// Purchase Order Payments table (for prepaid POs)
+export const purchaseOrderPayments = pgTable("purchase_order_payments", {
+  id: serial("id").primaryKey(),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: 'cascade' }).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  paymentType: varchar("payment_type", { length: 50 }).notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    purchaseOrderIdIdx: index("purchase_order_payments_purchase_order_id_idx").on(table.purchaseOrderId),
+    paymentDateIdx: index("purchase_order_payments_payment_date_idx").on(table.paymentDate)
   };
 });
 
@@ -785,6 +803,7 @@ export const insertAccountTransferSchema = createInsertSchema(accountTransfers).
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, purchaseOrderNumber: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPurchaseOrderPaymentSchema = createInsertSchema(purchaseOrderPayments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
@@ -856,6 +875,9 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+
+export type PurchaseOrderPayment = typeof purchaseOrderPayments.$inferSelect;
+export type InsertPurchaseOrderPayment = z.infer<typeof insertPurchaseOrderPaymentSchema>;
 
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
@@ -999,6 +1021,17 @@ export const invoiceItemsRelations = relations(invoiceItems, ({ one, many }) => 
 
 export const invoicePaymentsRelations = relations(invoicePayments, ({ one }) => ({
   invoice: one(invoices, { fields: [invoicePayments.invoiceId], references: [invoices.id] })
+}));
+
+export const purchaseOrdersRelations = relations(purchaseOrders, ({ one, many }) => ({
+  store: one(stores, { fields: [purchaseOrders.storeId], references: [stores.id] }),
+  supplier: one(suppliers, { fields: [purchaseOrders.supplierId], references: [suppliers.id] }),
+  items: many(purchaseOrderItems),
+  payments: many(purchaseOrderPayments)
+}));
+
+export const purchaseOrderPaymentsRelations = relations(purchaseOrderPayments, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, { fields: [purchaseOrderPayments.purchaseOrderId], references: [purchaseOrders.id] })
 }));
 
 export const deliveryNotesRelations = relations(deliveryNotes, ({ one, many }) => ({
