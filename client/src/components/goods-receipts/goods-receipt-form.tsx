@@ -328,8 +328,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       // Filter by supplier
       if (po.supplierId !== supplierId) return false;
       
-      // Filter by status
-      if (po.status !== 'sent' && po.status !== 'partial') return false;
+      // Filter by status - include pending, sent, and partial (not received or cancelled)
+      if (!['pending', 'sent', 'partial'].includes(po.status)) return false;
       
       // Filter by product - PO must contain the selected product
       const hasProduct = po.items?.some(item => item.productId === productId);
