@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown, Edit, DollarSign, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertPurchaseOrderSchema } from "@shared/schema";
@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -257,6 +259,16 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   // Back confirmation dialog state
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false);
   
+  // PO Payment state (for prepaid POs)
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+    paymentType: 'Bank Transfer',
+    amount: '',
+    notes: ''
+  });
+  
   // Store original loaded data for comparison-based change detection
   const originalDataRef = useRef<string | null>(null);
   
@@ -268,6 +280,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
       expectedDeliveryDate: poValues?.expectedDeliveryDate?.toISOString?.() || poValues?.expectedDeliveryDate,
       notes: poValues?.notes || '',
       useFakturPajak: poValues?.useFakturPajak || false,
+      isPrepaid: poValues?.isPrepaid || false,
       items: itemsArray.map(item => ({
         productId: item.productId,
         description: item.description,
@@ -355,6 +368,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   const nextPONumber = nextPONumberData?.purchaseOrderNumber || 
     (isNumberError ? generateFallbackPONumber() : null);
 
+  // Fetch PO payments for prepaid POs
+  const { data: poPayments = [] } = useQuery<any[]>({
+    queryKey: ['/api/purchase-orders', purchaseOrderId, 'payments'],
+    enabled: !!purchaseOrderId,
+  });
+
   // Form setup
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderFormSchema),
@@ -370,6 +389,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         expectedDeliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
         status: "pending",
         useFakturPajak: false,
+        isPrepaid: false,
         subtotal: "0",
         taxRate: "10",
         taxAmount: "0",
@@ -384,6 +404,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   // Watch the useFakturPajak toggle
   const useFakturPajak = form.watch('purchaseOrder.useFakturPajak');
+  
+  // Watch the isPrepaid toggle
+  const isPrepaid = form.watch('purchaseOrder.isPrepaid');
   
   // Get the global tax rate from user settings
   const globalTaxRate = currentUser?.defaultTaxRate || 11;
@@ -407,6 +430,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           expectedDeliveryDate: existingPO.expectedDeliveryDate ? new Date(existingPO.expectedDeliveryDate) : new Date(),
           status: existingPO.status || 'pending',
           useFakturPajak: existingPO.useFakturPajak || false,
+          isPrepaid: existingPO.isPrepaid || false,
           subtotal: existingPO.subtotal?.toString() || '0',
           taxRate: existingPO.taxRate?.toString() || '10',
           taxAmount: existingPO.taxAmount?.toString() || '0',
@@ -449,6 +473,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           expectedDeliveryDate: existingPO.expectedDeliveryDate ? new Date(existingPO.expectedDeliveryDate) : null,
           notes: existingPO.notes || '',
           useFakturPajak: existingPO.useFakturPajak || false,
+          isPrepaid: existingPO.isPrepaid || false,
         }, snapshotItems as any);
       } else {
         // Keep the default empty item
@@ -635,6 +660,59 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     setItems(newItems);
     form.setValue('items', newItems);
     updateTotals(newItems);
+  };
+
+  // Payment handlers for prepaid POs
+  const handleAddPayment = () => {
+    setEditingPayment(null);
+    setPaymentForm({
+      paymentDate: format(new Date(), 'yyyy-MM-dd'),
+      paymentType: 'Bank Transfer',
+      amount: '',
+      notes: ''
+    });
+    setPaymentDialogOpen(true);
+  };
+
+  const handleEditPayment = (payment: any) => {
+    setEditingPayment(payment);
+    setPaymentForm({
+      paymentDate: payment.paymentDate,
+      paymentType: payment.paymentType,
+      amount: payment.amount,
+      notes: payment.notes || ''
+    });
+    setPaymentDialogOpen(true);
+  };
+
+  const handleSavePayment = async () => {
+    if (!purchaseOrderId) return;
+    
+    try {
+      if (editingPayment) {
+        await apiRequest('PUT', `/api/purchase-orders/${purchaseOrderId}/payments/${editingPayment.id}`, paymentForm);
+        toast({ title: "Payment updated successfully" });
+      } else {
+        await apiRequest('POST', `/api/purchase-orders/${purchaseOrderId}/payments`, paymentForm);
+        toast({ title: "Payment added successfully" });
+      }
+      setPaymentDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', purchaseOrderId, 'payments'] });
+    } catch (error) {
+      toast({ title: "Failed to save payment", variant: "destructive" });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: number) => {
+    if (!purchaseOrderId) return;
+    
+    try {
+      await apiRequest('DELETE', `/api/purchase-orders/${purchaseOrderId}/payments/${paymentId}`);
+      toast({ title: "Payment deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', purchaseOrderId, 'payments'] });
+    } catch (error) {
+      toast({ title: "Failed to delete payment", variant: "destructive" });
+    }
   };
 
   const onSubmit = (values: PurchaseOrderFormValues) => {
@@ -843,6 +921,27 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="purchaseOrder.isPrepaid"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Prepaid (Pembayaran di Muka)</FormLabel>
+                      <FormDescription>
+                        Centang jika PO ini dibayar terlebih dahulu sebelum barang datang
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
               
               <div className="md:col-span-2">
                 <FormField
@@ -1037,6 +1136,203 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
               </CardContent>
             </Card>
           </div>
+
+          {/* Prepaid Payments Section - Only visible when isPrepaid is enabled */}
+          {isPrepaid && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <DollarSign className="mr-2 h-5 w-5" />
+                    Pembayaran (Prepaid)
+                  </div>
+                  {purchaseOrderId && (
+                    <Button type="button" onClick={handleAddPayment} size="sm">
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Add Payment
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!purchaseOrderId ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p className="font-medium">Simpan PO Terlebih Dahulu</p>
+                    <p className="text-sm">Klik "Create Purchase Order" untuk menyimpan, lalu Anda dapat mencatat pembayaran.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Payment Summary */}
+                    {(() => {
+                      const poTotal = parseFloat(form.watch('purchaseOrder.totalAmount') || '0');
+                      const totalPaid = poPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+                      const remaining = poTotal - totalPaid;
+                      const paymentProgress = poTotal > 0 ? (totalPaid / poTotal) * 100 : 0;
+                      const isFullyPaid = remaining <= 0;
+                      
+                      return (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <h4 className="text-lg font-medium mb-3">Payment Summary</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Total PO</span>
+                              <span className="font-medium">{formatCurrency(poTotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Sudah Dibayar</span>
+                              <span className="font-medium text-green-600">{formatCurrency(totalPaid)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Sisa</span>
+                              <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                {formatCurrency(Math.max(0, remaining))}
+                              </span>
+                            </div>
+                            <Progress value={Math.min(100, paymentProgress)} className="h-2 mt-2" />
+                          </div>
+                          {isFullyPaid ? (
+                            <div className="mt-3 p-2 bg-green-100 text-green-800 rounded text-sm text-center">
+                              <CheckCircle className="h-4 w-4 inline mr-2" />
+                              Lunas
+                            </div>
+                          ) : totalPaid > 0 ? (
+                            <div className="mt-3 p-2 bg-orange-100 text-orange-800 rounded text-sm text-center">
+                              <DollarSign className="h-4 w-4 inline mr-2" />
+                              Sebagian Dibayar ({Math.round(paymentProgress)}%)
+                            </div>
+                          ) : (
+                            <div className="mt-3 p-2 bg-red-100 text-red-800 rounded text-sm text-center">
+                              <DollarSign className="h-4 w-4 inline mr-2" />
+                              Belum Dibayar
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Payment Records */}
+                    {poPayments.length === 0 ? (
+                      <div className="text-center py-4 text-gray-500">
+                        <p className="text-sm">Belum ada pembayaran tercatat</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipe</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Jumlah</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Catatan</th>
+                              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {poPayments.map((payment: any) => (
+                              <tr key={payment.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {format(new Date(payment.paymentDate), 'dd MMM yyyy')}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">{payment.paymentType}</td>
+                                <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+                                  {formatCurrency(parseFloat(payment.amount))}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500">{payment.notes || '-'}</td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditPayment(payment)}
+                                    className="mr-1"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeletePayment(payment.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payment Dialog */}
+          <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingPayment ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Pembayaran</label>
+                  <Input
+                    type="date"
+                    value={paymentForm.paymentDate}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Pembayaran</label>
+                  <Select
+                    value={paymentForm.paymentType}
+                    onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih tipe pembayaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Check">Check</SelectItem>
+                      <SelectItem value="Other">Lainnya</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                  <Input
+                    type="number"
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+                  <Textarea
+                    value={paymentForm.notes}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                    placeholder="Catatan pembayaran (opsional)"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="button" onClick={handleSavePayment}>
+                  {editingPayment ? 'Update' : 'Simpan'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Actions */}
           <div className="flex justify-end space-x-4">
