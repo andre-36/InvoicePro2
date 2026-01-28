@@ -1064,7 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stores/:storeId/invoices", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
-      const invoices = await storage.getInvoices(storeId);
+      const invoices = await storage.getInvoicesWithStatus(storeId);
       res.json(invoices);
     } catch (error) {
       console.error("Error getting invoices:", error);
@@ -1227,11 +1227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Invoice not found" });
       }
       
-      if (invoice.status === 'void') {
+      if (invoice.isVoided) {
         return res.status(400).json({ error: "Invoice is already voided" });
       }
       
-      const updatedInvoice = await storage.updateInvoiceStatus(invoiceId, 'void');
+      const updatedInvoice = await storage.voidInvoice(invoiceId);
       res.json(updatedInvoice);
     } catch (error) {
       console.error("Error voiding invoice:", error);

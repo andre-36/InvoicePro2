@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, FileDown, Eye, FilePenLine } from "lucide-react";
+import { Plus, Search, ArrowDown, ArrowUp, MoreHorizontal, FileDown, Eye, FilePenLine, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,13 +21,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDF } from "@/lib/pdf-generator";
+
+type PaymentStatus = 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+type DeliveryStatus = 'undelivered' | 'partial_delivered' | 'delivered';
 
 type Invoice = {
   id: number;
@@ -37,17 +51,23 @@ type Invoice = {
   issueDate: string;
   dueDate: string;
   totalAmount: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+  status: string;
+  isVoided: boolean;
+  paymentStatus: PaymentStatus;
+  deliveryStatus: DeliveryStatus;
 };
 
-type InvoiceStatus = 'all' | 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+type PaymentStatusFilter = 'all' | PaymentStatus;
+type DeliveryStatusFilter = 'all' | DeliveryStatus;
 
 type SortDirection = 'asc' | 'desc';
 
 export default function InvoicesPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatusFilter>("all");
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatusFilter>("all");
+  const [showVoided, setShowVoided] = useState(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,43 +76,30 @@ export default function InvoicesPage() {
     queryKey: ['/api/invoices'],
   });
 
-  // Handle create invoice navigation
-  const handleCreateInvoice = () => {
-    navigate('/invoices/create');
-  };
-
-  // Update invoice status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: string }) => {
-      return apiRequest('PATCH', `/api/invoices/${id}/status`, { status });
+  // Void invoice mutation
+  const voidMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('POST', `/api/invoices/${id}/void`, undefined);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       toast({
-        title: "Status updated",
-        description: "The invoice status has been updated successfully.",
+        title: "Invoice dibatalkan",
+        description: "Invoice telah di-void.",
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Failed to update status: ${error.message}`,
+        description: `Gagal membatalkan invoice: ${error.message}`,
         variant: "destructive",
       });
     }
   });
-  
-  // Render create invoice button in the header or action area
-  // This should be added to your page layout where appropriate:
-  // <Button onClick={handleCreateInvoice}>
-  //   <Plus className="h-4 w-4 mr-2" />
-  //   Create Invoice
-  // </Button>
 
   // Handle generating PDF
   const handleGeneratePDF = async (invoice: Invoice) => {
     try {
-      // Fetch invoice details with items
       const res = await fetch(`/api/invoices/${invoice.id}`, {
         credentials: 'include'
       });
@@ -131,7 +138,7 @@ export default function InvoicesPage() {
     setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
   };
 
-  // Filter and sort invoices based on search query, status, and sort direction
+  // Filter and sort invoices
   const filteredInvoices = invoices
     ? invoices
         .filter(invoice => {
@@ -139,30 +146,46 @@ export default function InvoicesPage() {
             invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (invoice.clientName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
           
-          const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+          // Filter voided invoices
+          if (!showVoided && invoice.isVoided) return false;
+          if (invoice.isVoided) return matchesSearch; // Don't apply other filters to voided
           
-          return matchesSearch && matchesStatus;
+          const matchesPaymentStatus = paymentStatusFilter === 'all' || invoice.paymentStatus === paymentStatusFilter;
+          const matchesDeliveryStatus = deliveryStatusFilter === 'all' || invoice.deliveryStatus === deliveryStatusFilter;
+          
+          return matchesSearch && matchesPaymentStatus && matchesDeliveryStatus;
         })
         .sort((a, b) => {
-          // Sort by invoice number
           const comparison = a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true });
           return sortDirection === 'desc' ? -comparison : comparison;
         })
     : [];
   
-  // Render badge based on invoice status
-  const getStatusBadge = (status: string) => {
+  // Payment status badge
+  const getPaymentStatusBadge = (status: PaymentStatus) => {
     switch (status) {
-      case 'draft':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
-      case 'sent':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      case 'unpaid':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Unpaid</Badge>;
+      case 'partial_paid':
+        return <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
       case 'paid':
         return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
       case 'overdue':
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
-      case 'void':
-        return <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  // Delivery status badge
+  const getDeliveryStatusBadge = (status: DeliveryStatus) => {
+    switch (status) {
+      case 'undelivered':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-600">Undelivered</Badge>;
+      case 'partial_delivered':
+        return <Badge className="bg-blue-100 text-blue-800">Partial</Badge>;
+      case 'delivered':
+        return <Badge className="bg-emerald-100 text-emerald-800">Delivered</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -197,26 +220,16 @@ export default function InvoicesPage() {
               />
             </div>
             
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={statusFilter}
-                onValueChange={(value: string) => setStatusFilter(value as InvoiceStatus)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <div className="flex items-center">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="All Statuses" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="void">Void</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input 
+                  type="checkbox" 
+                  checked={showVoided}
+                  onChange={(e) => setShowVoided(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Show Voided
+              </label>
             </div>
           </div>
         </CardHeader>
@@ -237,11 +250,11 @@ export default function InvoicesPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-1">No invoices found</h3>
               <p className="text-sm text-gray-500 mb-4 max-w-md">
-                {searchQuery || statusFilter !== 'all'
+                {searchQuery || paymentStatusFilter !== 'all' || deliveryStatusFilter !== 'all'
                   ? "Try adjusting your search or filter to find what you're looking for."
                   : "You haven't created any invoices yet. Get started by creating your first invoice."}
               </p>
-              {!searchQuery && statusFilter === 'all' && (
+              {!searchQuery && paymentStatusFilter === 'all' && deliveryStatusFilter === 'all' && (
                 <Link href="/invoices/create">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
@@ -272,13 +285,45 @@ export default function InvoicesPage() {
                     <TableHead>Date</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>
+                      <Select
+                        value={paymentStatusFilter}
+                        onValueChange={(value: string) => setPaymentStatusFilter(value as PaymentStatusFilter)}
+                      >
+                        <SelectTrigger className="h-8 w-[130px] border-none bg-transparent p-0 font-medium text-sm shadow-none focus:ring-0">
+                          <SelectValue placeholder="Payment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Payment</SelectItem>
+                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                          <SelectItem value="partial_paid">Partial Paid</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="overdue">Overdue</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableHead>
+                    <TableHead>
+                      <Select
+                        value={deliveryStatusFilter}
+                        onValueChange={(value: string) => setDeliveryStatusFilter(value as DeliveryStatusFilter)}
+                      >
+                        <SelectTrigger className="h-8 w-[130px] border-none bg-transparent p-0 font-medium text-sm shadow-none focus:ring-0">
+                          <SelectValue placeholder="Delivery" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Delivery</SelectItem>
+                          <SelectItem value="undelivered">Undelivered</SelectItem>
+                          <SelectItem value="partial_delivered">Partial Delivered</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="group">
+                    <TableRow key={invoice.id} className={`group ${invoice.isVoided ? 'opacity-50' : ''}`}>
                       <TableCell className="font-medium text-primary">
                         <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary">
                           {invoice.invoiceNumber}
@@ -288,7 +333,20 @@ export default function InvoicesPage() {
                       <TableCell>{formatDate(invoice.issueDate)}</TableCell>
                       <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(invoice.totalAmount)}</TableCell>
-                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                      <TableCell>
+                        {invoice.isVoided ? (
+                          <Badge variant="outline" className="bg-slate-200 text-slate-600 line-through">Void</Badge>
+                        ) : (
+                          getPaymentStatusBadge(invoice.paymentStatus)
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {invoice.isVoided ? (
+                          <span className="text-slate-400">-</span>
+                        ) : (
+                          getDeliveryStatusBadge(invoice.deliveryStatus)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -307,31 +365,41 @@ export default function InvoicesPage() {
                               <FileDown className="mr-2 h-4 w-4" />
                               <span>Download PDF</span>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
-                              <FilePenLine className="mr-2 h-4 w-4" />
-                              <span>Edit</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled={invoice.status === 'paid'}>
-                              <Select
-                                onValueChange={(value) => {
-                                  updateStatusMutation.mutate({ id: invoice.id, status: value });
-                                }}
-                                value={invoice.status}
-                              >
-                                <SelectTrigger className="border-none p-0 h-auto font-normal shadow-none">
-                                  <span className="text-sm">Change Status</span>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="draft">Draft</SelectItem>
-                                  <SelectItem value="sent">Pending</SelectItem>
-                                  <SelectItem value="paid">Paid</SelectItem>
-                                  <SelectItem value="overdue">Overdue</SelectItem>
-                                  <SelectItem value="void">Void</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </DropdownMenuItem>
+                            {!invoice.isVoided && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
+                                  <FilePenLine className="mr-2 h-4 w-4" />
+                                  <span>Edit</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
+                                      <Ban className="mr-2 h-4 w-4" />
+                                      <span>Void Invoice</span>
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Void Invoice</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Yakin ingin membatalkan invoice {invoice.invoiceNumber}? Invoice yang di-void tidak bisa dihapus dan akan tetap tercatat untuk audit.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Batal</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => voidMutation.mutate(invoice.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Void
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
