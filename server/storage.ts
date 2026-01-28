@@ -4,7 +4,7 @@ import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
   transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
-  printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
+  purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
   returns, returnItems, creditNoteUsages,
 
@@ -19,6 +19,7 @@ import {
   type DeliveryNote, type InsertDeliveryNote, type DeliveryNoteItem, type InsertDeliveryNoteItem,
   type Quotation, type InsertQuotation, type QuotationItem, type InsertQuotationItem,
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
+  type PurchaseOrderPayment, type InsertPurchaseOrderPayment,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
   type PrintSettings, type InsertPrintSettings,
@@ -134,6 +135,14 @@ export interface IStorage {
   createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   updateInvoicePayment(id: number, payment: Partial<InsertInvoicePayment>): Promise<InvoicePayment>;
   deleteInvoicePayment(id: number): Promise<void>;
+
+  // Purchase order payment methods (for prepaid POs)
+  getPurchaseOrderPayment(paymentId: number): Promise<PurchaseOrderPayment | undefined>;
+  getPurchaseOrderPayments(purchaseOrderId: number): Promise<PurchaseOrderPayment[]>;
+  getPurchaseOrderPaidAmount(purchaseOrderId: number): Promise<number>;
+  createPurchaseOrderPayment(payment: InsertPurchaseOrderPayment): Promise<PurchaseOrderPayment>;
+  updatePurchaseOrderPayment(id: number, payment: Partial<InsertPurchaseOrderPayment>): Promise<PurchaseOrderPayment>;
+  deletePurchaseOrderPayment(id: number): Promise<void>;
 
   // Delivery note methods
   getDeliveryNote(id: number): Promise<DeliveryNote | undefined>;
@@ -1764,6 +1773,65 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(invoicePayments)
       .where(eq(invoicePayments.id, id));
+  }
+
+  // Purchase order payment methods (for prepaid POs)
+  async getPurchaseOrderPayment(paymentId: number): Promise<PurchaseOrderPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(purchaseOrderPayments)
+      .where(eq(purchaseOrderPayments.id, paymentId));
+    return payment;
+  }
+
+  async getPurchaseOrderPayments(purchaseOrderId: number): Promise<PurchaseOrderPayment[]> {
+    const payments = await db
+      .select()
+      .from(purchaseOrderPayments)
+      .where(eq(purchaseOrderPayments.purchaseOrderId, purchaseOrderId))
+      .orderBy(desc(purchaseOrderPayments.paymentDate));
+    
+    return payments;
+  }
+
+  async getPurchaseOrderPaidAmount(purchaseOrderId: number): Promise<number> {
+    const result = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${purchaseOrderPayments.amount}), 0)`
+      })
+      .from(purchaseOrderPayments)
+      .where(eq(purchaseOrderPayments.purchaseOrderId, purchaseOrderId));
+    
+    return parseFloat(result[0]?.total || '0');
+  }
+
+  async createPurchaseOrderPayment(payment: InsertPurchaseOrderPayment): Promise<PurchaseOrderPayment> {
+    const [newPayment] = await db
+      .insert(purchaseOrderPayments)
+      .values(payment)
+      .returning();
+    
+    return newPayment;
+  }
+
+  async updatePurchaseOrderPayment(id: number, payment: Partial<InsertPurchaseOrderPayment>): Promise<PurchaseOrderPayment> {
+    const [updatedPayment] = await db
+      .update(purchaseOrderPayments)
+      .set({ ...payment, updatedAt: new Date() })
+      .where(eq(purchaseOrderPayments.id, id))
+      .returning();
+    
+    if (!updatedPayment) {
+      throw new Error(`Purchase order payment with ID ${id} not found`);
+    }
+    
+    return updatedPayment;
+  }
+
+  async deletePurchaseOrderPayment(id: number): Promise<void> {
+    await db
+      .delete(purchaseOrderPayments)
+      .where(eq(purchaseOrderPayments.id, id));
   }
 
   // Delivery note methods
