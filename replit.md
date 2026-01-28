@@ -10,6 +10,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### January 28, 2026 - Return Form Improvements and PO Duplicate Warning
+- **Feature**: Enhanced return form with flexible pricing
+  - Shows 3 price columns: Harga Invoice (original), Harga Sekarang (current product price), and Nilai Retur (editable return value)
+  - Return value defaults to the lower of invoice price and current price
+  - Subtotal calculations use the editable return value
+  - Allows adjusting return value based on business needs (e.g., depreciation, price changes)
+- **Feature**: PO duplicate item warning
+  - Displays alert when same product is added multiple times in a purchase order
+  - Shows product names and count (e.g., "ProductX (2x)")
+  - Suggests consolidating duplicate items
+
 ### January 28, 2026 - Prepaid Purchase Order Feature
 - **Feature**: Implemented prepaid PO functionality for handling upfront bulk purchases
   - Added `isPrepaid` boolean field to purchase_orders table
