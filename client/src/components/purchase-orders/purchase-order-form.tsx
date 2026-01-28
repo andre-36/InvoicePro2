@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown, Edit, DollarSign, CheckCircle } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown, Edit, DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertPurchaseOrderSchema } from "@shared/schema";
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
@@ -715,6 +716,33 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     }
   };
 
+  // Detect duplicate products in items
+  const duplicateProducts = (() => {
+    const productIds = items
+      .filter(item => item.productId && item.productId !== null)
+      .map(item => item.productId as number);
+    
+    const duplicates: { productId: number; productName: string; count: number }[] = [];
+    const seen: Record<number, number> = {};
+    
+    productIds.forEach(id => {
+      seen[id] = (seen[id] || 0) + 1;
+    });
+    
+    Object.entries(seen).forEach(([id, count]) => {
+      if (count > 1) {
+        const product = products?.find(p => p.id === parseInt(id));
+        duplicates.push({
+          productId: parseInt(id),
+          productName: product?.name || `Product #${id}`,
+          count
+        });
+      }
+    });
+    
+    return duplicates;
+  })();
+
   const onSubmit = (values: PurchaseOrderFormValues) => {
     // Use items from state, not from form values
     const submitValues = {
@@ -973,6 +1001,22 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Duplicate product warning */}
+              {duplicateProducts.length > 0 && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <span className="font-medium">Produk duplikat terdeteksi: </span>
+                    {duplicateProducts.map((dup, idx) => (
+                      <span key={dup.productId}>
+                        {dup.productName} ({dup.count}x)
+                        {idx < duplicateProducts.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                    <span className="block mt-1 text-sm">Pertimbangkan untuk menggabungkan item yang sama.</span>
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
