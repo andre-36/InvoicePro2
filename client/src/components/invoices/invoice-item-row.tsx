@@ -459,27 +459,7 @@ export function InvoiceItemRow({
         </div>
       </td>
 
-      {/* Tax Rate */}
-      <td>
-        <Select
-          value={taxRate}
-          onValueChange={setTaxRate}
-        >
-          <SelectTrigger className="excel-cell-input-right">
-            <SelectValue placeholder="0%" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">0%</SelectItem>
-            <SelectItem value="5">5%</SelectItem>
-            <SelectItem value="7.5">7.5%</SelectItem>
-            <SelectItem value="10">10%</SelectItem>
-            <SelectItem value="15">15%</SelectItem>
-            <SelectItem value="20">20%</SelectItem>
-          </SelectContent>
-        </Select>
-      </td>
-
-      {/* Total (subtotal + tax) */}
+      {/* Total (subtotal) */}
       <td className="text-right text-sm font-medium text-gray-900 whitespace-nowrap">
         {formatCurrency(item.total || item.subtotal || "0")}
       </td>

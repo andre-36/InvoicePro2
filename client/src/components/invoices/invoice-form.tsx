@@ -35,6 +35,7 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   subtotal: z.string().optional(),
   tax: z.string().optional(),
   discount: z.string().optional(),
+  shipping: z.string().optional(),
   total: z.string().optional(),
   useFakturPajak: z.boolean().optional(),
   taxRate: z.string().optional(),
@@ -280,6 +281,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         subtotal: "0",
         tax: "0",
         discount: "0",
+        shipping: "0",
         total: "0",
         notes: "",
         useFakturPajak: false,
@@ -527,6 +529,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const watchUseFakturPajak = form.watch('invoice.useFakturPajak');
   const watchTaxRate = form.watch('invoice.taxRate');
   const watchDiscount = form.watch('invoice.discount');
+  const watchShipping = form.watch('invoice.shipping');
 
   // Calculate totals whenever items or tax settings change
   useEffect(() => {
@@ -537,8 +540,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         itemsTotal += parseFloat(item.subtotal || "0");
       });
 
-      // Apply discount
+      // Apply discount and shipping
       const discountValue = parseFloat(watchDiscount || "0");
+      const shippingValue = parseFloat(watchShipping || "0");
 
       // Get tax rate from user settings or form
       const taxRate = parseFloat(watchTaxRate || currentUser?.defaultTaxRate || "11") || 11;
@@ -553,24 +557,25 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         // Calculate base subtotal by dividing by tax multiplier
         subtotal = itemsTotal / taxMultiplier;
         taxAmount = itemsTotal - subtotal;
-        total = itemsTotal - discountValue;
+        total = itemsTotal - discountValue + shippingValue;
       } else {
         // No tax - subtotal equals items total, no separate tax
         subtotal = itemsTotal;
         taxAmount = 0;
-        total = subtotal - discountValue;
+        total = subtotal - discountValue + shippingValue;
       }
 
       // Update form values
       form.setValue('invoice.subtotal', subtotal.toFixed(2));
       form.setValue('invoice.tax', taxAmount.toFixed(2));
       form.setValue('invoice.taxRate', taxRate.toString());
+      form.setValue('invoice.shipping', shippingValue.toFixed(2));
       form.setValue('invoice.total', total.toFixed(2));
 
       // Update items in the form
       form.setValue('items', items);
     }
-  }, [items, form, watchUseFakturPajak, watchTaxRate, watchDiscount, currentUser]);
+  }, [items, form, watchUseFakturPajak, watchTaxRate, watchDiscount, watchShipping, currentUser]);
 
   // Add a new invoice item
   const addItem = () => {
@@ -1019,6 +1024,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         subtotal: values.invoice.subtotal || "0",
         tax: values.invoice.tax || "0",
         discount: values.invoice.discount || "0",
+        shipping: values.invoice.shipping || "0",
         total: values.invoice.total || "0",
         notes: values.invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes,
         useFakturPajak: values.invoice.useFakturPajak || false,
@@ -1384,9 +1390,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '120px' }}>
                           Unit Price
                         </th>
-                        <th scope="col" className="excel-header-cell text-right" style={{ width: '65px' }}>
-                          Tax %
-                        </th>
                         <th scope="col" className="excel-header-cell text-right" style={{ width: '150px' }}>
                           Total
                         </th>
@@ -1399,13 +1402,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       {/* Only render items when not loading in edit mode */}
                       {(invoiceId && isLoadingInvoice) ? (
                         <tr>
-                          <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                          <td colSpan={7} className="px-3 py-4 text-center text-gray-500">
                             Loading items...
                           </td>
                         </tr>
                       ) : items.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                          <td colSpan={7} className="px-3 py-4 text-center text-gray-500">
                             No items yet. Click "Add New Row" to add items.
                           </td>
                         </tr>
@@ -1428,7 +1431,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                       ))}
                       {/* Add row button inside the table */}
                       <tr>
-                        <td colSpan={8} className="px-3 py-2 border-t border-gray-200">
+                        <td colSpan={7} className="px-3 py-2 border-t border-gray-200">
                           <Button
                             type="button"
                             variant="ghost"
@@ -1484,6 +1487,28 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           )}
                         />
                         <span className="text-gray-900">-{formatCurrency(parseFloat(form.watch('invoice.discount') || '0'))}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-700">Biaya Pengiriman:</span>
+                      <div className="flex items-center space-x-2">
+                        <FormField
+                          control={form.control}
+                          name="invoice.shipping"
+                          render={({ field }) => (
+                            <FormItem className="w-20">
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="number"
+                                  min="0"
+                                  className="text-right h-8"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <span className="text-gray-900">+{formatCurrency(parseFloat(form.watch('invoice.shipping') || '0'))}</span>
                       </div>
                     </div>
                     <div className="flex justify-between text-base pt-2 border-t border-gray-200">
