@@ -32,10 +32,13 @@ type InvoiceWithItems = {
 
 type ReturnItemData = {
   invoiceItemId: number;
+  productId: number;
   description: string;
   originalQty: number;
   quantity: number;
-  price: number;
+  invoicePrice: number;     // Harga saat di invoice
+  currentPrice: number;     // Harga produk sekarang
+  returnValue: number;      // Nilai retur (dapat diubah)
   subtotal: number;
   reason: string;
   selected: boolean;
@@ -85,6 +88,11 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
     staleTime: Infinity
   });
 
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+    staleTime: Infinity
+  });
+
   const { data: nextNumber } = useQuery<{ returnNumber: string }>({
     queryKey: ['/api/next-return-number'],
     staleTime: 0
@@ -97,20 +105,32 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
   }, [nextNumber, form]);
 
   useEffect(() => {
-    if (invoiceWithItems?.items) {
-      const items = invoiceWithItems.items.map(item => ({
-        invoiceItemId: item.id,
-        description: item.description,
-        originalQty: Number(item.quantity),
-        quantity: 0,
-        price: Number(item.unitPrice),
-        subtotal: 0,
-        reason: "",
-        selected: false,
-      }));
+    if (invoiceWithItems?.items && products) {
+      const items = invoiceWithItems.items.map(item => {
+        const invoicePrice = Number(item.unitPrice);
+        const productId = item.productId;
+        const product = products.find(p => p.id === productId);
+        const currentPrice = product ? Number(product.sellingPrice || product.price || 0) : invoicePrice;
+        // Default return value: lowest of invoice price and current price
+        const returnValue = Math.min(invoicePrice, currentPrice);
+        
+        return {
+          invoiceItemId: item.id,
+          productId: productId,
+          description: item.description,
+          originalQty: Number(item.quantity),
+          quantity: 0,
+          invoicePrice,
+          currentPrice,
+          returnValue,
+          subtotal: 0,
+          reason: "",
+          selected: false,
+        };
+      });
       setReturnItems(items);
     }
-  }, [invoiceWithItems]);
+  }, [invoiceWithItems, products]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -143,8 +163,18 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
     setReturnItems(prev => {
       const updated = [...prev];
       updated[index].quantity = Math.min(qty, updated[index].originalQty);
-      updated[index].subtotal = updated[index].quantity * updated[index].price;
+      updated[index].subtotal = updated[index].quantity * updated[index].returnValue;
       updated[index].selected = updated[index].quantity > 0;
+      return updated;
+    });
+  };
+
+  const handleItemReturnValueChange = (index: number, value: string) => {
+    const returnValue = parseFloat(value) || 0;
+    setReturnItems(prev => {
+      const updated = [...prev];
+      updated[index].returnValue = returnValue;
+      updated[index].subtotal = updated[index].quantity * updated[index].returnValue;
       return updated;
     });
   };
@@ -163,7 +193,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
       updated[index].selected = !updated[index].selected;
       if (updated[index].selected && updated[index].quantity === 0) {
         updated[index].quantity = updated[index].originalQty;
-        updated[index].subtotal = updated[index].quantity * updated[index].price;
+        updated[index].subtotal = updated[index].quantity * updated[index].returnValue;
       } else if (!updated[index].selected) {
         updated[index].quantity = 0;
         updated[index].subtotal = 0;
@@ -202,7 +232,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
       items: selectedItems.map(item => ({
         invoiceItemId: item.invoiceItemId,
         quantity: item.quantity.toString(),
-        price: item.price.toString(),
+        price: item.returnValue.toString(), // Use return value instead of invoice price
         subtotal: item.subtotal.toString(),
         reason: item.reason || undefined,
       })),
@@ -319,11 +349,13 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                           <TableRow>
                             <TableHead className="w-[50px]"></TableHead>
                             <TableHead>Produk</TableHead>
-                            <TableHead className="text-right w-[80px]">Qty Asli</TableHead>
-                            <TableHead className="text-right w-[100px]">Qty Retur</TableHead>
-                            <TableHead className="text-right">Harga</TableHead>
-                            <TableHead className="text-right">Subtotal</TableHead>
-                            <TableHead className="w-[150px]">Alasan</TableHead>
+                            <TableHead className="text-right w-[80px]">Qty</TableHead>
+                            <TableHead className="text-right w-[90px]">Qty Retur</TableHead>
+                            <TableHead className="text-right w-[100px]">Hrg Invoice</TableHead>
+                            <TableHead className="text-right w-[100px]">Hrg Skrg</TableHead>
+                            <TableHead className="text-right w-[110px]">Nilai Retur</TableHead>
+                            <TableHead className="text-right w-[100px]">Subtotal</TableHead>
+                            <TableHead className="w-[120px]">Alasan</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -335,7 +367,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                                   onCheckedChange={() => handleItemToggle(index)}
                                 />
                               </TableCell>
-                              <TableCell>{item.description}</TableCell>
+                              <TableCell className="max-w-[180px] truncate" title={item.description}>{item.description}</TableCell>
                               <TableCell className="text-right">{item.originalQty}</TableCell>
                               <TableCell>
                                 <Input
@@ -345,17 +377,30 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                                   step="any"
                                   value={item.quantity || ''}
                                   onChange={(e) => handleItemQuantityChange(index, e.target.value)}
-                                  className="w-20 text-right"
+                                  className="w-16 text-right"
                                   disabled={!item.selected}
                                 />
                               </TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
+                              <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.invoicePrice)}</TableCell>
+                              <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.currentPrice)}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="any"
+                                  value={item.returnValue || ''}
+                                  onChange={(e) => handleItemReturnValueChange(index, e.target.value)}
+                                  className="w-24 text-right"
+                                  disabled={!item.selected}
+                                />
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
                               <TableCell>
                                 <Input
                                   placeholder="Alasan..."
                                   value={item.reason}
                                   onChange={(e) => handleItemReasonChange(index, e.target.value)}
+                                  className="w-28"
                                   disabled={!item.selected}
                                 />
                               </TableCell>
