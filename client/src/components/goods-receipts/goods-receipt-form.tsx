@@ -325,8 +325,15 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     if (!supplierId || !productId) return [];
     
     return (purchaseOrders || []).filter(po => {
+      // Filter by supplier
       if (po.supplierId !== supplierId) return false;
+      
+      // Filter by status
       if (po.status !== 'sent' && po.status !== 'partial') return false;
+      
+      // Filter by product - PO must contain the selected product
+      const hasProduct = po.items?.some(item => item.productId === productId);
+      if (!hasProduct) return false;
       
       // Filter by search query
       if (poSearchQuery && !po.purchaseOrderNumber.toLowerCase().includes(poSearchQuery.toLowerCase())) {

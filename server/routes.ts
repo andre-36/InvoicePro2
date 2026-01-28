@@ -1874,7 +1874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fallback route without storeId - uses default store 1
   app.get("/api/purchase-orders", requireAuth, async (req, res) => {
     try {
-      const purchaseOrders = await storage.getPurchaseOrders(1);
+      const purchaseOrders = await storage.getPurchaseOrdersWithItems(1);
       res.json(purchaseOrders);
     } catch (error) {
       console.error("Error getting purchase orders:", error);

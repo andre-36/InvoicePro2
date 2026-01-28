@@ -161,6 +161,7 @@ export interface IStorage {
   getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
   getPurchaseOrderWithItems(id: number): Promise<{ purchaseOrder: PurchaseOrder, items: PurchaseOrderItem[] } | undefined>;
   getPurchaseOrders(storeId: number): Promise<PurchaseOrder[]>;
+  getPurchaseOrdersWithItems(storeId: number): Promise<(PurchaseOrder & { items: { productId: number; description: string; quantity: string; unitCost: string }[] })[]>;
   getPendingPOQuantityByProduct(storeId: number): Promise<Map<number, number>>;
   getReceivedQuantitiesForPO(purchaseOrderId: number): Promise<Map<number, string>>;
   createPurchaseOrder(purchaseOrder: InsertPurchaseOrder, items: Array<InsertPurchaseOrderItem & { productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
@@ -2610,6 +2611,38 @@ export class DatabaseStorage implements IStorage {
       .from(purchaseOrders)
       .where(eq(purchaseOrders.storeId, storeId))
       .orderBy(desc(purchaseOrders.orderDate));
+  }
+
+  async getPurchaseOrdersWithItems(storeId: number): Promise<(PurchaseOrder & { items: { productId: number; description: string; quantity: string; unitCost: string }[] })[]> {
+    const pos = await db
+      .select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.storeId, storeId))
+      .orderBy(desc(purchaseOrders.orderDate));
+
+    const result = [];
+    for (const po of pos) {
+      const items = await db
+        .select({
+          productId: purchaseOrderItems.productId,
+          description: purchaseOrderItems.description,
+          quantity: purchaseOrderItems.quantity,
+          unitCost: purchaseOrderItems.unitCost,
+        })
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+
+      result.push({
+        ...po,
+        items: items.map(item => ({
+          productId: item.productId,
+          description: item.description,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+        })),
+      });
+    }
+    return result;
   }
 
   async getPendingPOQuantityByProduct(storeId: number): Promise<Map<number, number>> {
