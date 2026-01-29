@@ -512,10 +512,13 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   id: serial("id").primaryKey(),
   purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: 'cascade' }).notNull(),
   productId: integer("product_id").references(() => products.id).notNull(),
+  productUnitId: integer("product_unit_id").references(() => productUnits.id), // For multi-unit products
   description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
-  receivedQuantity: numeric("received_quantity", { precision: 15, scale: 2 }).default("0"),
-  unitCost: numeric("unit_cost", { precision: 15, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(), // Quantity in selected unit
+  baseQuantity: numeric("base_quantity", { precision: 15, scale: 2 }), // Quantity converted to base unit
+  receivedQuantity: numeric("received_quantity", { precision: 15, scale: 2 }).default("0"), // Received in base unit
+  unitCost: numeric("unit_cost", { precision: 15, scale: 2 }).notNull(), // Cost per selected unit
+  baseCost: numeric("base_cost", { precision: 15, scale: 2 }), // Cost per base unit (auto-calculated)
   taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
   taxAmount: numeric("tax_amount", { precision: 15, scale: 2 }).default("0"),
   discount: numeric("discount", { precision: 15, scale: 2 }).default("0"),
