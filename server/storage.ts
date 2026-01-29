@@ -341,9 +341,24 @@ export interface IStorage {
   getProductPerformance(storeId: number, limit: number): Promise<ProductPerformanceStats[]>;
   getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
   getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]>;
+  getDeliveryProfitSummary(storeId: number, startDate?: Date, endDate?: Date): Promise<DeliveryProfitSummary>;
   getFinancialReport(storeId: number, dateRange: string): Promise<any>;
   getCashFlowReport(storeId: number, dateRange: string): Promise<any>;
 }
+
+export type DeliveryProfitSummary = {
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  profitMargin: number;
+  deliveryCount: number;
+  byPeriod: {
+    period: string;
+    revenue: number;
+    cost: number;
+    profit: number;
+  }[];
+};
 
 // Types for dashboard metrics
 export type DashboardStats = {
@@ -3958,11 +3973,11 @@ export class DatabaseStorage implements IStorage {
         AND issue_date >= ${startOfMonthStr}
     `);
 
-    // Calculate total profit
+    // Calculate total profit from delivered delivery notes
     const profitResult = await db.execute(sql`
-      SELECT COALESCE(SUM(total_profit::numeric), 0) as total
-      FROM ${invoices}
-      WHERE store_id = ${storeId} AND status = 'paid'
+      SELECT COALESCE(SUM(profit::numeric), 0) as total
+      FROM ${deliveryNotes}
+      WHERE store_id = ${storeId} AND status = 'delivered'
     `);
 
     return {
@@ -4472,45 +4487,50 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]> {
-    // Generate SQL for optionally filtering by product ID
+    // Product-level profitability based on delivered items
     const productFilter = productId 
-      ? sql`AND pb.product_id = ${productId}` 
+      ? sql`AND p.id = ${productId}` 
       : sql``;
 
     const result = await db.execute(sql`
-      WITH batch_sales AS (
+      WITH product_delivery_stats AS (
         SELECT 
-          iib.batch_id,
-          SUM(iib.quantity::numeric) as sold_quantity,
-          SUM(ii.unit_price::numeric * iib.quantity::numeric) as sales_value,
-          SUM(iib.capital_cost::numeric * iib.quantity::numeric) as cost_value
-        FROM ${invoiceItemBatches} iib
-        JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
-        JOIN ${invoices} i ON ii.invoice_id = i.id
-        WHERE i.store_id = ${storeId} AND i.status = 'paid'
-        GROUP BY iib.batch_id
+          ii.product_id,
+          SUM(dni.delivered_quantity::numeric) as delivered_qty,
+          SUM(ii.unit_price::numeric * dni.delivered_quantity::numeric) as revenue,
+          SUM(dn.total_cost::numeric) as cost
+        FROM ${deliveryNotes} dn
+        JOIN ${deliveryNoteItems} dni ON dni.delivery_note_id = dn.id
+        JOIN ${invoiceItems} ii ON dni.invoice_item_id = ii.id
+        WHERE dn.store_id = ${storeId}
+          AND dn.status = 'delivered'
+          AND dn.profit IS NOT NULL
+        GROUP BY ii.product_id
       )
       SELECT 
         p.id as product_id,
         p.name as product_name,
         pb.batch_number,
-        pb.capital_cost,
+        COALESCE(pb.base_cost, pb.cost) as capital_cost,
         pb.purchase_date,
-        COALESCE(bs.sold_quantity, 0) as sold_quantity,
+        (pb.quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
+        COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) as avg_selling_price,
         CASE 
-          WHEN COALESCE(bs.sold_quantity, 0) > 0 
-          THEN bs.sales_value / bs.sold_quantity 
-          ELSE 0 
-        END as avg_selling_price,
-        CASE 
-          WHEN COALESCE(bs.cost_value, 0) > 0 
-          THEN (bs.sales_value - bs.cost_value) / bs.cost_value * 100
+          WHEN COALESCE(pds.cost, 0) > 0 
+          THEN (COALESCE(pds.revenue, 0) - COALESCE(pds.cost, 0)) / NULLIF(pds.cost, 0) * 100
           ELSE 0 
         END as profit_margin,
-        COALESCE(bs.sales_value - bs.cost_value, 0) as total_profit
+        CASE 
+          WHEN (pb.quantity::numeric - pb.remaining_quantity::numeric) > 0 
+          THEN (
+            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.quantity::numeric - pb.remaining_quantity::numeric)) -
+            (COALESCE(pb.base_cost, pb.cost)::numeric * (pb.quantity::numeric - pb.remaining_quantity::numeric))
+          )
+          ELSE 0 
+        END as total_profit
       FROM ${productBatches} pb
       JOIN ${products} p ON pb.product_id = p.id
-      LEFT JOIN batch_sales bs ON pb.id = bs.batch_id
+      LEFT JOIN product_delivery_stats pds ON pds.product_id = p.id
       WHERE pb.store_id = ${storeId} ${productFilter}
       ORDER BY 
         CASE WHEN ${productId ? true : false} THEN pb.purchase_date ELSE p.name END,
@@ -4529,6 +4549,74 @@ export class DatabaseStorage implements IStorage {
       totalProfit: parseFloat(row.total_profit || '0'),
       purchaseDate: new Date(row.purchase_date)
     }));
+  }
+
+  async getDeliveryProfitSummary(storeId: number, startDate?: Date, endDate?: Date): Promise<DeliveryProfitSummary> {
+    // Default to last 30 days if not specified
+    const end = endDate || new Date();
+    const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const result = await db.execute(sql`
+      SELECT 
+        COUNT(*) as delivery_count,
+        COALESCE((
+          SELECT SUM(ii.unit_price::numeric * dni.delivered_quantity::numeric)
+          FROM delivery_note_items dni
+          JOIN invoice_items ii ON dni.invoice_item_id = ii.id
+          JOIN delivery_notes dn2 ON dni.delivery_note_id = dn2.id
+          WHERE dn2.store_id = ${storeId}
+            AND dn2.status = 'delivered'
+            AND dn2.delivery_date >= ${start.toISOString().split('T')[0]}
+            AND dn2.delivery_date <= ${end.toISOString().split('T')[0]}
+        ), 0) as total_revenue,
+        COALESCE(SUM(total_cost::numeric), 0) as total_cost,
+        COALESCE(SUM(profit::numeric), 0) as total_profit
+      FROM ${deliveryNotes} dn
+      WHERE dn.store_id = ${storeId}
+        AND dn.status = 'delivered'
+        AND dn.delivery_date >= ${start.toISOString().split('T')[0]}
+        AND dn.delivery_date <= ${end.toISOString().split('T')[0]}
+    `);
+
+    const summary = result[0] || { delivery_count: 0, total_revenue: 0, total_cost: 0, total_profit: 0 };
+    const totalRevenue = parseFloat(summary.total_revenue?.toString() || '0');
+    const totalCost = parseFloat(summary.total_cost?.toString() || '0');
+    const totalProfit = parseFloat(summary.total_profit?.toString() || '0');
+    
+    // Get profit by period (daily for last 30 days)
+    const periodResult = await db.execute(sql`
+      SELECT 
+        dn.delivery_date as period,
+        COALESCE(SUM(
+          (SELECT SUM(ii.unit_price::numeric * dni.delivered_quantity::numeric)
+           FROM delivery_note_items dni
+           JOIN invoice_items ii ON dni.invoice_item_id = ii.id
+           WHERE dni.delivery_note_id = dn.id)
+        ), 0) as revenue,
+        COALESCE(SUM(dn.total_cost::numeric), 0) as cost,
+        COALESCE(SUM(dn.profit::numeric), 0) as profit
+      FROM ${deliveryNotes} dn
+      WHERE dn.store_id = ${storeId}
+        AND dn.status = 'delivered'
+        AND dn.delivery_date >= ${start.toISOString().split('T')[0]}
+        AND dn.delivery_date <= ${end.toISOString().split('T')[0]}
+      GROUP BY dn.delivery_date
+      ORDER BY dn.delivery_date
+    `);
+
+    return {
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+      deliveryCount: parseInt(summary.delivery_count?.toString() || '0'),
+      byPeriod: periodResult.map((row: any) => ({
+        period: row.period,
+        revenue: parseFloat(row.revenue?.toString() || '0'),
+        cost: parseFloat(row.cost?.toString() || '0'),
+        profit: parseFloat(row.profit?.toString() || '0')
+      }))
+    };
   }
 
   // Preview number generation methods
