@@ -102,6 +102,22 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
+// Inflow category schema
+const inflowCategorySchema = z.object({
+  name: z.string().min(1, "Category name is required"),
+  description: z.string().optional(),
+  storeId: z.number().default(1),
+  isActive: z.boolean().default(true),
+});
+
+// Outflow category schema
+const outflowCategorySchema = z.object({
+  name: z.string().min(1, "Category name is required"),
+  description: z.string().optional(),
+  storeId: z.number().default(1),
+  isActive: z.boolean().default(true),
+});
+
 // Cash account schema
 const cashAccountSchema = z.object({
   name: z.string().min(1, "Account name is required"),
@@ -125,6 +141,12 @@ const accountTransferSchema = z.object({
 
 type CategoryFormData = z.infer<typeof categorySchema>;
 type Category = { id: number; name: string; description: string | null };
+
+type InflowCategoryFormData = z.infer<typeof inflowCategorySchema>;
+type InflowCategory = { id: number; storeId: number; name: string; description: string | null; isActive: boolean };
+
+type OutflowCategoryFormData = z.infer<typeof outflowCategorySchema>;
+type OutflowCategory = { id: number; storeId: number; name: string; description: string | null; isActive: boolean };
 
 type CashAccountFormData = z.infer<typeof cashAccountSchema>;
 type CashAccountWithBalance = { 
@@ -171,6 +193,12 @@ export default function SettingsPage() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [isInflowCategoryDialogOpen, setIsInflowCategoryDialogOpen] = useState(false);
+  const [editingInflowCategory, setEditingInflowCategory] = useState<InflowCategory | null>(null);
+  const [deletingInflowCategory, setDeletingInflowCategory] = useState<InflowCategory | null>(null);
+  const [isOutflowCategoryDialogOpen, setIsOutflowCategoryDialogOpen] = useState(false);
+  const [editingOutflowCategory, setEditingOutflowCategory] = useState<OutflowCategory | null>(null);
+  const [deletingOutflowCategory, setDeletingOutflowCategory] = useState<OutflowCategory | null>(null);
   const [editingCashAccount, setEditingCashAccount] = useState<CashAccountWithBalance | null>(null);
   const [deletingCashAccount, setDeletingCashAccount] = useState<CashAccountWithBalance | null>(null);
   const [cashAccountDialogOpen, setCashAccountDialogOpen] = useState(false);
@@ -197,6 +225,16 @@ export default function SettingsPage() {
   // Fetch categories
   const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+  });
+
+  // Fetch inflow categories
+  const { data: inflowCategories, isLoading: inflowCategoriesLoading } = useQuery<InflowCategory[]>({
+    queryKey: ['/api/stores/1/inflow-categories'],
+  });
+
+  // Fetch outflow categories
+  const { data: outflowCategories, isLoading: outflowCategoriesLoading } = useQuery<OutflowCategory[]>({
+    queryKey: ['/api/stores/1/outflow-categories'],
   });
 
   // Fetch cash accounts
@@ -291,6 +329,26 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       description: "",
+    }
+  });
+
+  const inflowCategoryForm = useForm<InflowCategoryFormData>({
+    resolver: zodResolver(inflowCategorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      storeId: 1,
+      isActive: true,
+    }
+  });
+
+  const outflowCategoryForm = useForm<OutflowCategoryFormData>({
+    resolver: zodResolver(outflowCategorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      storeId: 1,
+      isActive: true,
     }
   });
 
@@ -537,6 +595,108 @@ export default function SettingsPage() {
       toast({
         title: "Category deleted",
         description: "The category has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Inflow category mutations
+  const inflowCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id?: number, data: InflowCategoryFormData }) => {
+      if (id) {
+        return apiRequest('PUT', `/api/inflow-categories/${id}`, data);
+      } else {
+        return apiRequest('POST', '/api/inflow-categories', data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/inflow-categories'] });
+      setIsInflowCategoryDialogOpen(false);
+      setEditingInflowCategory(null);
+      inflowCategoryForm.reset();
+      toast({
+        title: editingInflowCategory ? "Inflow category updated" : "Inflow category created",
+        description: editingInflowCategory 
+          ? "The inflow category has been updated successfully." 
+          : "The inflow category has been created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteInflowCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/inflow-categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/inflow-categories'] });
+      setDeletingInflowCategory(null);
+      toast({
+        title: "Inflow category deleted",
+        description: "The inflow category has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Outflow category mutations
+  const outflowCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id?: number, data: OutflowCategoryFormData }) => {
+      if (id) {
+        return apiRequest('PUT', `/api/outflow-categories/${id}`, data);
+      } else {
+        return apiRequest('POST', '/api/outflow-categories', data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/outflow-categories'] });
+      setIsOutflowCategoryDialogOpen(false);
+      setEditingOutflowCategory(null);
+      outflowCategoryForm.reset();
+      toast({
+        title: editingOutflowCategory ? "Outflow category updated" : "Outflow category created",
+        description: editingOutflowCategory 
+          ? "The outflow category has been updated successfully." 
+          : "The outflow category has been created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteOutflowCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('DELETE', `/api/outflow-categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/outflow-categories'] });
+      setDeletingOutflowCategory(null);
+      toast({
+        title: "Outflow category deleted",
+        description: "The outflow category has been deleted successfully.",
       });
     },
     onError: (error: Error) => {
@@ -811,6 +971,78 @@ export default function SettingsPage() {
   const handleDeleteCategory = () => {
     if (deletingCategory) {
       deleteCategoryMutation.mutate(deletingCategory.id);
+    }
+  };
+
+  // Inflow category handlers
+  const handleEditInflowCategory = (category: InflowCategory) => {
+    setEditingInflowCategory(category);
+    inflowCategoryForm.reset({
+      name: category.name,
+      description: category.description || "",
+      storeId: category.storeId,
+      isActive: category.isActive,
+    });
+    setIsInflowCategoryDialogOpen(true);
+  };
+
+  const handleAddInflowCategory = () => {
+    setEditingInflowCategory(null);
+    inflowCategoryForm.reset({
+      name: "",
+      description: "",
+      storeId: 1,
+      isActive: true,
+    });
+    setIsInflowCategoryDialogOpen(true);
+  };
+
+  const handleSubmitInflowCategory = (data: InflowCategoryFormData) => {
+    inflowCategoryMutation.mutate({
+      id: editingInflowCategory?.id,
+      data,
+    });
+  };
+
+  const handleDeleteInflowCategory = () => {
+    if (deletingInflowCategory) {
+      deleteInflowCategoryMutation.mutate(deletingInflowCategory.id);
+    }
+  };
+
+  // Outflow category handlers
+  const handleEditOutflowCategory = (category: OutflowCategory) => {
+    setEditingOutflowCategory(category);
+    outflowCategoryForm.reset({
+      name: category.name,
+      description: category.description || "",
+      storeId: category.storeId,
+      isActive: category.isActive,
+    });
+    setIsOutflowCategoryDialogOpen(true);
+  };
+
+  const handleAddOutflowCategory = () => {
+    setEditingOutflowCategory(null);
+    outflowCategoryForm.reset({
+      name: "",
+      description: "",
+      storeId: 1,
+      isActive: true,
+    });
+    setIsOutflowCategoryDialogOpen(true);
+  };
+
+  const handleSubmitOutflowCategory = (data: OutflowCategoryFormData) => {
+    outflowCategoryMutation.mutate({
+      id: editingOutflowCategory?.id,
+      data,
+    });
+  };
+
+  const handleDeleteOutflowCategory = () => {
+    if (deletingOutflowCategory) {
+      deleteOutflowCategoryMutation.mutate(deletingOutflowCategory.id);
     }
   };
 
@@ -1834,6 +2066,152 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Inflow Categories Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Inflow Categories</CardTitle>
+                <CardDescription>Manage categories for income/revenue tracking</CardDescription>
+              </div>
+              <Button onClick={handleAddInflowCategory}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Inflow Category
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {inflowCategoriesLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !inflowCategories || inflowCategories.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No inflow categories</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Get started by creating a new inflow category.
+                  </p>
+                  <div className="mt-6">
+                    <Button onClick={handleAddInflowCategory}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Inflow Category
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inflowCategories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-gray-500 dark:text-gray-400">
+                          {category.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditInflowCategory(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingInflowCategory(category)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Outflow Categories Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Outflow Categories</CardTitle>
+                <CardDescription>Manage categories for expenses/costs tracking</CardDescription>
+              </div>
+              <Button onClick={handleAddOutflowCategory}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Outflow Category
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {outflowCategoriesLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !outflowCategories || outflowCategories.length === 0 ? (
+                <div className="text-center py-12">
+                  <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No outflow categories</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Get started by creating a new outflow category.
+                  </p>
+                  <div className="mt-6">
+                    <Button onClick={handleAddOutflowCategory}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Outflow Category
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {outflowCategories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-gray-500 dark:text-gray-400">
+                          {category.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditOutflowCategory(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingOutflowCategory(category)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="cash-accounts" className="space-y-6">
@@ -2300,6 +2678,152 @@ export default function SettingsPage() {
               data-testid="button-confirm-delete-category"
             >
               {deleteCategoryMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Inflow Category Dialog */}
+      <Dialog open={isInflowCategoryDialogOpen} onOpenChange={setIsInflowCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingInflowCategory ? "Edit Inflow Category" : "Add Inflow Category"}</DialogTitle>
+          </DialogHeader>
+          <Form {...inflowCategoryForm}>
+            <form onSubmit={inflowCategoryForm.handleSubmit(handleSubmitInflowCategory)} className="space-y-4">
+              <FormField
+                control={inflowCategoryForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Sales Revenue, Service Income" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={inflowCategoryForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter category description..." 
+                        {...field} 
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsInflowCategoryDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={inflowCategoryMutation.isPending}>
+                  {inflowCategoryMutation.isPending ? "Saving..." : (editingInflowCategory ? "Update" : "Create")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inflow Category Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingInflowCategory} onOpenChange={() => setDeletingInflowCategory(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the inflow category "{deletingInflowCategory?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteInflowCategory}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteInflowCategoryMutation.isPending}
+            >
+              {deleteInflowCategoryMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Outflow Category Dialog */}
+      <Dialog open={isOutflowCategoryDialogOpen} onOpenChange={setIsOutflowCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingOutflowCategory ? "Edit Outflow Category" : "Add Outflow Category"}</DialogTitle>
+          </DialogHeader>
+          <Form {...outflowCategoryForm}>
+            <form onSubmit={outflowCategoryForm.handleSubmit(handleSubmitOutflowCategory)} className="space-y-4">
+              <FormField
+                control={outflowCategoryForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Operating Expenses, Material Costs" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={outflowCategoryForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter category description..." 
+                        {...field} 
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsOutflowCategoryDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={outflowCategoryMutation.isPending}>
+                  {outflowCategoryMutation.isPending ? "Saving..." : (editingOutflowCategory ? "Update" : "Create")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Outflow Category Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingOutflowCategory} onOpenChange={() => setDeletingOutflowCategory(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the outflow category "{deletingOutflowCategory?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOutflowCategory}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteOutflowCategoryMutation.isPending}
+            >
+              {deleteOutflowCategoryMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
