@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lt, sql, isNull, inArray, count } from "drizzle-orm";
+import { eq, and, desc, gte, gt, lt, sql, isNull, inArray, count } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
@@ -1378,6 +1378,7 @@ export class DatabaseStorage implements IStorage {
           let itemProfit = 0;
 
           // Allocate from each batch until we've fulfilled the quantity
+          // Note: Stock is NOT reduced here - it will be reduced when Delivery Note is created
           for (const batch of availableBatches) {
             if (remainingQuantity <= 0) break;
 
@@ -1389,16 +1390,8 @@ export class DatabaseStorage implements IStorage {
 
             if (quantityFromBatch <= 0) continue;
 
-            // Update the batch's remaining quantity
-            await tx
-              .update(productBatches)
-              .set({ 
-                remainingQuantity: (parseFloat(batch.remainingQuantity.toString()) - quantityFromBatch).toString(),
-                updatedAt: new Date()
-              })
-              .where(eq(productBatches.id, batch.id));
-
-            // Record which batch was used for this item
+            // Record which batch was used for this item (for profit calculation)
+            // Stock reduction happens when Delivery Note is created
             const batchCost = parseFloat(batch.capitalCost.toString());
             await tx
               .insert(invoiceItemBatches)
@@ -2187,6 +2180,56 @@ export class DatabaseStorage implements IStorage {
             ...item,
             deliveryNoteId: newDeliveryNote.id
           })));
+
+        // Reduce stock for each delivered item using FIFO
+        for (const item of items) {
+          // Get the invoice item to find the product
+          const [invoiceItem] = await tx
+            .select()
+            .from(invoiceItems)
+            .where(eq(invoiceItems.id, item.invoiceItemId));
+
+          if (!invoiceItem || !invoiceItem.productId) continue;
+
+          const quantityToReduce = parseFloat(item.deliveredQuantity.toString());
+          if (quantityToReduce <= 0) continue;
+
+          // Get available batches for this product, ordered by purchase date (FIFO)
+          const availableBatches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, invoiceItem.productId),
+                eq(productBatches.storeId, invoice.store_id),
+                gt(productBatches.remainingQuantity, 0)
+              )
+            )
+            .orderBy(productBatches.purchaseDate);
+
+          let remainingQuantity = quantityToReduce;
+
+          // Reduce from each batch until we've fulfilled the quantity
+          for (const batch of availableBatches) {
+            if (remainingQuantity <= 0) break;
+
+            const batchRemaining = parseFloat(batch.remainingQuantity.toString());
+            const quantityFromBatch = Math.min(remainingQuantity, batchRemaining);
+
+            if (quantityFromBatch <= 0) continue;
+
+            // Update the batch's remaining quantity
+            await tx
+              .update(productBatches)
+              .set({ 
+                remainingQuantity: (batchRemaining - quantityFromBatch).toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
+
+            remainingQuantity -= quantityFromBatch;
+          }
+        }
       }
 
       return newDeliveryNote;
