@@ -1513,7 +1513,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid status" });
       }
       
+      // Get current status before update
+      const currentNote = await storage.getDeliveryNote(deliveryNoteId);
+      const previousStatus = currentNote?.status;
+      
       const updatedDeliveryNote = await storage.updateDeliveryNote(deliveryNoteId, { status });
+      
+      // When status changes to 'delivered', allocate stock using FIFO and calculate profit
+      if (status === 'delivered' && previousStatus !== 'delivered') {
+        await storage.allocateStockOnDelivery(deliveryNoteId);
+      }
+      
       res.json(updatedDeliveryNote);
     } catch (error) {
       console.error("Error updating delivery note status:", error);

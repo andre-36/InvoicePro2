@@ -173,6 +173,7 @@ export interface IStorage {
   updateDeliveryNote(id: number, deliveryNote: Partial<InsertDeliveryNote>): Promise<DeliveryNote>;
   deleteDeliveryNote(id: number): Promise<void>;
   getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string>;
+  allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
@@ -2344,6 +2345,105 @@ export class DatabaseStorage implements IStorage {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const yearMonth = year + month;
     return generateNextNumber("DN", yearMonth, deliveryNotes, deliveryNotes.deliveryNumber, db);
+  }
+
+  async allocateStockOnDelivery(deliveryNoteId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Get delivery note with items
+      const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
+      if (!deliveryNote) {
+        throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
+      }
+
+      // Get delivery note items
+      const dnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+      
+      // Get the invoice info
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
+      }
+
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      // For each delivery item, allocate stock using FIFO and calculate profit
+      for (const dnItem of dnItems) {
+        // Get invoice item details
+        const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
+        if (!invItem) continue;
+
+        const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
+        
+        // Calculate base quantity to deduct from batches
+        // If invoice item has baseQuantity set, use the ratio
+        let baseDeliveredQty = deliveredQty;
+        if (invItem.baseQuantity && invItem.quantity) {
+          const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
+          baseDeliveredQty = deliveredQty * ratio;
+        }
+
+        // Calculate revenue contribution for this item
+        const unitPrice = parseFloat(invItem.unitPrice.toString());
+        totalRevenue += deliveredQty * unitPrice;
+
+        // Get available batches for this product (FIFO)
+        const availableBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, invItem.productId),
+              eq(productBatches.storeId, invoice.storeId),
+              gt(productBatches.remainingQuantity, 0)
+            )
+          )
+          .orderBy(productBatches.purchaseDate);
+
+        let remainingToAllocate = baseDeliveredQty;
+
+        for (const batch of availableBatches) {
+          if (remainingToAllocate <= 0) break;
+
+          const remaining = parseFloat(batch.remainingQuantity.toString());
+          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+          const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+          
+          const quantityFromBatch = Math.min(remainingToAllocate, remaining);
+
+          // Calculate cost for this allocation
+          totalCost += quantityFromBatch * baseCost;
+
+          // Reduce remaining quantity in batch
+          const newRemaining = remaining - quantityFromBatch;
+          // Also reduce reserved quantity (proportionally)
+          const reservedReduction = Math.min(reserved, quantityFromBatch);
+          const newReserved = reserved - reservedReduction;
+
+          await tx
+            .update(productBatches)
+            .set({
+              remainingQuantity: newRemaining.toString(),
+              reservedQuantity: Math.max(0, newReserved).toString(),
+              updatedAt: new Date()
+            })
+            .where(eq(productBatches.id, batch.id));
+
+          remainingToAllocate -= quantityFromBatch;
+        }
+      }
+
+      // Update delivery note with cost and profit
+      const profit = totalRevenue - totalCost;
+      await tx
+        .update(deliveryNotes)
+        .set({
+          totalCost: totalCost.toString(),
+          profit: profit.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(deliveryNotes.id, deliveryNoteId));
+    });
   }
 
   // Goods Receipt methods

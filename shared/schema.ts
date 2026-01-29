@@ -368,6 +368,8 @@ export const deliveryNotes = pgTable("delivery_notes", {
   driverName: varchar("driver_name", { length: 100 }),
   recipientName: varchar("recipient_name", { length: 100 }),
   notes: text("notes"),
+  totalCost: numeric("total_cost", { precision: 15, scale: 2 }), // FIFO cost calculated on delivery
+  profit: numeric("profit", { precision: 15, scale: 2 }), // Revenue - FIFO cost
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
