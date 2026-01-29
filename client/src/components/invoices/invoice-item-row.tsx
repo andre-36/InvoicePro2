@@ -291,7 +291,7 @@ export function InvoiceItemRow({
               <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0">
+          <PopoverContent className="w-[450px] p-0" align="start">
             <Command
               ref={commandRef}
               onKeyDown={(e) => {
