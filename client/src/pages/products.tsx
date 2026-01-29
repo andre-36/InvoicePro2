@@ -134,6 +134,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -325,12 +326,22 @@ export default function ProductsPage() {
     }
   };
   
-  // Filter products based on search query
+  // Filter products based on search query and stock status
   const filteredProducts = products
-    ? products.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? products.filter(product => {
+        const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.sku.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        const available = product.availableStock ?? product.currentStock ?? 0;
+        const minStock = product.minStock || 0;
+        
+        const matchesStock = stockFilter === "all" ||
+          (stockFilter === "low" && available > 0 && available <= minStock) ||
+          (stockFilter === "out" && available <= 0);
+          
+        return matchesSearch && matchesStock;
+      })
     : [];
   
   // Product form setup
@@ -576,14 +587,29 @@ export default function ProductsPage() {
       
       <Card>
         <CardHeader className="pb-3">
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search products..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search products..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">Stock Status:</Label>
+              <Select value={stockFilter} onValueChange={(val: any) => setStockFilter(val)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products</SelectItem>
+                  <SelectItem value="low" className="text-amber-600 font-medium">Low Stock</SelectItem>
+                  <SelectItem value="out" className="text-red-600 font-medium">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         
