@@ -149,6 +149,10 @@ export interface IStorage {
   createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   updateInvoicePayment(id: number, payment: Partial<InsertInvoicePayment>): Promise<InvoicePayment>;
   deleteInvoicePayment(id: number): Promise<void>;
+  
+  // Stock reservation methods (for paid invoices awaiting delivery)
+  reserveStockForInvoice(invoiceId: number): Promise<void>;
+  releaseStockReservationForInvoice(invoiceId: number): Promise<void>;
 
   // Purchase order payment methods (for prepaid POs)
   getPurchaseOrderPayment(paymentId: number): Promise<PurchaseOrderPayment | undefined>;
@@ -1740,6 +1744,112 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(invoicePayments)
       .where(eq(invoicePayments.id, id));
+  }
+
+  // Stock reservation methods (for paid invoices awaiting delivery)
+  async reserveStockForInvoice(invoiceId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Get the invoice with its items
+      const invoice = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice.length) {
+        throw new Error(`Invoice with ID ${invoiceId} not found`);
+      }
+
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+
+      // For each item, reserve stock from available batches using FIFO
+      for (const item of items) {
+        const quantityToReserve = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+        
+        // Get available batches for this product, ordered by purchase date (FIFO)
+        const availableBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, item.productId),
+              eq(productBatches.storeId, invoice[0].storeId)
+            )
+          )
+          .orderBy(productBatches.purchaseDate);
+
+        let remainingToReserve = quantityToReserve;
+
+        for (const batch of availableBatches) {
+          if (remainingToReserve <= 0) break;
+
+          // Calculate available stock (remaining - already reserved)
+          const remaining = parseFloat(batch.remainingQuantity.toString());
+          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+          const availableToReserve = remaining - reserved;
+
+          if (availableToReserve <= 0) continue;
+
+          const quantityFromBatch = Math.min(remainingToReserve, availableToReserve);
+
+          // Update reserved quantity
+          await tx
+            .update(productBatches)
+            .set({ 
+              reservedQuantity: (reserved + quantityFromBatch).toString(),
+              updatedAt: new Date()
+            })
+            .where(eq(productBatches.id, batch.id));
+
+          remainingToReserve -= quantityFromBatch;
+        }
+      }
+    });
+  }
+
+  async releaseStockReservationForInvoice(invoiceId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Get the invoice with its items
+      const invoice = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice.length) {
+        throw new Error(`Invoice with ID ${invoiceId} not found`);
+      }
+
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+
+      // For each item, release reserved stock from batches using FIFO (reverse order for release)
+      for (const item of items) {
+        const quantityToRelease = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+        
+        // Get batches with reserved quantity, ordered by purchase date (FIFO)
+        const reservedBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, item.productId),
+              eq(productBatches.storeId, invoice[0].storeId),
+              gt(productBatches.reservedQuantity, 0)
+            )
+          )
+          .orderBy(productBatches.purchaseDate);
+
+        let remainingToRelease = quantityToRelease;
+
+        for (const batch of reservedBatches) {
+          if (remainingToRelease <= 0) break;
+
+          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+          const releaseFromBatch = Math.min(remainingToRelease, reserved);
+
+          // Update reserved quantity
+          await tx
+            .update(productBatches)
+            .set({ 
+              reservedQuantity: Math.max(0, reserved - releaseFromBatch).toString(),
+              updatedAt: new Date()
+            })
+            .where(eq(productBatches.id, batch.id));
+
+          remainingToRelease -= releaseFromBatch;
+        }
+      }
+    });
   }
 
   // Purchase order payment methods (for prepaid POs)

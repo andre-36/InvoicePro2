@@ -1349,9 +1349,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
         const invoiceTotal = parseFloat(invoice.totalAmount);
         
-        // If fully paid, update invoice status to "paid"
+        // If fully paid, update invoice status to "paid" and reserve stock
         if (totalPayments >= invoiceTotal && invoice.status !== 'paid') {
           await storage.updateInvoice(invoiceId, { status: 'paid' });
+          // Reserve stock for this invoice (prevents overselling)
+          await storage.reserveStockForInvoice(invoiceId);
         }
         
         // If payment is using a credit note, deduct from credit note balance
@@ -1473,9 +1475,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
         const invoiceTotal = parseFloat(invoice.totalAmount);
         
-        // If invoice was 'paid' but payments no longer cover full amount, revert to 'sent'
+        // If invoice was 'paid' but payments no longer cover full amount, revert to 'sent' and release reservations
         if (invoice.status === 'paid' && totalPayments < invoiceTotal) {
           await storage.updateInvoice(invoiceId, { status: 'sent' });
+          // Release stock reservation since invoice is no longer fully paid
+          await storage.releaseStockReservationForInvoice(invoiceId);
           console.log(`Invoice ${invoiceId} status changed from 'paid' to 'sent' (payments: ${totalPayments}, total: ${invoiceTotal})`);
         }
       }
