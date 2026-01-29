@@ -49,9 +49,9 @@ type Reservation = {
   invoiceId: number;
   invoiceNumber: string;
   clientName: string;
-  orderedQty: number;
+  totalInvoiceQty: number;
   deliveredQty: number;
-  reservedQty: number;
+  reservedQuantity: number;
 };
 
 type Product = {
@@ -160,7 +160,7 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Current Price</p>
-          <p className="text-lg font-semibold text-foreground">{formatCurrency(product.price)}</p>
+          <p className="text-lg font-semibold text-foreground">{formatCurrency(product.currentSellingPrice)}</p>
         </div>
       </div>
 
@@ -237,7 +237,7 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
             </CardTitle>
             {reservations && reservations.length > 0 && (
               <Badge variant="secondary">
-                {reservations.reduce((sum, r) => sum + r.reservedQty, 0)} total reserved
+                {reservations.reduce((sum, r) => sum + r.reservedQuantity, 0)} total reserved
               </Badge>
             )}
           </CardHeader>
@@ -273,10 +273,10 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
                           </Link>
                         </TableCell>
                         <TableCell>{reservation.clientName}</TableCell>
-                        <TableCell className="text-right">{reservation.orderedQty}</TableCell>
+                        <TableCell className="text-right">{reservation.totalInvoiceQty}</TableCell>
                         <TableCell className="text-right">{reservation.deliveredQty}</TableCell>
                         <TableCell className="text-right font-semibold text-amber-600">
-                          {reservation.reservedQty}
+                          {reservation.reservedQuantity}
                         </TableCell>
                       </TableRow>
                     ))}
