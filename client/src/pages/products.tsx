@@ -77,6 +77,8 @@ type Product = {
   lowestPrice?: string;
   minStock?: number;
   currentStock?: number;
+  reservedQty?: number;
+  availableStock?: number;
   pendingPOQuantity?: number;
   isLowStock?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
@@ -113,6 +115,7 @@ const productSchema = z.object({
   lowestPrice: z.string().transform(val => val === "" ? undefined : val).optional(),
   productType: z.enum(["standard", "bundle"]).optional().default("standard"),
   baseUnit: z.string().optional(),
+  minStock: z.coerce.number().min(0).optional().default(0),
   categoryId: z.number().nullable().optional(),
   isActive: z.boolean().default(true),
 }).refine((data) => {
@@ -342,6 +345,7 @@ export default function ProductsPage() {
       lowestPrice: "",
       productType: "standard",
       baseUnit: "",
+      minStock: 0,
       categoryId: null,
       isActive: true,
     }
@@ -361,6 +365,7 @@ export default function ProductsPage() {
       lowestPrice: product.lowestPrice || "",
       productType: product.productType || "standard",
       baseUnit: product.unit || "", // Map unit from database to baseUnit in form
+      minStock: product.minStock || 0,
       categoryId: product.categoryId || null,
       isActive: product.isActive ?? true,
     });
@@ -622,8 +627,10 @@ export default function ProductsPage() {
                   <TableRow>
                     <TableHead className="w-[300px]">Name</TableHead>
                     <TableHead className="w-[150px]">SKU/Code</TableHead>
-                    <TableHead className="w-[120px]">Stock</TableHead>
-                    <TableHead className="w-[80px]">PO</TableHead>
+                    <TableHead className="w-[80px] text-right">Stock</TableHead>
+                    <TableHead className="w-[80px] text-right">Reserved</TableHead>
+                    <TableHead className="w-[90px] text-right">Available</TableHead>
+                    <TableHead className="w-[60px] text-right">PO</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Cost Price</TableHead>
                     <TableHead>Lowest Price</TableHead>
@@ -651,32 +658,46 @@ export default function ProductsPage() {
                       <TableCell className="font-mono text-sm text-gray-600 dark:text-gray-400">
                         {product.sku || "—"}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
+                      <TableCell className="text-right">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {product.currentStock || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {(product.reservedQty || 0) > 0 ? (
+                          <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                            {product.reservedQty}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <div className="flex items-center gap-1.5">
                             <span className={`text-sm font-medium ${
-                              product.stockStatus === 'out_of_stock' ? 'text-red-600 dark:text-red-400' :
-                              product.stockStatus === 'low_stock' ? 'text-amber-600 dark:text-amber-400' :
+                              (product.availableStock ?? product.currentStock ?? 0) === 0 ? 'text-red-600 dark:text-red-400' :
+                              (product.availableStock ?? product.currentStock ?? 0) <= (product.minStock || 0) ? 'text-amber-600 dark:text-amber-400' :
                               'text-green-600 dark:text-green-400'
                             }`}>
-                              {product.currentStock || 0}
+                              {product.availableStock ?? product.currentStock ?? 0}
                             </span>
-                            {product.stockStatus === 'out_of_stock' ? (
+                            {(product.availableStock ?? product.currentStock ?? 0) === 0 ? (
                               <span className="text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">
                                 Out
                               </span>
-                            ) : product.isLowStock && (
+                            ) : (product.availableStock ?? product.currentStock ?? 0) <= (product.minStock || 0) && (product.minStock || 0) > 0 && (
                               <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 rounded-full">
                                 Low
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-gray-400">
                             Min: {product.minStock || 0}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {(product.pendingPOQuantity || 0) > 0 ? (
                           <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                             {product.pendingPOQuantity}
@@ -959,7 +980,7 @@ export default function ProductsPage() {
                     />
                   )}
                   
-                  <div>
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="baseUnit"
@@ -968,6 +989,24 @@ export default function ProductsPage() {
                           <FormLabel>Base Unit</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., pcs, kg, meter" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="minStock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Min Stock (Low Warning)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="0" 
+                              type="number"
+                              min="0"
+                              {...field} 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
