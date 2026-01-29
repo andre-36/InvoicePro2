@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -48,17 +49,37 @@ type PurchaseOrder = {
   status: 'pending' | 'partial' | 'received' | 'cancelled';
 };
 
+type PendingPOItem = {
+  purchaseOrderId: number;
+  purchaseOrderNumber: string;
+  supplierName: string;
+  orderDate: string;
+  productId: number;
+  productName: string;
+  orderedQty: number;
+  receivedQty: number;
+  pendingQty: number;
+};
+
 type PurchaseOrderStatus = 'all' | 'pending' | 'partial' | 'received' | 'cancelled';
 
 export default function PurchaseOrdersPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus>("all");
+  const [activeTab, setActiveTab] = useState<"by-po" | "by-item">("by-po");
+  const [itemSupplierFilter, setItemSupplierFilter] = useState<string>("all");
+  const [itemProductFilter, setItemProductFilter] = useState<string>("all");
+  const [itemPOFilter, setItemPOFilter] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const { data: purchaseOrders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['/api/purchase-orders'],
+  });
+
+  const { data: pendingItems, isLoading: isLoadingPendingItems } = useQuery<PendingPOItem[]>({
+    queryKey: ['/api/purchase-orders/pending-items'],
   });
 
   // Delete purchase order mutation
@@ -132,6 +153,27 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  // Get unique values from pending items for filters
+  const uniqueSuppliers = pendingItems 
+    ? [...new Set(pendingItems.map(item => item.supplierName))].sort()
+    : [];
+  const uniqueProducts = pendingItems
+    ? [...new Set(pendingItems.map(item => item.productName))].sort()
+    : [];
+  const uniquePOs = pendingItems
+    ? [...new Set(pendingItems.map(item => item.purchaseOrderNumber))].sort()
+    : [];
+
+  // Filter pending items based on all filters
+  const filteredPendingItems = pendingItems
+    ? pendingItems.filter(item => {
+        const matchesSupplier = itemSupplierFilter === 'all' || item.supplierName === itemSupplierFilter;
+        const matchesProduct = itemProductFilter === 'all' || item.productName === itemProductFilter;
+        const matchesPO = itemPOFilter === 'all' || item.purchaseOrderNumber === itemPOFilter;
+        return matchesSupplier && matchesProduct && matchesPO;
+      })
+    : [];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -148,42 +190,56 @@ export default function PurchaseOrdersPage() {
         </Link>
       </div>
       
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col md:flex-row gap-4 justify-between">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search purchase orders..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-purchase-orders"
-              />
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={statusFilter}
-                onValueChange={(value: string) => setStatusFilter(value as PurchaseOrderStatus)}
-              >
-                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-                  <div className="flex items-center">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="All Statuses" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
-                  <SelectItem value="received">Received</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "by-po" | "by-item")} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="by-po">By PO</TabsTrigger>
+          <TabsTrigger value="by-item">
+            By Item
+            {pendingItems && pendingItems.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {pendingItems.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="by-po">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col md:flex-row gap-4 justify-between">
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Search purchase orders..."
+                    className="pl-8"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-search-purchase-orders"
+                  />
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(value: string) => setStatusFilter(value as PurchaseOrderStatus)}
+                  >
+                    <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                      <div className="flex items-center">
+                        <Filter className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="All Statuses" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="partial">Partial</SelectItem>
+                      <SelectItem value="received">Received</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
         
         <CardContent>
           {isLoading ? (
@@ -320,8 +376,126 @@ export default function PurchaseOrdersPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="by-item">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col md:flex-row gap-4 justify-between">
+                <CardTitle className="text-lg">Pending Items</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={itemSupplierFilter}
+                    onValueChange={setItemSupplierFilter}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="All Suppliers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Suppliers</SelectItem>
+                      {uniqueSuppliers.map((supplier) => (
+                        <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={itemProductFilter}
+                    onValueChange={setItemProductFilter}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="All Products" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Products</SelectItem>
+                      {uniqueProducts.map((product) => (
+                        <SelectItem key={product} value={product}>{product}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={itemPOFilter}
+                    onValueChange={setItemPOFilter}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="All POs" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All POs</SelectItem>
+                      {uniquePOs.map((po) => (
+                        <SelectItem key={po} value={po}>{po}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPendingItems ? (
+                <div className="space-y-4">
+                  {Array(5).fill(0).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredPendingItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="rounded-full bg-gray-100 p-3 mb-4">
+                    <Package className="h-6 w-6 text-gray-500" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No pending items</h3>
+                  <p className="text-sm text-gray-500 mb-4 max-w-md">
+                    {itemSupplierFilter !== 'all' || itemProductFilter !== 'all' || itemPOFilter !== 'all'
+                      ? "Try adjusting your filters to find what you're looking for."
+                      : "All purchase order items have been received."}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>PO #</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Order Date</TableHead>
+                        <TableHead className="text-right">Ordered</TableHead>
+                        <TableHead className="text-right">Received</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPendingItems.map((item, index) => (
+                        <TableRow key={`${item.purchaseOrderId}-${item.productId}-${index}`}>
+                          <TableCell className="font-medium">
+                            <Link href={`/products/${item.productId}/dashboard`} className="text-primary hover:underline">
+                              {item.productName}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/purchase-orders/${item.purchaseOrderId}`} className="text-primary hover:underline">
+                              {item.purchaseOrderNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{item.supplierName}</TableCell>
+                          <TableCell>{formatDate(item.orderDate)}</TableCell>
+                          <TableCell className="text-right">{item.orderedQty}</TableCell>
+                          <TableCell className="text-right">{item.receivedQty}</TableCell>
+                          <TableCell className="text-right font-semibold text-blue-600">
+                            {item.pendingQty}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

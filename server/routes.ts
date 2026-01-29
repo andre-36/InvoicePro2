@@ -936,6 +936,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product pending purchase orders (for product dashboard)
+  app.get("/api/products/:id/pending-pos", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const pendingPOs = await storage.getProductPendingPOs(productId, storeId);
+      res.json(pendingPOs);
+    } catch (error) {
+      console.error("Error getting product pending POs:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // All pending PO items list (for PO list "By Item" view)
+  app.get("/api/purchase-orders/pending-items", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const pendingItems = await storage.getPendingPOItemsList(storeId);
+      res.json(pendingItems);
+    } catch (error) {
+      console.error("Error getting pending PO items:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Product bundle component routes
   app.get("/api/products/:id/bundle-components", requireAuth, async (req, res) => {
     try {

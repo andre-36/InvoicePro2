@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, TrendingUp, TrendingDown, Package, DollarSign, Clock } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Package, DollarSign, Clock, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -54,6 +54,16 @@ type Reservation = {
   reservedQuantity: number;
 };
 
+type PendingPO = {
+  purchaseOrderId: number;
+  purchaseOrderNumber: string;
+  supplierName: string;
+  orderDate: string;
+  orderedQty: number;
+  receivedQty: number;
+  pendingQty: number;
+};
+
 type Product = {
   id: number;
   name: string;
@@ -83,6 +93,10 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
 
   const { data: reservations, isLoading: isLoadingReservations, error: reservationsError } = useQuery<Reservation[]>({
     queryKey: [`/api/products/${id}/reservations`],
+  });
+
+  const { data: pendingPOs, isLoading: isLoadingPendingPOs, error: pendingPOsError } = useQuery<PendingPO[]>({
+    queryKey: [`/api/products/${id}/pending-pos`],
   });
 
   if (isLoadingProduct) {
@@ -277,6 +291,67 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
                         <TableCell className="text-right">{reservation.deliveredQty}</TableCell>
                         <TableCell className="text-right font-semibold text-amber-600">
                           {reservation.reservedQuantity}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Purchase Orders */}
+      {((pendingPOs && pendingPOs.length > 0) || isLoadingPendingPOs) && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg text-foreground flex items-center gap-2">
+              <Truck className="h-5 w-5 text-blue-500" />
+              Pending PO
+            </CardTitle>
+            {pendingPOs && pendingPOs.length > 0 && (
+              <Badge variant="secondary">
+                {pendingPOs.reduce((sum, po) => sum + po.pendingQty, 0)} pending
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {isLoadingPendingPOs ? (
+              <div className="space-y-4">
+                {Array(3).fill(0).map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            ) : pendingPOsError ? (
+              <div className="text-center py-4">
+                <p className="text-destructive">Failed to load pending POs</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>PO #</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead className="text-right">Ordered</TableHead>
+                      <TableHead className="text-right">Received</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingPOs?.map((po) => (
+                      <TableRow key={po.purchaseOrderId}>
+                        <TableCell className="font-medium">
+                          <Link href={`/purchase-orders/${po.purchaseOrderId}`} className="text-primary hover:underline">
+                            {po.purchaseOrderNumber}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{po.supplierName}</TableCell>
+                        <TableCell className="text-right">{po.orderedQty}</TableCell>
+                        <TableCell className="text-right">{po.receivedQty}</TableCell>
+                        <TableCell className="text-right font-semibold text-blue-600">
+                          {po.pendingQty}
                         </TableCell>
                       </TableRow>
                     ))}

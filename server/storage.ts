@@ -191,6 +191,26 @@ export interface IStorage {
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
   receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder>;
   deletePurchaseOrder(id: number): Promise<void>;
+  getProductPendingPOs(productId: number, storeId: number): Promise<Array<{
+    purchaseOrderId: number;
+    purchaseOrderNumber: string;
+    supplierName: string;
+    orderDate: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQty: number;
+  }>>;
+  getPendingPOItemsList(storeId: number): Promise<Array<{
+    purchaseOrderId: number;
+    purchaseOrderNumber: string;
+    supplierName: string;
+    orderDate: string;
+    productId: number;
+    productName: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQty: number;
+  }>>;
 
   // Preview number generation methods
   getNextInvoiceNumber(issueDate?: Date): Promise<string>;
@@ -3229,6 +3249,112 @@ export class DatabaseStorage implements IStorage {
         .delete(purchaseOrders)
         .where(eq(purchaseOrders.id, id));
     });
+  }
+
+  async getProductPendingPOs(productId: number, storeId: number): Promise<Array<{
+    purchaseOrderId: number;
+    purchaseOrderNumber: string;
+    supplierName: string;
+    orderDate: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQty: number;
+  }>> {
+    const result = await db
+      .select({
+        purchaseOrderId: purchaseOrders.id,
+        purchaseOrderNumber: purchaseOrders.purchaseOrderNumber,
+        supplierName: purchaseOrders.supplierName,
+        orderDate: purchaseOrders.orderDate,
+        orderedQty: purchaseOrderItems.quantity,
+        receivedQty: purchaseOrderItems.receivedQuantity,
+      })
+      .from(purchaseOrderItems)
+      .innerJoin(purchaseOrders, eq(purchaseOrderItems.purchaseOrderId, purchaseOrders.id))
+      .where(
+        and(
+          eq(purchaseOrderItems.productId, productId),
+          eq(purchaseOrders.storeId, storeId),
+          or(
+            eq(purchaseOrders.status, 'pending'),
+            eq(purchaseOrders.status, 'partial')
+          )
+        )
+      )
+      .orderBy(desc(purchaseOrders.orderDate));
+
+    return result
+      .map(row => {
+        const orderedQty = parseFloat(row.orderedQty);
+        const receivedQty = parseFloat(row.receivedQty || '0');
+        const pendingQty = orderedQty - receivedQty;
+        return {
+          purchaseOrderId: row.purchaseOrderId,
+          purchaseOrderNumber: row.purchaseOrderNumber,
+          supplierName: row.supplierName,
+          orderDate: row.orderDate,
+          orderedQty,
+          receivedQty,
+          pendingQty,
+        };
+      })
+      .filter(row => row.pendingQty > 0);
+  }
+
+  async getPendingPOItemsList(storeId: number): Promise<Array<{
+    purchaseOrderId: number;
+    purchaseOrderNumber: string;
+    supplierName: string;
+    orderDate: string;
+    productId: number;
+    productName: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQty: number;
+  }>> {
+    const result = await db
+      .select({
+        purchaseOrderId: purchaseOrders.id,
+        purchaseOrderNumber: purchaseOrders.purchaseOrderNumber,
+        supplierName: purchaseOrders.supplierName,
+        orderDate: purchaseOrders.orderDate,
+        productId: purchaseOrderItems.productId,
+        productName: products.name,
+        orderedQty: purchaseOrderItems.quantity,
+        receivedQty: purchaseOrderItems.receivedQuantity,
+      })
+      .from(purchaseOrderItems)
+      .innerJoin(purchaseOrders, eq(purchaseOrderItems.purchaseOrderId, purchaseOrders.id))
+      .innerJoin(products, eq(purchaseOrderItems.productId, products.id))
+      .where(
+        and(
+          eq(purchaseOrders.storeId, storeId),
+          or(
+            eq(purchaseOrders.status, 'pending'),
+            eq(purchaseOrders.status, 'partial')
+          )
+        )
+      )
+      .orderBy(desc(purchaseOrders.orderDate), purchaseOrderItems.id);
+
+    return result
+      .map(row => {
+        const orderedQty = parseFloat(row.orderedQty);
+        const receivedQty = parseFloat(row.receivedQty || '0');
+        const pendingQty = orderedQty - receivedQty;
+        return {
+          purchaseOrderId: row.purchaseOrderId,
+          purchaseOrderNumber: row.purchaseOrderNumber,
+          supplierName: row.supplierName,
+          orderDate: row.orderDate,
+          productId: row.productId,
+          productName: row.productName,
+          orderedQty,
+          receivedQty,
+          pendingQty,
+        };
+      })
+      .filter(row => row.pendingQty > 0);
   }
 
   // Transaction methods
