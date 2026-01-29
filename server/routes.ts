@@ -927,10 +927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/:id/reservations", requireAuth, async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
-      const storeId = parseInt(req.query.storeId as string);
-      if (!storeId) {
-        return res.status(400).json({ error: "storeId is required" });
-      }
+      const storeId = parseInt(req.query.storeId as string) || 1;
       const reservations = await storage.getProductReservations(productId, storeId);
       res.json(reservations);
     } catch (error) {

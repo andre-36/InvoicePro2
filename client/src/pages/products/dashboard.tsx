@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { ArrowLeft, TrendingUp, TrendingDown, Package, DollarSign } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { ArrowLeft, TrendingUp, TrendingDown, Package, DollarSign, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,6 +45,15 @@ type ProductStats = {
   profitMargin: string;
 };
 
+type Reservation = {
+  invoiceId: number;
+  invoiceNumber: string;
+  clientName: string;
+  orderedQty: number;
+  deliveredQty: number;
+  reservedQty: number;
+};
+
 type Product = {
   id: number;
   name: string;
@@ -70,6 +79,10 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
 
   const { data: purchaseHistory, isLoading: isLoadingPurchases, error: purchasesError } = useQuery<PurchaseHistory[]>({
     queryKey: [`/api/products/${id}/purchases`],
+  });
+
+  const { data: reservations, isLoading: isLoadingReservations, error: reservationsError } = useQuery<Reservation[]>({
+    queryKey: [`/api/products/${id}/reservations`],
   });
 
   if (isLoadingProduct) {
@@ -213,6 +226,67 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
           </>
         )}
       </div>
+
+      {/* Reserved Stock */}
+      {((reservations && reservations.length > 0) || isLoadingReservations) && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg text-foreground flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              Reserved By
+            </CardTitle>
+            {reservations && reservations.length > 0 && (
+              <Badge variant="secondary">
+                {reservations.reduce((sum, r) => sum + r.reservedQty, 0)} total reserved
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {isLoadingReservations ? (
+              <div className="space-y-4">
+                {Array(3).fill(0).map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            ) : reservationsError ? (
+              <div className="text-center py-4">
+                <p className="text-destructive">Failed to load reservations</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead className="text-right">Ordered</TableHead>
+                      <TableHead className="text-right">Delivered</TableHead>
+                      <TableHead className="text-right">Reserved</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reservations?.map((reservation) => (
+                      <TableRow key={reservation.invoiceId}>
+                        <TableCell className="font-medium">
+                          <Link href={`/invoices/${reservation.invoiceId}`} className="text-primary hover:underline">
+                            {reservation.invoiceNumber}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{reservation.clientName}</TableCell>
+                        <TableCell className="text-right">{reservation.orderedQty}</TableCell>
+                        <TableCell className="text-right">{reservation.deliveredQty}</TableCell>
+                        <TableCell className="text-right font-semibold text-amber-600">
+                          {reservation.reservedQty}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sales and Purchase History */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
