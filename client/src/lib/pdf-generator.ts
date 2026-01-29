@@ -43,6 +43,7 @@ interface PDFData {
   invoice: Invoice;
   items: PDFInvoiceItem[];
   client: Client;
+  defaultNotes?: string;
 }
 
 export async function generatePDF(data: PDFData) {
@@ -258,8 +259,11 @@ export async function generatePDF(data: PDFData) {
     // Update finalY for notes positioning
     finalY += boxHeight - 40;
     
-    // Add notes
-    if (invoice.notes) {
+    // Add notes - default notes first, then document-specific notes
+    const hasDefaultNotes = !!data.defaultNotes;
+    const hasInvoiceNotes = !!invoice.notes;
+    
+    if (hasDefaultNotes || hasInvoiceNotes) {
       finalY += 50;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
@@ -268,8 +272,20 @@ export async function generatePDF(data: PDFData) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       
-      const notesLines = doc.splitTextToSize(invoice.notes, 170);
-      doc.text(notesLines, 20, finalY + 10);
+      let notesY = finalY + 10;
+      
+      // Show default notes first
+      if (hasDefaultNotes) {
+        const defaultNotesLines = doc.splitTextToSize(data.defaultNotes!, 170);
+        doc.text(defaultNotesLines, 20, notesY);
+        notesY += defaultNotesLines.length * 5 + 5;
+      }
+      
+      // Show document-specific notes below
+      if (hasInvoiceNotes) {
+        const invoiceNotesLines = doc.splitTextToSize(invoice.notes!, 170);
+        doc.text(invoiceNotesLines, 20, notesY);
+      }
     }
     
     // Add footer

@@ -1026,7 +1026,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         discount: values.invoice.discount || "0",
         shipping: values.invoice.shipping || "0",
         total: values.invoice.total || "0",
-        notes: values.invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes,
+        notes: values.invoice.notes || '',
         useFakturPajak: values.invoice.useFakturPajak || false,
         taxRate: values.invoice.taxRate || globalTaxRate,
       };
@@ -1040,7 +1040,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       await generatePDF({
         invoice: safeInvoice,
         items: values.items || [],
-        client: safeClient
+        client: safeClient,
+        defaultNotes: currentUser?.invoiceNotes || currentUser?.defaultNotes
       });
 
       toast({

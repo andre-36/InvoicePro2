@@ -396,7 +396,15 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             <div className="print-footer-left">
               <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
-                {quotation.notes || currentUser?.quotationNotes || currentUser?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {(currentUser?.quotationNotes || currentUser?.defaultNotes) && (
+                  <div>{currentUser?.quotationNotes || currentUser?.defaultNotes}</div>
+                )}
+                {quotation.notes && (
+                  <div style={{ marginTop: (currentUser?.quotationNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{quotation.notes}</div>
+                )}
+                {!quotation.notes && !(currentUser?.quotationNotes || currentUser?.defaultNotes) && (
+                  <div>Items checked and verified upon delivery. Items cannot be returned.</div>
+                )}
               </div>
             </div>
             

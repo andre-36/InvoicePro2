@@ -208,7 +208,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           ...item,
           price: item.unitPrice
         })) as any,
-        client: client as any
+        client: client as any,
+        defaultNotes: currentUser?.invoiceNotes || currentUser?.defaultNotes
       });
       
       toast({
@@ -944,7 +945,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <div className="print-footer-left">
               <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
-                {invoice.notes || currentUser?.invoiceNotes || currentUser?.defaultNotes || 'Items checked and verified upon delivery. Items cannot be returned.'}
+                {(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
+                  <div>{currentUser?.invoiceNotes || currentUser?.defaultNotes}</div>
+                )}
+                {invoice.notes && (
+                  <div style={{ marginTop: (currentUser?.invoiceNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{invoice.notes}</div>
+                )}
+                {!invoice.notes && !(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
+                  <div>Items checked and verified upon delivery. Items cannot be returned.</div>
+                )}
               </div>
             </div>
             

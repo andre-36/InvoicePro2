@@ -76,6 +76,14 @@ export default function InvoicesPage() {
     queryKey: ['/api/invoices'],
   });
 
+  // Fetch current user for default notes
+  const { data: currentUser } = useQuery<{
+    invoiceNotes?: string;
+    defaultNotes?: string;
+  }>({
+    queryKey: ['/api/user'],
+  });
+
   // Void invoice mutation
   const voidMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -117,7 +125,8 @@ export default function InvoicesPage() {
           dueDate: formatDate(invoiceData.dueDate)
         },
         items: invoiceData.items,
-        client: invoiceData.client
+        client: invoiceData.client,
+        defaultNotes: currentUser?.invoiceNotes || currentUser?.defaultNotes
       });
       
       toast({
