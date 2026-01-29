@@ -1486,84 +1486,17 @@ export class DatabaseStorage implements IStorage {
             })
             .returning();
 
-      // Calculate total profit for the invoice
-      let totalProfit = 0;
-
-      // Process each item to allocate batches and calculate profits
+      // Create invoice items (batch allocation and profit calculation moved to Delivery Note)
       for (const item of items) {
-        const productId = item.productId;
         const quantityNeeded = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
 
-        // Create the invoice item
-        const [newItem] = await tx
+        await tx
           .insert(invoiceItems)
           .values({
             ...item,
             invoiceId: newInvoice.id,
             quantity: quantityNeeded.toString()
-          })
-          .returning();
-
-        // If this is a real invoice (not draft), allocate from batches and calculate profit
-        if (invoiceData.status !== 'draft') {
-          // Get available batches for this product, ordered by purchase date (FIFO)
-          const availableBatches = await tx
-            .select()
-            .from(productBatches)
-            .where(
-              and(
-                eq(productBatches.productId, productId),
-                eq(productBatches.storeId, invoiceData.storeId),
-                gte(productBatches.remainingQuantity, 0)
-              )
-            )
-            .orderBy(productBatches.purchaseDate);
-
-          let remainingQuantity = quantityNeeded;
-          let itemProfit = 0;
-
-          // Allocate from each batch until we've fulfilled the quantity
-          // Note: Stock is NOT reduced here - it will be reduced when Delivery Note is created
-          for (const batch of availableBatches) {
-            if (remainingQuantity <= 0) break;
-
-            // Calculate how much we can take from this batch
-            const quantityFromBatch = Math.min(
-              remainingQuantity,
-              parseFloat(batch.remainingQuantity.toString())
-            );
-
-            if (quantityFromBatch <= 0) continue;
-
-            // Record which batch was used for this item (for profit calculation)
-            // Stock reduction happens when Delivery Note is created
-            const batchCost = parseFloat(batch.capitalCost.toString());
-            await tx
-              .insert(invoiceItemBatches)
-              .values({
-                invoiceItemId: newItem.id,
-                batchId: batch.id,
-                quantity: quantityFromBatch.toString(),
-                capitalCost: batch.capitalCost
-              });
-
-            // Calculate profit for this portion of the item
-            const sellingPrice = parseFloat(item.unitPrice.toString());
-            const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
-            itemProfit += batchProfit;
-
-            // Reduce the remaining quantity needed
-            remainingQuantity -= quantityFromBatch;
-          }
-
-          // Update the item with its profit
-          await tx
-            .update(invoiceItems)
-            .set({ profit: itemProfit.toString() })
-            .where(eq(invoiceItems.id, newItem.id));
-
-          totalProfit += itemProfit;
-        }
+          });
       }
 
       // Calculate invoice totals from items
@@ -1578,20 +1511,19 @@ export class DatabaseStorage implements IStorage {
       const discount = parseFloat(invoiceData.discount?.toString() || "0");
       const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount;
 
-      // Update the invoice with calculated totals and total profit
-      if (invoiceData.status !== 'draft') {
-        await tx
-          .update(invoices)
-          .set({ 
-            subtotal: invoiceSubtotal.toString(),
-            taxAmount: invoiceTaxAmount.toString(),
-            totalAmount: invoiceTotalAmount.toString(),
-            totalProfit: totalProfit.toString(),
-            updatedAt: new Date()
-          })
-          .where(eq(invoices.id, newInvoice.id));
+      // Update the invoice with calculated totals (profit will be calculated when Delivery Note is delivered)
+      await tx
+        .update(invoices)
+        .set({ 
+          subtotal: invoiceSubtotal.toString(),
+          taxAmount: invoiceTaxAmount.toString(),
+          totalAmount: invoiceTotalAmount.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, newInvoice.id));
 
-        // Create a transaction record for this invoice
+      // Create a transaction record for non-draft invoices
+      if (invoiceData.status !== 'draft') {
         await tx
           .insert(transactions)
           .values({
@@ -1603,17 +1535,6 @@ export class DatabaseStorage implements IStorage {
             invoiceId: newInvoice.id,
             referenceNumber: invoiceNumber,
           });
-      } else {
-        // For draft invoices, still update the totals
-        await tx
-          .update(invoices)
-          .set({ 
-            subtotal: invoiceSubtotal.toString(),
-            taxAmount: invoiceTaxAmount.toString(),
-            totalAmount: invoiceTotalAmount.toString(),
-            updatedAt: new Date()
-          })
-          .where(eq(invoices.id, newInvoice.id));
       }
 
       // Return the invoice with the updated totals
@@ -1661,99 +1582,19 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Invoice with ID ${id} not found`);
     }
 
-    // If changing from draft to another status, we need to allocate batches and calculate profits
-    if (invoice.status === 'draft' && status !== 'draft') {
-      return withTransaction(async (tx) => {
-        // Get all items for this invoice
-        const items = await tx
-          .select()
-          .from(invoiceItems)
-          .where(eq(invoiceItems.invoiceId, id));
+    // Simple status update (batch allocation moved to Delivery Note)
+    return withTransaction(async (tx) => {
+      const [updatedInvoice] = await tx
+        .update(invoices)
+        .set({ 
+          status: status as any,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, id))
+        .returning();
 
-        let totalProfit = 0;
-
-        // Process each item to allocate batches and calculate profits
-        for (const item of items) {
-          const quantityNeeded = parseFloat(item.quantity.toString());
-
-          // Get available batches for this product, ordered by purchase date (FIFO)
-          const availableBatches = await tx
-            .select()
-            .from(productBatches)
-            .where(
-              and(
-                eq(productBatches.productId, item.productId),
-                eq(productBatches.storeId, invoice.storeId),
-                gte(productBatches.remainingQuantity, 0)
-              )
-            )
-            .orderBy(productBatches.purchaseDate);
-
-          let remainingQuantity = quantityNeeded;
-          let itemProfit = 0;
-
-          // Allocate from each batch until we've fulfilled the quantity
-          for (const batch of availableBatches) {
-            if (remainingQuantity <= 0) break;
-
-            // Calculate how much we can take from this batch
-            const quantityFromBatch = Math.min(
-              remainingQuantity,
-              parseFloat(batch.remainingQuantity.toString())
-            );
-
-            if (quantityFromBatch <= 0) continue;
-
-            // Update the batch's remaining quantity
-            await tx
-              .update(productBatches)
-              .set({ 
-                remainingQuantity: (parseFloat(batch.remainingQuantity.toString()) - quantityFromBatch).toString(),
-                updatedAt: new Date()
-              })
-              .where(eq(productBatches.id, batch.id));
-
-            // Record which batch was used for this item
-            const batchCost = parseFloat(batch.capitalCost.toString());
-            await tx
-              .insert(invoiceItemBatches)
-              .values({
-                invoiceItemId: item.id,
-                batchId: batch.id,
-                quantity: quantityFromBatch.toString(),
-                capitalCost: batch.capitalCost
-              });
-
-            // Calculate profit for this portion of the item
-            const sellingPrice = parseFloat(item.unitPrice.toString());
-            const batchProfit = (sellingPrice - batchCost) * quantityFromBatch;
-            itemProfit += batchProfit;
-
-            // Reduce the remaining quantity needed
-            remainingQuantity -= quantityFromBatch;
-          }
-
-          // Update the item with its profit
-          await tx
-            .update(invoiceItems)
-            .set({ profit: itemProfit.toString() })
-            .where(eq(invoiceItems.id, item.id));
-
-          totalProfit += itemProfit;
-        }
-
-        // Update the invoice with its new status and total profit
-        const [updatedInvoice] = await tx
-          .update(invoices)
-          .set({ 
-            status: status as any, 
-            totalProfit: totalProfit.toString(),
-            updatedAt: new Date()
-          })
-          .where(eq(invoices.id, id))
-          .returning();
-
-        // Create a transaction record for this invoice if not exist yet
+      // Create a transaction record when changing from draft to active status
+      if (invoice.status === 'draft' && status !== 'draft') {
         const [existingTransaction] = await tx
           .select()
           .from(transactions)
@@ -1772,22 +1613,10 @@ export class DatabaseStorage implements IStorage {
               referenceNumber: invoice.invoiceNumber,
             });
         }
-
-        return updatedInvoice;
-      });
-    } else {
-      // Simple status update
-      const [updatedInvoice] = await db
-        .update(invoices)
-        .set({ 
-          status: status as any,
-          updatedAt: new Date()
-        })
-        .where(eq(invoices.id, id))
-        .returning();
+      }
 
       return updatedInvoice;
-    }
+    });
   }
 
   async voidInvoice(id: number): Promise<Invoice> {

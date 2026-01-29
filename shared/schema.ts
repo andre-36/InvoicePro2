@@ -239,6 +239,7 @@ export const productBatches = pgTable("product_batches", {
   capitalCost: numeric("capital_cost", { precision: 15, scale: 2 }).notNull(), // Per unit capital cost
   initialQuantity: numeric("initial_quantity", { precision: 15, scale: 2 }).notNull(),
   remainingQuantity: numeric("remaining_quantity", { precision: 15, scale: 2 }).notNull(),
+  reservedQuantity: numeric("reserved_quantity", { precision: 15, scale: 2 }).default("0").notNull(), // Quantity reserved for paid invoices awaiting delivery
   supplierName: varchar("supplier_name", { length: 100 }),
   supplierInvoice: varchar("supplier_invoice", { length: 100 }),
   notes: text("notes"),
