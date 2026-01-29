@@ -4695,8 +4695,71 @@ export class DatabaseStorage implements IStorage {
         );
       }
 
+      // If return is completed (e.g., refund type), create batches for returned items
+      if (returnData.status === 'completed') {
+        await this.createBatchesForReturn(tx, newReturn, items);
+      }
+
       return newReturn;
     });
+  }
+
+  private async createBatchesForReturn(tx: any, returnRecord: Return, items: InsertReturnItem[]): Promise<void> {
+    // Get the invoice to determine store
+    const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, returnRecord.invoiceId));
+    if (!invoice) return;
+
+    for (const item of items) {
+      // Get the invoice item to get product info
+      const [invoiceItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, item.invoiceItemId));
+      if (!invoiceItem) continue;
+
+      // Calculate the base quantity being returned
+      let baseReturnedQty = parseFloat(item.quantity.toString());
+      if (invoiceItem.baseQuantity && invoiceItem.quantity) {
+        const ratio = parseFloat(invoiceItem.baseQuantity.toString()) / parseFloat(invoiceItem.quantity.toString());
+        baseReturnedQty = parseFloat(item.quantity.toString()) * ratio;
+      }
+
+      // Get the unit cost from invoice item's unitCost or calculate from available data
+      // If invoice item has a unitCost field, use it; otherwise, use FIFO average from batches
+      let returnCost = parseFloat(invoiceItem.unitCost?.toString() || '0');
+      
+      if (returnCost === 0) {
+        // Fallback: Get average cost from existing batches for this product
+        const existingBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, invoiceItem.productId),
+              eq(productBatches.storeId, invoice.storeId)
+            )
+          )
+          .orderBy(desc(productBatches.purchaseDate))
+          .limit(1);
+        
+        if (existingBatches.length > 0) {
+          returnCost = parseFloat(existingBatches[0].baseCost?.toString() || existingBatches[0].cost?.toString() || '0');
+        }
+      }
+
+      // Create a new batch for the returned items
+      const batchReference = `RTN-${returnRecord.returnNumber}`;
+      await tx.insert(productBatches).values({
+        productId: invoiceItem.productId,
+        storeId: invoice.storeId,
+        quantity: baseReturnedQty.toString(),
+        remainingQuantity: baseReturnedQty.toString(),
+        reservedQuantity: '0',
+        cost: returnCost.toString(),
+        baseCost: returnCost.toString(),
+        purchaseDate: returnRecord.returnDate,
+        batchReference: batchReference,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
   }
 
   async updateReturn(id: number, returnData: Partial<InsertReturn>, items?: InsertReturnItem[]): Promise<Return> {
@@ -4747,12 +4810,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateReturnStatus(id: number, status: string): Promise<Return> {
-    const [updated] = await db
-      .update(returns)
-      .set({ status: status as "pending" | "completed" | "cancelled", updatedAt: new Date() })
-      .where(eq(returns.id, id))
-      .returning();
-    return updated;
+    return withTransaction(async (tx) => {
+      // Get return before update to check previous status
+      const [existingReturn] = await tx.select().from(returns).where(eq(returns.id, id));
+      const previousStatus = existingReturn?.status;
+
+      const [updated] = await tx
+        .update(returns)
+        .set({ status: status as "pending" | "completed" | "cancelled", updatedAt: new Date() })
+        .where(eq(returns.id, id))
+        .returning();
+
+      // If status changed to 'completed' from non-completed, create batches for returned items
+      if (status === 'completed' && previousStatus !== 'completed' && existingReturn) {
+        const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, id));
+        await this.createBatchesForReturn(tx, updated, items);
+      }
+
+      return updated;
+    });
   }
 
   async deleteReturn(id: number): Promise<void> {
