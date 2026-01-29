@@ -3,7 +3,7 @@ import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
   invoices, invoiceItems, invoiceItemBatches, invoicePayments, quotations, quotationItems, 
-  transactions, stores, settings, categories, importExportLogs, purchaseOrders, purchaseOrderItems, 
+  transactions, stores, settings, categories, inflowCategories, outflowCategories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
   returns, returnItems, creditNoteUsages,
@@ -21,6 +21,7 @@ import {
   type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem,
   type PurchaseOrderPayment, type InsertPurchaseOrderPayment,
   type Transaction, type InsertTransaction, type Category, type InsertCategory,
+  type InflowCategory, type InsertInflowCategory, type OutflowCategory, type InsertOutflowCategory,
   type Setting, type InsertSetting, type ImportExportLog, type InsertImportExportLog,
   type PrintSettings, type InsertPrintSettings,
   type PaymentType, type InsertPaymentType, type PaymentTerm, type InsertPaymentTerm,
@@ -252,6 +253,20 @@ export interface IStorage {
   createPaymentTerm(paymentTerm: InsertPaymentTerm): Promise<PaymentTerm>;
   updatePaymentTerm(id: number, paymentTerm: Partial<InsertPaymentTerm>): Promise<PaymentTerm>;
   deletePaymentTerm(id: number): Promise<void>;
+
+  // Inflow Categories methods
+  getInflowCategories(storeId: number): Promise<InflowCategory[]>;
+  getInflowCategory(id: number): Promise<InflowCategory | undefined>;
+  createInflowCategory(category: InsertInflowCategory): Promise<InflowCategory>;
+  updateInflowCategory(id: number, category: Partial<InsertInflowCategory>): Promise<InflowCategory>;
+  deleteInflowCategory(id: number): Promise<void>;
+
+  // Outflow Categories methods
+  getOutflowCategories(storeId: number): Promise<OutflowCategory[]>;
+  getOutflowCategory(id: number): Promise<OutflowCategory | undefined>;
+  createOutflowCategory(category: InsertOutflowCategory): Promise<OutflowCategory>;
+  updateOutflowCategory(id: number, category: Partial<InsertOutflowCategory>): Promise<OutflowCategory>;
+  deleteOutflowCategory(id: number): Promise<void>;
 
   // Cash Account methods
   getCashAccounts(storeId: number): Promise<CashAccount[]>;
@@ -3580,6 +3595,82 @@ export class DatabaseStorage implements IStorage {
 
   async deletePaymentTerm(id: number): Promise<void> {
     await db.delete(paymentTermsConfig).where(eq(paymentTermsConfig.id, id));
+  }
+
+  // Inflow Categories methods
+  async getInflowCategories(storeId: number): Promise<InflowCategory[]> {
+    return db
+      .select()
+      .from(inflowCategories)
+      .where(eq(inflowCategories.storeId, storeId))
+      .orderBy(inflowCategories.name);
+  }
+
+  async getInflowCategory(id: number): Promise<InflowCategory | undefined> {
+    const [category] = await db
+      .select()
+      .from(inflowCategories)
+      .where(eq(inflowCategories.id, id));
+    return category;
+  }
+
+  async createInflowCategory(categoryData: InsertInflowCategory): Promise<InflowCategory> {
+    const [newCategory] = await db
+      .insert(inflowCategories)
+      .values(categoryData)
+      .returning();
+    return newCategory;
+  }
+
+  async updateInflowCategory(id: number, categoryData: Partial<InsertInflowCategory>): Promise<InflowCategory> {
+    const [updatedCategory] = await db
+      .update(inflowCategories)
+      .set({ ...categoryData, updatedAt: new Date() })
+      .where(eq(inflowCategories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+
+  async deleteInflowCategory(id: number): Promise<void> {
+    await db.delete(inflowCategories).where(eq(inflowCategories.id, id));
+  }
+
+  // Outflow Categories methods
+  async getOutflowCategories(storeId: number): Promise<OutflowCategory[]> {
+    return db
+      .select()
+      .from(outflowCategories)
+      .where(eq(outflowCategories.storeId, storeId))
+      .orderBy(outflowCategories.name);
+  }
+
+  async getOutflowCategory(id: number): Promise<OutflowCategory | undefined> {
+    const [category] = await db
+      .select()
+      .from(outflowCategories)
+      .where(eq(outflowCategories.id, id));
+    return category;
+  }
+
+  async createOutflowCategory(categoryData: InsertOutflowCategory): Promise<OutflowCategory> {
+    const [newCategory] = await db
+      .insert(outflowCategories)
+      .values(categoryData)
+      .returning();
+    return newCategory;
+  }
+
+  async updateOutflowCategory(id: number, categoryData: Partial<InsertOutflowCategory>): Promise<OutflowCategory> {
+    const [updatedCategory] = await db
+      .update(outflowCategories)
+      .set({ ...categoryData, updatedAt: new Date() })
+      .where(eq(outflowCategories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+
+  async deleteOutflowCategory(id: number): Promise<void> {
+    await db.delete(outflowCategories).where(eq(outflowCategories.id, id));
   }
 
   // Cash Account methods
