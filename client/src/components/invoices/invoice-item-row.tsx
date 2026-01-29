@@ -26,6 +26,8 @@ interface Product {
   productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
   currentStock?: number;
+  reservedQty?: number;
+  availableStock?: number;
 }
 
 interface InvoiceItem {
@@ -361,10 +363,13 @@ export function InvoiceItemRow({
                       <span>{product.name}</span>
                       <span className={cn(
                         "text-xs ml-2",
-                        product.currentStock === 0 ? "text-red-500" :
-                        product.currentStock && product.currentStock <= 5 ? "text-orange-500" : "text-gray-500"
+                        (product.availableStock ?? product.currentStock ?? 0) === 0 ? "text-red-500" :
+                        (product.availableStock ?? product.currentStock ?? 0) <= 5 ? "text-orange-500" : "text-gray-500"
                       )}>
-                        Stok: {product.currentStock ?? 0}
+                        Tersedia: {product.availableStock ?? product.currentStock ?? 0}
+                        {(product.reservedQty ?? 0) > 0 && (
+                          <span className="text-gray-400 ml-1">(Rsv: {product.reservedQty})</span>
+                        )}
                       </span>
                     </div>
                   </CommandItem>

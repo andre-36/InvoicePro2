@@ -3137,9 +3137,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const pendingPOQuantity = pendingPOQuantities.get(product.id) || 0;
           
+          // Get reserved quantity (from invoices with payment but not fully delivered)
+          const reservedQty = await storage.getProductReservedQuantity(product.id, storeId);
+          const availableStock = Math.max(0, currentStock - reservedQty);
+          
           return {
             ...product,
             currentStock,
+            reservedQty,
+            availableStock,
             pendingPOQuantity,
             isLowStock: currentStock <= (product.minStock || 0),
             stockStatus: currentStock === 0 ? 'out_of_stock' : 
