@@ -1183,15 +1183,12 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
               <label className="text-sm font-medium">Payment Type *</label>
               <Select value={paymentForm.paymentType} onValueChange={(v) => setPaymentForm({ ...paymentForm, paymentType: v })}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue />
+                  <SelectValue placeholder="Select payment type" />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentTypes?.map((pt) => (
                     <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
                   ))}
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Check">Check</SelectItem>
                 </SelectContent>
               </Select>
             </div>
