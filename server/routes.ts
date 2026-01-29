@@ -1524,6 +1524,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.allocateStockOnDelivery(deliveryNoteId);
       }
       
+      // When status changes from 'delivered' to 'cancelled', reverse the stock allocation
+      if (status === 'cancelled' && previousStatus === 'delivered') {
+        await storage.reverseDeliveryNoteStock(deliveryNoteId);
+      }
+      
       res.json(updatedDeliveryNote);
     } catch (error) {
       console.error("Error updating delivery note status:", error);

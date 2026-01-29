@@ -465,6 +465,8 @@ export const transactions = pgTable("transactions", {
   description: text("description").notNull(),
   category: varchar("category", { length: 50 }),
   invoiceId: integer("invoice_id").references(() => invoices.id),
+  goodsReceiptId: integer("goods_receipt_id"),
+  returnId: integer("return_id"),
   referenceNumber: varchar("reference_number", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
