@@ -15,6 +15,8 @@ import {
   insertClientSchema,
   insertSupplierSchema,
   insertCategorySchema,
+  insertInflowCategorySchema,
+  insertOutflowCategorySchema,
   insertProductSchema,
   insertProductBatchSchema,
   insertInvoiceSchema,
@@ -3628,6 +3630,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting payment term:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Inflow Categories routes
+  app.get("/api/stores/:storeId/inflow-categories", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const categories = await storage.getInflowCategories(storeId);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error getting inflow categories:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/inflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getInflowCategory(id);
+      if (!category) {
+        return res.status(404).json({ error: "Inflow category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error getting inflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/inflow-categories", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertInflowCategorySchema, req, res);
+      if (!validatedData) return;
+      const newCategory = await storage.createInflowCategory(validatedData);
+      res.status(201).json(newCategory);
+    } catch (error) {
+      console.error("Error creating inflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/inflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertInflowCategorySchema.partial(), req, res);
+      if (!validatedData) return;
+      const updatedCategory = await storage.updateInflowCategory(id, validatedData);
+      res.json(updatedCategory);
+    } catch (error) {
+      console.error("Error updating inflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/inflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteInflowCategory(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting inflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Outflow Categories routes
+  app.get("/api/stores/:storeId/outflow-categories", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const categories = await storage.getOutflowCategories(storeId);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error getting outflow categories:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/outflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getOutflowCategory(id);
+      if (!category) {
+        return res.status(404).json({ error: "Outflow category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error getting outflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/outflow-categories", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertOutflowCategorySchema, req, res);
+      if (!validatedData) return;
+      const newCategory = await storage.createOutflowCategory(validatedData);
+      res.status(201).json(newCategory);
+    } catch (error) {
+      console.error("Error creating outflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/outflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertOutflowCategorySchema.partial(), req, res);
+      if (!validatedData) return;
+      const updatedCategory = await storage.updateOutflowCategory(id, validatedData);
+      res.json(updatedCategory);
+    } catch (error) {
+      console.error("Error updating outflow category:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/outflow-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteOutflowCategory(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting outflow category:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
