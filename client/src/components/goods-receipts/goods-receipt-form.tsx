@@ -39,9 +39,13 @@ const goodsReceiptItemSchema = z.object({
   id: z.number().optional(),
   productId: z.number(),
   purchaseOrderId: z.number().nullable().optional(),
+  purchaseOrderItemId: z.number().nullable().optional(),
   description: z.string().min(1, "Description is required"),
   quantity: z.string().min(1, "Quantity is required"),
   unitCost: z.string().min(1, "Unit cost is required"),
+  baseCost: z.string().nullable().optional(),
+  baseQuantity: z.string().nullable().optional(),
+  conversionFactor: z.string().optional(),
   taxRate: z.string().optional(),
   taxAmount: z.string().optional(),
   discount: z.string().optional(),
@@ -63,7 +67,16 @@ interface PurchaseOrderWithItems {
   useFakturPajak?: boolean;
   isPrepaid?: boolean;
   totalAmount?: string;
-  items?: { productId: number; description: string; quantity: string; unitCost: string }[];
+  items?: { 
+    id: number;
+    productId: number; 
+    description: string; 
+    quantity: string; 
+    unitCost: string; 
+    baseCost?: string | null; 
+    baseQuantity?: string | null;
+    productUnitId?: number | null;
+  }[];
 }
 
 interface POPaymentSummary {
@@ -112,6 +125,9 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     description: "",
     quantity: "1",
     unitCost: "0",
+    baseCost: null,
+    baseQuantity: null,
+    conversionFactor: "1",
     taxRate: "0",
     taxAmount: "0",
     discount: "0",
@@ -315,6 +331,14 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       updatedItems[index] = calculateItemTotals(updatedItems[index]);
     }
     
+    // Recalculate baseQuantity when quantity changes (using stored conversionFactor)
+    if (field === 'quantity') {
+      const conversionFactor = parseFloat(updatedItems[index].conversionFactor || '1') || 1;
+      const quantity = parseFloat(value || '1') || 1;
+      const baseQuantity = quantity * conversionFactor;
+      updatedItems[index].baseQuantity = baseQuantity.toFixed(2);
+    }
+    
     setItems(updatedItems);
     updateFormTotals(updatedItems);
   };
@@ -326,6 +350,9 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       description: "",
       quantity: "1",
       unitCost: "0",
+      baseCost: null,
+      baseQuantity: null,
+      conversionFactor: "1",
       taxRate: "0",
       taxAmount: "0",
       discount: "0",
@@ -398,21 +425,40 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   const selectPO = (index: number, po: PurchaseOrderWithItems | null) => {
     const updatedItems = [...items];
     if (po) {
-      // Find the unit cost for this product from the PO items
+      // Find the unit cost and base cost for this product from the PO items
       const productId = updatedItems[index].productId;
       const poItem = po.items?.find(item => item.productId === productId);
       const poUnitCost = poItem ? poItem.unitCost : updatedItems[index].unitCost;
+      const poBaseCost = poItem?.baseCost || poUnitCost; // Use baseCost if available, otherwise use unitCost
+      
+      // Calculate conversion factor from PO item: baseQuantity / quantity
+      // This allows us to calculate the base quantity for received items
+      const poQuantity = parseFloat(poItem?.quantity || '1') || 1;
+      const poBaseQuantity = parseFloat(poItem?.baseQuantity || poItem?.quantity || '1') || 1;
+      const conversionFactor = poBaseQuantity / poQuantity;
+      
+      // Calculate base quantity for this GR item
+      const receivedQuantity = parseFloat(updatedItems[index].quantity || '1') || 1;
+      const baseQuantity = receivedQuantity * conversionFactor;
       
       updatedItems[index] = {
         ...updatedItems[index],
         purchaseOrderId: po.id,
+        purchaseOrderItemId: poItem?.id || null,
         unitCost: poUnitCost,
+        baseCost: poBaseCost,
+        baseQuantity: baseQuantity.toFixed(2),
+        conversionFactor: conversionFactor.toString(),
         taxRate: po.useFakturPajak ? "11" : "0" // 11% PPN if using Faktur Pajak
       };
     } else {
       updatedItems[index] = {
         ...updatedItems[index],
         purchaseOrderId: null,
+        purchaseOrderItemId: null,
+        baseCost: null,
+        baseQuantity: null,
+        conversionFactor: "1",
         taxRate: "0"
       };
     }

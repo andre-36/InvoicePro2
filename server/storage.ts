@@ -2435,8 +2435,10 @@ export class DatabaseStorage implements IStorage {
           });
 
           // Update product stock by creating/updating product batch
-          const quantityReceived = parseFloat(String(item.quantity || 0));
-          if (quantityReceived > 0) {
+          // Use baseQuantity if available (for multi-unit products), otherwise use quantity
+          const itemAny = item as any;
+          const baseQuantity = parseFloat(String(itemAny.baseQuantity || item.quantity || 0));
+          if (baseQuantity > 0) {
             const batchReference = `GR-${receiptNumber}-${item.productId}`;
             const batchDescription = `Received from GR ${receiptNumber}`;
             
@@ -2451,9 +2453,9 @@ export class DatabaseStorage implements IStorage {
               .limit(1);
 
             if (existingBatch) {
-              // Update existing batch
-              const newQuantity = parseFloat(existingBatch.totalQuantity) + quantityReceived;
-              const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + quantityReceived;
+              // Update existing batch with base quantity
+              const newQuantity = parseFloat(existingBatch.totalQuantity) + baseQuantity;
+              const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + baseQuantity;
 
               await tx
                 .update(productBatches)
@@ -2464,7 +2466,8 @@ export class DatabaseStorage implements IStorage {
                 })
                 .where(eq(productBatches.id, existingBatch.id));
             } else {
-              // Create new batch
+              // Create new batch - use baseCost if available (for multi-unit products), otherwise use unitCost
+              const batchCost = itemAny.baseCost || item.unitCost || '0';
               await tx
                 .insert(productBatches)
                 .values({
@@ -2473,9 +2476,9 @@ export class DatabaseStorage implements IStorage {
                   batchNumber: batchReference,
                   purchaseDate: new Date(goodsReceiptData.receiptDate || new Date()),
                   expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
-                  totalQuantity: quantityReceived.toString(),
-                  remainingQuantity: quantityReceived.toString(),
-                  costPrice: String(item.unitCost || '0'),
+                  totalQuantity: baseQuantity.toString(),
+                  remainingQuantity: baseQuantity.toString(),
+                  costPrice: String(batchCost),
                   notes: batchDescription
                 });
             }
@@ -3044,7 +3047,10 @@ export class DatabaseStorage implements IStorage {
             totalAmount: item.totalAmount.toString(),
             taxRate: item.taxRate?.toString() || '0',
             taxAmount: item.taxAmount?.toString() || '0',
-            discount: item.discount?.toString() || '0'
+            discount: item.discount?.toString() || '0',
+            productUnitId: (item as any).productUnitId || null,
+            baseQuantity: (item as any).baseQuantity?.toString() || null,
+            baseCost: (item as any).baseCost?.toString() || null
           });
       }
 
@@ -3079,7 +3085,10 @@ export class DatabaseStorage implements IStorage {
             totalAmount: item.totalAmount.toString(),
             taxRate: item.taxRate?.toString() || '0',
             taxAmount: item.taxAmount?.toString() || '0',
-            discount: item.discount?.toString() || '0'
+            discount: item.discount?.toString() || '0',
+            productUnitId: (item as any).productUnitId || null,
+            baseQuantity: (item as any).baseQuantity?.toString() || null,
+            baseCost: (item as any).baseCost?.toString() || null
           });
       }
 

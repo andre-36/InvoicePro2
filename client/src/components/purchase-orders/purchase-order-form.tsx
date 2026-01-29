@@ -43,6 +43,11 @@ const purchaseOrderItemSchema = z.object({
   taxAmount: z.string().optional(),
   totalAmount: z.string().optional(),
   productId: z.number().nullable().optional(),
+  productUnitId: z.number().nullable().optional(),
+  baseQuantity: z.string().optional(),
+  baseCost: z.string().optional(),
+  conversionFactor: z.string().optional(),
+  unitLabel: z.string().optional(),
 });
 
 const purchaseOrderFormSchema = z.object({
@@ -63,7 +68,9 @@ interface PurchaseOrderItemRowProps {
   index: number;
   item: PurchaseOrderItem;
   products: any[];
+  productUnitsMap: Record<number, any[]>;
   updateItem: (index: number, field: string, value: string) => void;
+  updateItemUnit: (index: number, unitId: number | null, unitLabel: string, conversionFactor: string) => void;
   removeItem: (index: number) => void;
   selectProduct: (index: number, productId: number) => void;
   canRemove: boolean;
@@ -73,7 +80,9 @@ function PurchaseOrderItemRow({
   index,
   item,
   products,
+  productUnitsMap,
   updateItem,
+  updateItemUnit,
   removeItem,
   selectProduct,
   canRemove
@@ -86,6 +95,24 @@ function PurchaseOrderItemRow({
   };
 
   const selectedProduct = item.productId ? products.find(p => p.id === item.productId) : null;
+  const availableUnits = item.productId ? (productUnitsMap[item.productId] || []) : [];
+  const hasMultipleUnits = availableUnits.length > 0;
+  
+  const handleUnitChange = (value: string) => {
+    if (value === 'base' || value === '') {
+      updateItemUnit(index, null, selectedProduct?.unit || '', '1');
+    } else {
+      const unitId = parseInt(value);
+      const unit = availableUnits.find(u => u.id === unitId);
+      if (unit) {
+        updateItemUnit(index, unitId, unit.unitLabel, unit.conversionFactor);
+      }
+    }
+  };
+
+  const conversionFactor = parseFloat(item.conversionFactor || '1') || 1;
+  const unitCost = parseFloat(item.unitCost || '0') || 0;
+  const baseCostValue = conversionFactor > 0 ? unitCost / conversionFactor : 0;
 
   return (
     <tr className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
@@ -183,19 +210,45 @@ function PurchaseOrderItemRow({
           </div>
         </div>
       </td>
-      <td className="px-3 py-2 text-sm text-gray-600">
-        {selectedProduct?.unit || '-'}
+      <td className="px-3 py-2">
+        {hasMultipleUnits ? (
+          <Select
+            value={item.productUnitId?.toString() || 'base'}
+            onValueChange={handleUnitChange}
+          >
+            <SelectTrigger className="h-8 text-sm w-24">
+              <SelectValue placeholder="Unit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="base">{selectedProduct?.unit || 'pcs'}</SelectItem>
+              {availableUnits.map((unit) => (
+                <SelectItem key={unit.id} value={unit.id.toString()}>
+                  {unit.unitLabel} ({unit.conversionFactor}x)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-sm text-gray-600">{item.unitLabel || selectedProduct?.unit || '-'}</span>
+        )}
       </td>
       <td className="px-3 py-2">
-        <Input
-          type="number"
-          value={item.unitCost}
-          onChange={(e) => updateItem(index, 'unitCost', e.target.value)}
-          placeholder="0.00"
-          min="0"
-          step="0.01"
-          className="h-8 text-sm text-right"
-        />
+        <div className="flex flex-col">
+          <Input
+            type="number"
+            value={item.unitCost}
+            onChange={(e) => updateItem(index, 'unitCost', e.target.value)}
+            placeholder="0.00"
+            min="0"
+            step="0.01"
+            className="h-8 text-sm text-right"
+          />
+          {conversionFactor > 1 && (
+            <span className="text-xs text-blue-600 text-right mt-0.5">
+              = {formatCurrency(baseCostValue.toFixed(2))}/{selectedProduct?.unit || 'pcs'}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2 text-right text-sm font-medium">
         {formatCurrency(item.subtotal || "0")}
@@ -253,6 +306,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   
   // Store original loaded data for comparison-based change detection
   const originalDataRef = useRef<string | null>(null);
+  
+  // Product units map - stores units for each product
+  const [productUnitsMap, setProductUnitsMap] = useState<Record<number, any[]>>({});
   
   // Helper function to create a comparable snapshot of form data
   const createFormSnapshot = (poValues: any, itemsArray: PurchaseOrderItem[]): string => {
@@ -584,6 +640,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     const quantity = parseFloat(newItems[index].quantity || '0') || 0;
     const unitCost = parseFloat(newItems[index].unitCost || '0') || 0;
     const taxRate = parseFloat(newItems[index].taxRate || '0') || 0;
+    const conversionFactor = parseFloat(newItems[index].conversionFactor || '1') || 1;
     
     const subtotal = quantity * unitCost;
     const taxAmount = (subtotal * taxRate) / 100;
@@ -592,6 +649,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     newItems[index].subtotal = subtotal.toFixed(2);
     newItems[index].taxAmount = taxAmount.toFixed(2);
     newItems[index].totalAmount = totalAmount.toFixed(2);
+    
+    // Update base quantity and base cost when quantity or unitCost changes
+    if (field === 'quantity' || field === 'unitCost') {
+      newItems[index].baseQuantity = (quantity * conversionFactor).toFixed(2);
+      newItems[index].baseCost = conversionFactor > 0 ? (unitCost / conversionFactor).toFixed(2) : '0';
+    }
     
     setItems(newItems);
     form.setValue('items', newItems);
@@ -633,6 +696,20 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     form.setValue('purchaseOrder.totalAmount', totalAmount.toFixed(2));
   };
 
+  // Fetch product units for a product
+  const fetchProductUnits = async (productId: number) => {
+    if (!productId || productUnitsMap[productId]) return;
+    try {
+      const response = await fetch(`/api/products/${productId}/units`, { credentials: 'include' });
+      if (response.ok) {
+        const units = await response.json();
+        setProductUnitsMap(prev => ({ ...prev, [productId]: units }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch product units:', error);
+    }
+  };
+
   // Update product selection for item
   const selectProduct = (index: number, productId: number) => {
     const newItems = [...items];
@@ -644,6 +721,11 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         description: '',
         unitCost: '0',
         productId: null,
+        productUnitId: null,
+        baseQuantity: '',
+        baseCost: '',
+        conversionFactor: '1',
+        unitLabel: '',
         subtotal: '0',
         taxAmount: '0',
         totalAmount: '0'
@@ -651,16 +733,29 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     } else {
       const product = products?.find(p => p.id === productId);
       if (product) {
+        // Fetch product units for this product
+        fetchProductUnits(productId);
+        
+        // Calculate quantities (conversion factor is 1 for base unit)
+        const quantity = parseFloat(newItems[index].quantity || '1') || 1;
+        const unitCost = parseFloat(product.costPrice || '0') || 0;
+        const conversionFactor = 1; // Base unit
+        const baseQuantity = quantity * conversionFactor;
+        const baseCost = unitCost / conversionFactor;
+        
         newItems[index] = {
           ...newItems[index],
           description: product.name,
           unitCost: product.costPrice || '0',
-          productId: productId
+          productId: productId,
+          productUnitId: null,
+          baseQuantity: baseQuantity.toFixed(2),
+          baseCost: baseCost.toFixed(2),
+          conversionFactor: '1',
+          unitLabel: product.unit || ''
         };
         
         // Recalculate totals
-        const quantity = parseFloat(newItems[index].quantity || '1') || 1;
-        const unitCost = parseFloat(product.costPrice || '0') || 0;
         const taxRate = parseFloat(newItems[index].taxRate || '10') || 10;
         const subtotal = quantity * unitCost;
         const taxAmount = (subtotal * taxRate) / 100;
@@ -671,6 +766,41 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         newItems[index].totalAmount = totalAmount.toFixed(2);
       }
     }
+    
+    setItems(newItems);
+    form.setValue('items', newItems);
+    updateTotals(newItems);
+  };
+  
+  // Update item unit selection
+  const updateItemUnit = (index: number, unitId: number | null, unitLabel: string, conversionFactor: string) => {
+    const newItems = [...items];
+    const product = products?.find(p => p.id === newItems[index].productId);
+    
+    newItems[index] = {
+      ...newItems[index],
+      productUnitId: unitId,
+      unitLabel: unitLabel,
+      conversionFactor: conversionFactor
+    };
+    
+    // Recalculate base quantity and base cost
+    const quantity = parseFloat(newItems[index].quantity || '1') || 1;
+    const unitCost = parseFloat(newItems[index].unitCost || '0') || 0;
+    const factor = parseFloat(conversionFactor) || 1;
+    
+    newItems[index].baseQuantity = (quantity * factor).toFixed(2);
+    newItems[index].baseCost = factor > 0 ? (unitCost / factor).toFixed(2) : '0';
+    
+    // Recalculate totals
+    const taxRate = parseFloat(newItems[index].taxRate || '0') || 0;
+    const subtotal = quantity * unitCost;
+    const taxAmount = (subtotal * taxRate) / 100;
+    const totalAmount = subtotal + taxAmount;
+    
+    newItems[index].subtotal = subtotal.toFixed(2);
+    newItems[index].taxAmount = taxAmount.toFixed(2);
+    newItems[index].totalAmount = totalAmount.toFixed(2);
     
     setItems(newItems);
     form.setValue('items', newItems);
@@ -1051,7 +1181,9 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                         index={index}
                         item={item}
                         products={products || []}
+                        productUnitsMap={productUnitsMap}
                         updateItem={(idx, field, value) => updateItem(idx, field, value)}
+                        updateItemUnit={updateItemUnit}
                         removeItem={removeItem}
                         selectProduct={selectProduct}
                         canRemove={items.length > 1}
