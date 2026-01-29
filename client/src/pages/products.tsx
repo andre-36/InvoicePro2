@@ -1136,7 +1136,7 @@ export default function ProductsPage() {
                   
                   {productUnits.length > 0 && (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-5 gap-2 text-xs font-medium text-gray-500 px-2">
+                      <div className="grid gap-2 text-xs font-medium text-gray-500 px-2" style={{ gridTemplateColumns: '1fr 1.5fr 0.8fr 1.5fr 40px' }}>
                         <span>Unit Code</span>
                         <span>Label</span>
                         <span>Conversion</span>
@@ -1144,7 +1144,7 @@ export default function ProductsPage() {
                         <span></span>
                       </div>
                       {productUnits.map((unit, index) => (
-                        <div key={index} className="grid grid-cols-5 gap-2 items-center bg-gray-50 p-2 rounded-md">
+                        <div key={index} className="grid gap-2 items-center bg-gray-50 p-2 rounded-md" style={{ gridTemplateColumns: '1fr 1.5fr 0.8fr 1.5fr 40px' }}>
                           <Input
                             placeholder="box"
                             value={unit.unitCode}
