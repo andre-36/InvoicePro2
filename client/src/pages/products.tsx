@@ -1168,25 +1168,29 @@ export default function ProductsPage() {
                             min="1"
                             step="0.01"
                             placeholder="12"
-                            value={unit.conversionFactor}
+                            value={parseFloat(unit.conversionFactor) || ""}
                             onChange={(e) => {
                               const updated = [...productUnits];
                               updated[index].conversionFactor = e.target.value;
                               setProductUnits(updated);
                             }}
                           />
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="Price"
-                            value={unit.price || ""}
-                            onChange={(e) => {
-                              const updated = [...productUnits];
-                              updated[index].price = e.target.value || null;
-                              setProductUnits(updated);
-                            }}
-                          />
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm">Rp</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="Price"
+                              className="pl-8"
+                              value={unit.price || ""}
+                              onChange={(e) => {
+                                const updated = [...productUnits];
+                                updated[index].price = e.target.value || null;
+                                setProductUnits(updated);
+                              }}
+                            />
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
