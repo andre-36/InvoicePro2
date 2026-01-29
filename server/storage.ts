@@ -90,6 +90,19 @@ export interface IStorage {
   getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]>;
   getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]>;
 
+  // Product reservation methods
+  getProductReservedQuantity(productId: number, storeId: number): Promise<number>;
+  getProductReservations(productId: number, storeId: number): Promise<Array<{
+    invoiceId: number;
+    invoiceNumber: string;
+    clientId: number | null;
+    clientName: string;
+    reservedQuantity: number;
+    totalInvoiceQty: number;
+    deliveredQty: number;
+  }>>;
+  getProductAvailableQuantity(productId: number, storeId: number): Promise<{ stock: number; reserved: number; available: number }>;
+
   // Product batch methods
   getProductBatch(id: number): Promise<ProductBatch | undefined>;
   getProductBatches(productId: number, storeId: number): Promise<ProductBatch[]>;
@@ -958,6 +971,103 @@ export class DatabaseStorage implements IStorage {
       date: row.receiptDate,
       status: row.status,
     }));
+  }
+
+  // Get reserved quantity for a product (from invoices with payment but not fully delivered)
+  async getProductReservedQuantity(productId: number, storeId: number): Promise<number> {
+    // Reserved = invoice items from invoices that have payments, minus already delivered quantities
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(
+          CAST(ii.quantity AS DECIMAL) - COALESCE(
+            (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
+             FROM ${deliveryNoteItems} dni 
+             WHERE dni.invoice_item_id = ii.id), 0
+          )
+        ), 0) as reserved_qty
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${productId}
+        AND i.store_id = ${storeId}
+        AND i.status != 'draft'
+        AND i.status != 'void'
+        AND EXISTS (SELECT 1 FROM ${invoicePayments} ip WHERE ip.invoice_id = i.id)
+        AND CAST(ii.quantity AS DECIMAL) > COALESCE(
+          (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
+           FROM ${deliveryNoteItems} dni 
+           WHERE dni.invoice_item_id = ii.id), 0
+        )
+    `);
+    return parseFloat(result[0]?.reserved_qty?.toString() || '0');
+  }
+
+  // Get all reserved items for a product with invoice and client details
+  async getProductReservations(productId: number, storeId: number): Promise<Array<{
+    invoiceId: number;
+    invoiceNumber: string;
+    clientId: number | null;
+    clientName: string;
+    reservedQuantity: number;
+    totalInvoiceQty: number;
+    deliveredQty: number;
+  }>> {
+    const result = await db.execute(sql`
+      SELECT 
+        i.id as invoice_id,
+        i.invoice_number,
+        i.client_id,
+        COALESCE(c.name, 'Walk-in Customer') as client_name,
+        CAST(ii.quantity AS DECIMAL) as total_qty,
+        COALESCE(
+          (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
+           FROM ${deliveryNoteItems} dni 
+           WHERE dni.invoice_item_id = ii.id), 0
+        ) as delivered_qty
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      LEFT JOIN ${clients} c ON i.client_id = c.id
+      WHERE ii.product_id = ${productId}
+        AND i.store_id = ${storeId}
+        AND i.status != 'draft'
+        AND i.status != 'void'
+        AND EXISTS (SELECT 1 FROM ${invoicePayments} ip WHERE ip.invoice_id = i.id)
+        AND CAST(ii.quantity AS DECIMAL) > COALESCE(
+          (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
+           FROM ${deliveryNoteItems} dni 
+           WHERE dni.invoice_item_id = ii.id), 0
+        )
+      ORDER BY i.issue_date DESC
+    `);
+    
+    return result.map((row: any) => ({
+      invoiceId: row.invoice_id,
+      invoiceNumber: row.invoice_number,
+      clientId: row.client_id,
+      clientName: row.client_name,
+      reservedQuantity: parseFloat(row.total_qty) - parseFloat(row.delivered_qty),
+      totalInvoiceQty: parseFloat(row.total_qty),
+      deliveredQty: parseFloat(row.delivered_qty),
+    }));
+  }
+
+  // Get available quantity for a product (stock - reserved)
+  async getProductAvailableQuantity(productId: number, storeId: number): Promise<{ stock: number; reserved: number; available: number }> {
+    // Get current stock
+    const stockResult = await db.execute(sql`
+      SELECT COALESCE(SUM(CAST(remaining_quantity AS DECIMAL)), 0) as stock
+      FROM ${productBatches}
+      WHERE product_id = ${productId} AND store_id = ${storeId}
+    `);
+    const stock = parseFloat(stockResult[0]?.stock?.toString() || '0');
+    
+    // Get reserved quantity
+    const reserved = await this.getProductReservedQuantity(productId, storeId);
+    
+    return {
+      stock,
+      reserved,
+      available: Math.max(0, stock - reserved)
+    };
   }
 
   // Product batch methods

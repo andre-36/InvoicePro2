@@ -907,6 +907,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product available quantity (stock - reserved)
+  app.get("/api/products/:id/availability", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const storeId = parseInt(req.query.storeId as string);
+      if (!storeId) {
+        return res.status(400).json({ error: "storeId is required" });
+      }
+      const availability = await storage.getProductAvailableQuantity(productId, storeId);
+      res.json(availability);
+    } catch (error) {
+      console.error("Error getting product availability:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product reservations list (for product detail page)
+  app.get("/api/products/:id/reservations", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const storeId = parseInt(req.query.storeId as string);
+      if (!storeId) {
+        return res.status(400).json({ error: "storeId is required" });
+      }
+      const reservations = await storage.getProductReservations(productId, storeId);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error getting product reservations:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Product bundle component routes
   app.get("/api/products/:id/bundle-components", requireAuth, async (req, res) => {
     try {
