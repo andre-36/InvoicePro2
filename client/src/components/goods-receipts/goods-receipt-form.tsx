@@ -189,7 +189,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
   });
 
   const { data: paymentTypes } = useQuery<{ id: number; name: string }[]>({
-    queryKey: ['/api/payment-types'],
+    queryKey: ['/api/stores/1/payment-types'],
   });
 
   const { data: existingReceipt } = useQuery<GoodsReceiptData>({
