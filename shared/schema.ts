@@ -147,6 +147,26 @@ export const categories = pgTable("categories", {
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
+export const inflowCategories = pgTable("inflow_categories", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
+export const outflowCategories = pgTable("outflow_categories", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
 // Products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -794,6 +814,8 @@ export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, cre
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInflowCategorySchema = createInsertSchema(inflowCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOutflowCategorySchema = createInsertSchema(outflowCategories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBundleComponentSchema = createInsertSchema(productBundleComponents).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductUnitSchema = createInsertSchema(productUnits).omit({ id: true, createdAt: true, updatedAt: true });
@@ -845,6 +867,12 @@ export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
 export type Category = typeof categories.$inferSelect;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type InflowCategory = typeof inflowCategories.$inferSelect;
+export type InsertInflowCategory = z.infer<typeof insertInflowCategorySchema>;
+
+export type OutflowCategory = typeof outflowCategories.$inferSelect;
+export type InsertOutflowCategory = z.infer<typeof insertOutflowCategorySchema>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
