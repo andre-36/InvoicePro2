@@ -51,6 +51,7 @@ interface InvoiceItemRowProps {
   updateItem: (index: number, item: InvoiceItem) => void;
   removeItem: (index: number) => void;
   onProductSelect: (index: number, productId: number | null, productUnitId?: number | null) => void;
+  disabled?: boolean;
 }
 
 export function InvoiceItemRow({ 
@@ -59,7 +60,8 @@ export function InvoiceItemRow({
   products, 
   updateItem, 
   removeItem,
-  onProductSelect
+  onProductSelect,
+  disabled = false
 }: InvoiceItemRowProps) {
   const [description, setDescription] = useState(item.description || "");
   const [quantity, setQuantity] = useState(item.quantity || "1");
@@ -266,6 +268,7 @@ export function InvoiceItemRow({
               variant="ghost"
               role="combobox"
               aria-expanded={open}
+              disabled={disabled}
               className="w-full justify-between text-sm h-8 px-2 border border-transparent hover:border-gray-300 hover:bg-gray-50"
             >
               <div className="flex items-center justify-between w-full min-w-0">
@@ -383,8 +386,8 @@ export function InvoiceItemRow({
       {/* Unit selection (only show if product has units) */}
       <td className="w-[65px]">
         {productUnits.length > 0 ? (
-          <Select value={productUnitId || "base"} onValueChange={handleUnitChange}>
-            <SelectTrigger className="h-8 text-sm">
+          <Select value={productUnitId || "base"} onValueChange={handleUnitChange} disabled={disabled}>
+            <SelectTrigger className="h-8 text-sm" disabled={disabled}>
               <SelectValue placeholder="Unit" />
             </SelectTrigger>
             <SelectContent>
@@ -415,6 +418,7 @@ export function InvoiceItemRow({
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             className="excel-cell-input-right flex-1"
+            disabled={disabled}
           />
           <div className="flex flex-col">
             <Button
@@ -422,6 +426,7 @@ export function InvoiceItemRow({
               variant="ghost"
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
+              disabled={disabled}
               onClick={() => {
                 const currentQty = parseFloat(quantity) || 0;
                 setQuantity(String(currentQty + 1));
@@ -434,6 +439,7 @@ export function InvoiceItemRow({
               variant="ghost"
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
+              disabled={disabled}
               onClick={() => {
                 const currentQty = parseFloat(quantity) || 0;
                 if (currentQty > 1) {
@@ -460,6 +466,7 @@ export function InvoiceItemRow({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className="excel-cell-input-right pl-5 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+            disabled={disabled}
           />
         </div>
       </td>
@@ -476,6 +483,7 @@ export function InvoiceItemRow({
           variant="ghost"
           size="sm"
           onClick={() => removeItem(index)}
+          disabled={disabled}
           className="text-gray-400 hover:text-red-600 p-1 h-8 w-8"
         >
           <Trash2 className="h-4 w-4" />
