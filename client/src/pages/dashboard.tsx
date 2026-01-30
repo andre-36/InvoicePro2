@@ -71,9 +71,9 @@ export default function Dashboard() {
         />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {isLoading ? (
-          Array(6).fill(0).map((_, i) => (
+          Array(3).fill(0).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-5">
                 <div className="animate-pulse space-y-3">
@@ -85,7 +85,7 @@ export default function Dashboard() {
             </Card>
           ))
         ) : error || !data ? (
-          <div className="col-span-6">
+          <div className="col-span-3">
             <Card>
               <CardContent className="p-5 text-center">
                 <p className="text-gray-500">Failed to load dashboard statistics</p>
@@ -107,26 +107,6 @@ export default function Dashboard() {
             <StatsCard
               title="Total Profit"
               value={data.totalRevenue - data.totalExpenses}
-            />
-            
-            <StatsCard
-              title="Open Invoices"
-              value={data.openInvoices.count}
-              secondaryText={`${formatCurrency(data.openInvoices.value)} total`}
-              noCurrency={true}
-            />
-
-            <StatsCard
-              title="Total Products"
-              value={data.productsCount}
-              noCurrency={true}
-            />
-
-            <StatsCard
-              title="Low Stock Items"
-              value={data.lowStockCount}
-              noCurrency={true}
-              status={data.lowStockCount > 0 ? { label: "Needs attention", color: "yellow" } : undefined}
             />
           </>
         )}
