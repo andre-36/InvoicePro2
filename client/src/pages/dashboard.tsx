@@ -8,11 +8,12 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { CategorySalesChart } from "@/components/dashboard/category-sales-chart";
-import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { TopClientsList } from "@/components/dashboard/top-clients-list";
 import { InventoryStatsCard } from "@/components/dashboard/inventory-stats-card";
 import { LowStockProducts } from "@/components/dashboard/low-stock-products";
 import { TopSellingProducts } from "@/components/dashboard/top-selling-products";
+import { UnpaidSupplierBills } from "@/components/dashboard/unpaid-supplier-bills";
+import { DeliveredUnpaidInvoices } from "@/components/dashboard/delivered-unpaid-invoices";
 
 
 type DashboardStats = {
@@ -126,9 +127,13 @@ export default function Dashboard() {
         <CategorySalesChart />
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <RecentInvoicesTable />
+      <div className="grid grid-cols-1 gap-5">
         <TopClientsList />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <UnpaidSupplierBills />
+        <DeliveredUnpaidInvoices />
       </div>
     </div>
   );
