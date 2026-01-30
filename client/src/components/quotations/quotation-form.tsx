@@ -25,7 +25,7 @@ import { formatCurrency } from "@/lib/utils";
 // Extend the schema for client-side validation
 const extendedQuotationSchema = insertQuotationSchema.extend({
   issueDate: z.date(),
-  expiryDate: z.date().optional().nullable(),
+  expiryDate: z.date({ required_error: "Expiry date is required" }),
   // Using string representation for numeric fields to work with form inputs
   subtotal: z.string().optional(),
   taxAmount: z.string().optional(),
@@ -183,7 +183,10 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   const nextQuotationNumber = nextQuotationNumberData?.quotationNumber || 
     (isNumberError ? generateFallbackQuotationNumber() : null);
 
-  // Form setup - expiry date is empty by default (prices can change anytime)
+  // Form setup - expiry date defaults to 30 days from today
+  const defaultExpiryDate = new Date();
+  defaultExpiryDate.setDate(defaultExpiryDate.getDate() + 30);
+  
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationFormSchema),
     defaultValues: {
@@ -191,7 +194,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         clientId: 0,
         storeId: 1, // Default store
         issueDate: new Date(),
-        expiryDate: null,
+        expiryDate: defaultExpiryDate,
         status: "draft",
         subtotal: "0",
         taxRate: "0",
@@ -214,13 +217,13 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   // Create/update quotation mutation
   const mutation = useMutation({
     mutationFn: async (values: QuotationFormValues) => {
-      // Format dates as ISO strings (expiryDate is optional)
+      // Format dates as ISO strings
       const formattedValues = {
         ...values,
         quotation: {
           ...values.quotation,
           issueDate: values.quotation.issueDate.toISOString(),
-          expiryDate: values.quotation.expiryDate ? values.quotation.expiryDate.toISOString() : null,
+          expiryDate: values.quotation.expiryDate.toISOString(),
         }
       };
 
