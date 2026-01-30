@@ -124,9 +124,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     items: [] as { invoiceItemId: number; deliveredQuantity: string; remarks: string }[]
   });
 
-  // State for editing delivery note (metadata only)
+  // State for editing delivery note
   const [editDeliveryDialogOpen, setEditDeliveryDialogOpen] = useState(false);
   const [editingDeliveryNote, setEditingDeliveryNote] = useState<DeliveryNote | null>(null);
+  const [editDeliveryItems, setEditDeliveryItems] = useState<{ invoiceItemId: number; description: string; deliveredQuantity: string; maxQuantity: number }[]>([]);
   const [editDeliveryForm, setEditDeliveryForm] = useState({
     deliveryDate: '',
     deliveryType: 'delivered' as 'delivered' | 'self_pickup',
@@ -380,13 +381,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     }
   });
 
-  // Update delivery note mutation (metadata only)
+  // Update delivery note mutation
   const updateDeliveryNoteMutation = useMutation({
     mutationFn: async (data: { id: number; updates: Partial<typeof editDeliveryForm> }) => {
       return apiRequest('PUT', `/api/delivery-notes/${data.id}`, data.updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
       setEditDeliveryDialogOpen(false);
       setEditingDeliveryNote(null);
       toast({
@@ -398,6 +400,24 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       toast({
         title: "Error",
         description: `Failed to update delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update delivery note items mutation (for pending delivery notes)
+  const updateDeliveryNoteItemsMutation = useMutation({
+    mutationFn: async (data: { id: number; items: { invoiceItemId: number; deliveredQuantity: number }[] }) => {
+      return apiRequest('PUT', `/api/delivery-notes/${data.id}/items`, { items: data.items });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update delivery note items: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -468,7 +488,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     createDeliveryNoteMutation.mutate(data);
   };
 
-  const handleEditDeliveryNote = (dn: DeliveryNote) => {
+  const handleEditDeliveryNote = async (dn: DeliveryNote) => {
     setEditingDeliveryNote(dn);
     setEditDeliveryForm({
       deliveryDate: format(new Date(dn.deliveryDate), 'yyyy-MM-dd'),
@@ -478,15 +498,76 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       recipientName: dn.recipientName || '',
       notes: dn.notes || ''
     });
+
+    // If status is pending, fetch items for editing
+    if (dn.status === 'pending') {
+      try {
+        const response = await fetch(`/api/delivery-notes/${dn.id}`, { credentials: 'include' });
+        const data = await response.json();
+        if (data.items) {
+          // Build list of all invoice items with their current delivery quantities
+          const allItems = items.map(item => {
+            const dnItem = data.items.find((di: any) => di.invoiceItemId === item.id);
+            const statusItem = deliveryStatus?.orderedItems.find(oi => oi.invoiceItemId === item.id);
+            // Max quantity is: remaining (not yet delivered) + current delivery quantity
+            const currentDeliveredQty = dnItem ? parseFloat(dnItem.deliveredQuantity) : 0;
+            const remainingFromOtherDN = statusItem?.remaining || 0;
+            return {
+              invoiceItemId: item.id,
+              description: item.description,
+              deliveredQuantity: currentDeliveredQty.toString(),
+              maxQuantity: remainingFromOtherDN + currentDeliveredQty
+            };
+          });
+          setEditDeliveryItems(allItems);
+        }
+      } catch (error) {
+        console.error('Error fetching delivery note items:', error);
+      }
+    } else {
+      setEditDeliveryItems([]);
+    }
+
     setEditDeliveryDialogOpen(true);
   };
 
-  const handleUpdateDeliveryNote = () => {
+  const handleUpdateDeliveryNote = async () => {
     if (!editingDeliveryNote) return;
-    updateDeliveryNoteMutation.mutate({
-      id: editingDeliveryNote.id,
-      updates: editDeliveryForm
-    });
+    
+    try {
+      // Update metadata first
+      await apiRequest('PUT', `/api/delivery-notes/${editingDeliveryNote.id}`, editDeliveryForm);
+      
+      // If pending and items have been edited, update items
+      if (editingDeliveryNote.status === 'pending' && editDeliveryItems.length > 0) {
+        const itemsToUpdate = editDeliveryItems
+          .filter(item => parseFloat(item.deliveredQuantity) > 0)
+          .map(item => ({
+            invoiceItemId: item.invoiceItemId,
+            deliveredQuantity: parseFloat(item.deliveredQuantity)
+          }));
+        
+        if (itemsToUpdate.length > 0) {
+          await apiRequest('PUT', `/api/delivery-notes/${editingDeliveryNote.id}/items`, { items: itemsToUpdate });
+        }
+      }
+      
+      // Both succeeded - invalidate and close
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      setEditDeliveryDialogOpen(false);
+      setEditingDeliveryNote(null);
+      toast({
+        title: "Success",
+        description: "Delivery note updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to update delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePrintDeliveryNote = async (deliveryNote: DeliveryNote) => {
@@ -1856,9 +1937,50 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     />
                   </div>
 
-                  <p className="text-xs text-gray-500">
-                    Note: Item quantities cannot be edited. To change quantities, delete this delivery note and create a new one.
-                  </p>
+                  {editingDeliveryNote?.status === 'pending' && editDeliveryItems.length > 0 ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Item yang Dikirim</label>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead className="text-right w-24">Max</TableHead>
+                            <TableHead className="text-right w-32">Qty</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {editDeliveryItems.map((item) => (
+                            <TableRow key={item.invoiceItemId}>
+                              <TableCell className="font-medium">{item.description}</TableCell>
+                              <TableCell className="text-right">{item.maxQuantity}</TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={item.maxQuantity}
+                                  step="0.01"
+                                  className="w-24 text-right"
+                                  value={item.deliveredQuantity}
+                                  onChange={(e) => {
+                                    const newItems = editDeliveryItems.map(i => 
+                                      i.invoiceItemId === item.invoiceItemId 
+                                        ? { ...i, deliveredQuantity: e.target.value }
+                                        : i
+                                    );
+                                    setEditDeliveryItems(newItems);
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Note: Item quantities cannot be edited on delivered notes. Use "Kembalikan ke Pending" first.
+                    </p>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setEditDeliveryDialogOpen(false)}>

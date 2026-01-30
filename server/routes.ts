@@ -1536,6 +1536,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/delivery-notes/:id/revert-to-pending", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      const updatedDeliveryNote = await storage.revertDeliveryNoteToPending(deliveryNoteId);
+      res.json(updatedDeliveryNote);
+    } catch (error: any) {
+      console.error("Error reverting delivery note to pending:", error);
+      res.status(400).json({ error: error.message || "Server error" });
+    }
+  });
+
+  app.put("/api/delivery-notes/:id/items", requireAuth, async (req, res) => {
+    try {
+      const deliveryNoteId = parseInt(req.params.id);
+      const { items } = req.body;
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required" });
+      }
+      
+      // Validate each item in the array
+      const validatedItems: { invoiceItemId: number; deliveredQuantity: number }[] = [];
+      for (const item of items) {
+        if (typeof item.invoiceItemId !== 'number' || isNaN(item.invoiceItemId)) {
+          return res.status(400).json({ error: "Each item must have a valid invoiceItemId" });
+        }
+        if (typeof item.deliveredQuantity !== 'number' || isNaN(item.deliveredQuantity) || item.deliveredQuantity < 0) {
+          return res.status(400).json({ error: "Each item must have a valid non-negative deliveredQuantity" });
+        }
+        validatedItems.push({
+          invoiceItemId: item.invoiceItemId,
+          deliveredQuantity: item.deliveredQuantity
+        });
+      }
+      
+      await storage.updateDeliveryNoteItems(deliveryNoteId, validatedItems);
+      const updatedNote = await storage.getDeliveryNoteWithItems(deliveryNoteId);
+      res.json(updatedNote);
+    } catch (error: any) {
+      console.error("Error updating delivery note items:", error);
+      res.status(400).json({ error: error.message || "Server error" });
+    }
+  });
+
   app.get("/api/invoices/:invoiceId/delivery-notes", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId);

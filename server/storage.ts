@@ -175,6 +175,8 @@ export interface IStorage {
   getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string>;
   allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
   reverseDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
+  revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote>;
+  updateDeliveryNoteItems(deliveryNoteId: number, items: { invoiceItemId: number; deliveredQuantity: number }[]): Promise<void>;
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
@@ -2658,6 +2660,115 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+    });
+  }
+
+  async revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote> {
+    return withTransaction(async (tx) => {
+      const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
+      if (!deliveryNote) {
+        throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
+      }
+
+      if (deliveryNote.status !== 'delivered') {
+        throw new Error(`Can only revert delivered delivery notes. Current status: ${deliveryNote.status}`);
+      }
+
+      // Reverse the stock allocation first
+      await this.reverseDeliveryNoteStock(deliveryNoteId);
+
+      // Update status to pending
+      const [updated] = await tx
+        .update(deliveryNotes)
+        .set({
+          status: 'pending',
+          updatedAt: new Date()
+        })
+        .where(eq(deliveryNotes.id, deliveryNoteId))
+        .returning();
+
+      return updated;
+    });
+  }
+
+  async updateDeliveryNoteItems(deliveryNoteId: number, items: { invoiceItemId: number; deliveredQuantity: number }[]): Promise<void> {
+    return withTransaction(async (tx) => {
+      const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
+      if (!deliveryNote) {
+        throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
+      }
+
+      if (deliveryNote.status !== 'pending') {
+        throw new Error(`Can only edit items on pending delivery notes. Current status: ${deliveryNote.status}`);
+      }
+
+      // Get invoice items to validate ownership and calculate max quantities
+      const invItems = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, deliveryNote.invoiceId));
+      const invItemIds = new Set(invItems.map(i => i.id));
+
+      // Get current delivery note items (to add back to remaining calc)
+      const currentDnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+      const currentQtyMap = new Map(currentDnItems.map(di => [di.invoiceItemId, parseFloat(di.deliveredQuantity.toString())]));
+
+      // Get all other delivery notes for this invoice (excluding this one) to calculate delivered quantities
+      const otherDnItems = await tx
+        .select({
+          invoiceItemId: deliveryNoteItems.invoiceItemId,
+          deliveredQuantity: deliveryNoteItems.deliveredQuantity
+        })
+        .from(deliveryNoteItems)
+        .innerJoin(deliveryNotes, eq(deliveryNotes.id, deliveryNoteItems.deliveryNoteId))
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            not(eq(deliveryNotes.id, deliveryNoteId)),
+            not(eq(deliveryNotes.status, 'cancelled'))
+          )
+        );
+
+      // Calculate delivered by other DNs
+      const deliveredByOthers = new Map<number, number>();
+      for (const item of otherDnItems) {
+        const current = deliveredByOthers.get(item.invoiceItemId) || 0;
+        deliveredByOthers.set(item.invoiceItemId, current + parseFloat(item.deliveredQuantity.toString()));
+      }
+
+      // Validate items
+      const validItems = items.filter(item => item.deliveredQuantity > 0);
+      if (validItems.length === 0) {
+        throw new Error('At least one item with quantity > 0 is required');
+      }
+
+      for (const item of validItems) {
+        // Validate item belongs to invoice
+        if (!invItemIds.has(item.invoiceItemId)) {
+          throw new Error(`Invoice item ${item.invoiceItemId} does not belong to this delivery note's invoice`);
+        }
+
+        // Validate quantity doesn't exceed available
+        const invItem = invItems.find(i => i.id === item.invoiceItemId);
+        if (!invItem) continue;
+        
+        const orderedQty = parseFloat(invItem.quantity.toString());
+        const deliveredOther = deliveredByOthers.get(item.invoiceItemId) || 0;
+        const maxAllowed = orderedQty - deliveredOther;
+        
+        if (item.deliveredQuantity > maxAllowed) {
+          throw new Error(`Quantity ${item.deliveredQuantity} exceeds maximum allowed ${maxAllowed} for item ${invItem.description}`);
+        }
+      }
+
+      // Delete existing items
+      await tx.delete(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+
+      // Insert new items
+      for (const item of validItems) {
+        await tx.insert(deliveryNoteItems).values({
+          deliveryNoteId,
+          invoiceItemId: item.invoiceItemId,
+          deliveredQuantity: item.deliveredQuantity.toString()
+        });
+      }
     });
   }
 

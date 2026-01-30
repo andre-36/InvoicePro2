@@ -82,8 +82,28 @@ export default function DeliveryNotesPage() {
     updateStatusMutation.mutate({ id, status: 'delivered' });
   };
 
-  const handleMarkAsPending = (id: number) => {
-    updateStatusMutation.mutate({ id, status: 'pending' });
+  const revertToPendingMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest('PUT', `/api/delivery-notes/${id}/revert-to-pending`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      toast({
+        title: "Status dikembalikan",
+        description: "Surat jalan dikembalikan ke pending, alokasi stok di-reverse.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Gagal mengembalikan status: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleRevertToPending = (id: number) => {
+    revertToPendingMutation.mutate(id);
   };
 
   const handleBatchMarkAsDelivered = () => {
@@ -310,7 +330,7 @@ export default function DeliveryNotesPage() {
                             </DropdownMenuItem>
                           )}
                           {note.status === 'delivered' && (
-                            <DropdownMenuItem onClick={() => handleMarkAsPending(note.id)}>
+                            <DropdownMenuItem onClick={() => handleRevertToPending(note.id)}>
                               <Clock className="h-4 w-4 mr-2" />
                               Kembalikan ke Pending
                             </DropdownMenuItem>
