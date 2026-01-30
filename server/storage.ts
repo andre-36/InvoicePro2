@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, gt, lt, sql, isNull, inArray, count } from "drizzle-orm";
+import { eq, and, or, desc, gte, gt, lt, sql, isNull, inArray, count, not } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
