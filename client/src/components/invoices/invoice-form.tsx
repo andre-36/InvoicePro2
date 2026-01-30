@@ -1083,8 +1083,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card className="border-0 shadow-none w-full">
-          <CardHeader className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 sticky top-0 bg-white/95 backdrop-blur-sm border-b z-10 dark:bg-gray-900/95">
+        <div className="w-full">
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-white dark:bg-gray-900">
             <Button
               type="button"
               variant="ghost"
@@ -1095,13 +1095,13 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-gray-900">
               {invoiceId ? "Edit Invoice" : "Create New Invoice"}
-            </CardTitle>
+            </h2>
             <div className="w-9"></div> {/* Spacer to center title */}
-          </CardHeader>
+          </div>
 
-          <CardContent className="p-4 md:p-6">
+          <div className="p-4 md:p-6">
             <Tabs defaultValue="invoice" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="invoice">Invoice Details</TabsTrigger>
@@ -1803,9 +1803,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 )}
               </TabsContent>
             </Tabs>
-          </CardContent>
+          </div>
 
-          <CardFooter className="flex justify-end space-x-3 p-4 md:p-6 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 p-4 md:p-6 border-t border-gray-200">
             <Button
               type="button"
               variant="outline"
@@ -1826,7 +1826,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               <Check className="mr-1.5 h-4 w-4" />
               <span>{invoiceId || savedInvoiceId ? 'Update' : 'Create'}</span>
             </Button>
-          </CardFooter>
+          </div>
 
           {/* Back confirmation dialog */}
           <AlertDialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
@@ -1850,7 +1850,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </Card>
+        </div>
       </form>
     </Form>
   );
