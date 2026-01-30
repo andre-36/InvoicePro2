@@ -409,15 +409,24 @@ export function InvoiceItemRow({
       </td>
 
       {/* Quantity */}
-      <td>
+      <td className="min-w-[100px]">
         <div className="flex items-center gap-1">
           <Input
             type="number"
             min="1"
             step="1"
-            value={quantity}
+            value={(() => {
+              const num = parseFloat(quantity) || 0;
+              return Number.isInteger(num) ? String(num) : quantity;
+            })()}
             onChange={(e) => setQuantity(e.target.value)}
-            className="excel-cell-input-right flex-1"
+            onBlur={(e) => {
+              const num = parseFloat(e.target.value) || 1;
+              if (Number.isInteger(num)) {
+                setQuantity(String(num));
+              }
+            }}
+            className="excel-cell-input-right flex-1 w-full text-center font-medium"
             disabled={disabled}
           />
           <div className="flex flex-col">
@@ -428,7 +437,7 @@ export function InvoiceItemRow({
               className="h-4 w-6 p-0 hover:bg-gray-100"
               disabled={disabled}
               onClick={() => {
-                const currentQty = parseFloat(quantity) || 0;
+                const currentQty = Math.floor(parseFloat(quantity) || 0);
                 setQuantity(String(currentQty + 1));
               }}
             >
@@ -441,7 +450,7 @@ export function InvoiceItemRow({
               className="h-4 w-6 p-0 hover:bg-gray-100"
               disabled={disabled}
               onClick={() => {
-                const currentQty = parseFloat(quantity) || 0;
+                const currentQty = Math.floor(parseFloat(quantity) || 0);
                 if (currentQty > 1) {
                   setQuantity(String(currentQty - 1));
                 }

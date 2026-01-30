@@ -913,14 +913,24 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                 </PopoverContent>
                               </Popover>
                             </TableCell>
-                            <TableCell className="p-1">
+                            <TableCell className="p-1 min-w-[100px]">
                               <div className="flex items-center gap-1">
                                 <Input 
                                   type="number" 
-                                  step="1" 
-                                  value={item.quantity} 
-                                  onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
-                                  className="h-8 text-right flex-1" 
+                                  step="1"
+                                  min="1"
+                                  value={(() => {
+                                    const num = parseFloat(item.quantity) || 0;
+                                    return Number.isInteger(num) ? String(num) : item.quantity;
+                                  })()} 
+                                  onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                  onBlur={(e) => {
+                                    const num = parseFloat(e.target.value) || 1;
+                                    if (Number.isInteger(num)) {
+                                      updateItem(index, 'quantity', String(num));
+                                    }
+                                  }}
+                                  className="h-8 text-center font-medium flex-1" 
                                 />
                                 <div className="flex flex-col">
                                   <Button
@@ -929,7 +939,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                     size="sm"
                                     className="h-4 w-6 p-0 hover:bg-gray-100"
                                     onClick={() => {
-                                      const currentQty = parseFloat(item.quantity) || 0;
+                                      const currentQty = Math.floor(parseFloat(item.quantity) || 0);
                                       updateItem(index, 'quantity', String(currentQty + 1));
                                     }}
                                   >
@@ -941,9 +951,9 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                     size="sm"
                                     className="h-4 w-6 p-0 hover:bg-gray-100"
                                     onClick={() => {
-                                      const currentQty = parseFloat(item.quantity) || 0;
-                                      if (currentQty > 0) {
-                                        updateItem(index, 'quantity', String(Math.max(0, currentQty - 1)));
+                                      const currentQty = Math.floor(parseFloat(item.quantity) || 0);
+                                      if (currentQty > 1) {
+                                        updateItem(index, 'quantity', String(currentQty - 1));
                                       }
                                     }}
                                   >

@@ -292,12 +292,21 @@ export function QuotationItemRow({
         <div className="flex items-center gap-1">
           <Input
             type="number"
-            min="0"
+            min="1"
             step="1"
             placeholder="1"
-            value={quantity}
+            value={(() => {
+              const num = parseFloat(quantity) || 0;
+              return Number.isInteger(num) ? String(num) : quantity;
+            })()}
             onChange={(e) => setQuantity(e.target.value)}
-            className="flex-1"
+            onBlur={(e) => {
+              const num = parseFloat(e.target.value) || 1;
+              if (Number.isInteger(num)) {
+                setQuantity(String(num));
+              }
+            }}
+            className="flex-1 text-center font-medium min-w-[80px]"
             data-testid={`input-quantity-${index}`}
           />
           <div className="flex flex-col">
@@ -307,7 +316,7 @@ export function QuotationItemRow({
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
               onClick={() => {
-                const currentQty = parseFloat(quantity) || 0;
+                const currentQty = Math.floor(parseFloat(quantity) || 0);
                 setQuantity(String(currentQty + 1));
               }}
             >
@@ -319,9 +328,9 @@ export function QuotationItemRow({
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
               onClick={() => {
-                const currentQty = parseFloat(quantity) || 0;
-                if (currentQty > 0) {
-                  setQuantity(String(Math.max(0, currentQty - 1)));
+                const currentQty = Math.floor(parseFloat(quantity) || 0);
+                if (currentQty > 1) {
+                  setQuantity(String(currentQty - 1));
                 }
               }}
             >

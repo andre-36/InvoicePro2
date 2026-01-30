@@ -169,16 +169,25 @@ function PurchaseOrderItemRow({
           </PopoverContent>
         </Popover>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2 min-w-[100px]">
         <div className="flex items-center gap-1">
           <Input
             type="number"
-            value={item.quantity}
+            value={(() => {
+              const num = parseFloat(item.quantity) || 0;
+              return Number.isInteger(num) ? String(num) : item.quantity;
+            })()}
             onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+            onBlur={(e) => {
+              const num = parseFloat(e.target.value) || 1;
+              if (Number.isInteger(num)) {
+                updateItem(index, 'quantity', String(num));
+              }
+            }}
             placeholder="1"
-            min="0"
-            step="any"
-            className="h-8 text-sm text-right w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            min="1"
+            step="1"
+            className="h-8 text-sm text-center font-medium w-20"
           />
           <div className="flex flex-col">
             <Button
@@ -187,7 +196,7 @@ function PurchaseOrderItemRow({
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
               onClick={() => {
-                const currentQty = parseFloat(item.quantity) || 0;
+                const currentQty = Math.floor(parseFloat(item.quantity) || 0);
                 updateItem(index, 'quantity', String(currentQty + 1));
               }}
             >
@@ -199,9 +208,9 @@ function PurchaseOrderItemRow({
               size="sm"
               className="h-4 w-6 p-0 hover:bg-gray-100"
               onClick={() => {
-                const currentQty = parseFloat(item.quantity) || 0;
-                if (currentQty > 0) {
-                  updateItem(index, 'quantity', String(Math.max(0, currentQty - 1)));
+                const currentQty = Math.floor(parseFloat(item.quantity) || 0);
+                if (currentQty > 1) {
+                  updateItem(index, 'quantity', String(currentQty - 1));
                 }
               }}
             >
