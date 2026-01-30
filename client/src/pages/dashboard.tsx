@@ -11,6 +11,9 @@ import { InvoiceStatusChart } from "@/components/dashboard/invoice-status-chart"
 import { CategorySalesChart } from "@/components/dashboard/category-sales-chart";
 import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { TopClientsList } from "@/components/dashboard/top-clients-list";
+import { InventoryStatsCard } from "@/components/dashboard/inventory-stats-card";
+import { LowStockProducts } from "@/components/dashboard/low-stock-products";
+import { TopSellingProducts } from "@/components/dashboard/top-selling-products";
 
 
 type DashboardStats = {
@@ -21,16 +24,16 @@ type DashboardStats = {
     value: number;
   };
   totalClients: number;
+  productsCount: number;
+  lowStockCount: number;
 };
 
 export default function Dashboard() {
-  // Initialize with last 30 days
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
   });
 
-  // Format dates for API queries
   const queryDates = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) {
       return {
@@ -60,7 +63,6 @@ export default function Dashboard() {
   
   return (
     <div className="space-y-6">
-      {/* Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <DateRangePicker
@@ -70,11 +72,9 @@ export default function Dashboard() {
         />
       </div>
       
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5">
         {isLoading ? (
-          // Loading state for stats cards
-          Array(4).fill(0).map((_, i) => (
+          Array(6).fill(0).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-5">
                 <div className="animate-pulse space-y-3">
@@ -86,8 +86,7 @@ export default function Dashboard() {
             </Card>
           ))
         ) : error || !data ? (
-          // Error state
-          <div className="col-span-4">
+          <div className="col-span-6">
             <Card>
               <CardContent className="p-5 text-center">
                 <p className="text-gray-500">Failed to load dashboard statistics</p>
@@ -95,7 +94,6 @@ export default function Dashboard() {
             </Card>
           </div>
         ) : (
-          // Stats cards with data
           <>
             <StatsCard
               title="Total Income"
@@ -118,22 +116,40 @@ export default function Dashboard() {
               secondaryText={`${formatCurrency(data.openInvoices.value)} total`}
               noCurrency={true}
             />
+
+            <StatsCard
+              title="Total Products"
+              value={data.productsCount}
+              noCurrency={true}
+            />
+
+            <StatsCard
+              title="Low Stock Items"
+              value={data.lowStockCount}
+              noCurrency={true}
+              status={data.lowStockCount > 0 ? { label: "Needs attention", color: "yellow" } : undefined}
+            />
           </>
         )}
       </div>
       
-      {/* Charts and Graphs Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <RevenueChart startDate={queryDates.start} endDate={queryDates.end} />
+        <div className="lg:col-span-2">
+          <RevenueChart startDate={queryDates.start} endDate={queryDates.end} />
+        </div>
         <InvoiceStatusChart />
       </div>
 
-      {/* Category Sales Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <InventoryStatsCard />
+        <LowStockProducts />
+        <TopSellingProducts />
+      </div>
+
       <div className="grid grid-cols-1 gap-5">
         <CategorySalesChart />
       </div>
       
-      {/* Recent Invoices & Clients */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <RecentInvoicesTable />
         <TopClientsList />
