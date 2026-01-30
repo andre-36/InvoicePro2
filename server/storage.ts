@@ -56,7 +56,7 @@ export interface IStorage {
 
   // Client methods
   getClient(id: number): Promise<Client | undefined>;
-  getClients(storeId: number): Promise<Client[]>;
+  getClients(storeId: number): Promise<(Client & { lastPurchase: string | null })[]>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: number): Promise<void>;
@@ -721,8 +721,29 @@ export class DatabaseStorage implements IStorage {
     return client;
   }
 
-  async getClients(storeId: number): Promise<Client[]> {
-    return db.select().from(clients).where(eq(clients.storeId, storeId)).orderBy(clients.name);
+  async getClients(storeId: number): Promise<(Client & { lastPurchase: string | null })[]> {
+    const clientsData = await db.select().from(clients).where(eq(clients.storeId, storeId)).orderBy(clients.name);
+    
+    const lastPurchases = await db
+      .select({
+        clientId: invoices.clientId,
+        lastPurchase: sql<string>`TO_CHAR(MAX(${invoices.invoiceDate}), 'YYYY-MM-DD')`.as('lastPurchase')
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.storeId, storeId),
+          not(eq(invoices.status, 'void'))
+        )
+      )
+      .groupBy(invoices.clientId);
+    
+    const lastPurchaseMap = new Map(lastPurchases.map(lp => [lp.clientId, lp.lastPurchase]));
+    
+    return clientsData.map(client => ({
+      ...client,
+      lastPurchase: lastPurchaseMap.get(client.id) || null
+    }));
   }
 
   async createClient(client: InsertClient): Promise<Client> {

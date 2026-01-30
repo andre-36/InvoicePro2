@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Download, Upload, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -54,12 +55,16 @@ type Client = {
   address: string;
   addressLink: string;
   taxNumber: string;
+  lastPurchase?: string | null;
 };
+
+type SortOrder = 'none' | 'asc' | 'desc';
 
 export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [lastPurchaseSort, setLastPurchaseSort] = useState<SortOrder>('none');
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,6 +72,14 @@ export default function ClientsPage() {
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
+
+  const toggleSort = () => {
+    setLastPurchaseSort(prev => {
+      if (prev === 'none') return 'asc';
+      if (prev === 'asc') return 'desc';
+      return 'none';
+    });
+  };
   
   // Delete client mutation
   const deleteMutation = useMutation({
@@ -203,14 +216,31 @@ export default function ClientsPage() {
     }
   };
   
-  // Filter clients based on search query
-  const filteredClients = clients
-    ? clients.filter(client =>
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.clientNumber.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
+  // Filter and sort clients
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    
+    let result = clients.filter(client =>
+      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.clientNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    if (lastPurchaseSort !== 'none') {
+      result = [...result].sort((a, b) => {
+        const dateA = a.lastPurchase ? new Date(a.lastPurchase).getTime() : 0;
+        const dateB = b.lastPurchase ? new Date(b.lastPurchase).getTime() : 0;
+        
+        if (lastPurchaseSort === 'asc') {
+          return dateA - dateB;
+        } else {
+          return dateB - dateA;
+        }
+      });
+    }
+    
+    return result;
+  }, [clients, searchQuery, lastPurchaseSort]);
   
   const handleViewDetails = (id: number) => {
     navigate(`/clients/${id}`);
@@ -290,6 +320,7 @@ export default function ClientsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
+                  <TableHead className="w-[130px]">Last Purchase</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -300,6 +331,7 @@ export default function ClientsPage() {
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                   </TableRow>
                 ))}
@@ -333,6 +365,19 @@ export default function ClientsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
+                  <TableHead className="w-[130px]">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 -ml-3 font-medium"
+                      onClick={toggleSort}
+                    >
+                      Last Purchase
+                      {lastPurchaseSort === 'none' && <ArrowUpDown className="ml-2 h-4 w-4" />}
+                      {lastPurchaseSort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
+                      {lastPurchaseSort === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+                    </Button>
+                  </TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -359,6 +404,15 @@ export default function ClientsPage() {
                       {client.address ? (
                         <span className="text-sm text-gray-600 line-clamp-1" title={client.address}>
                           {client.address}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.lastPurchase ? (
+                        <span className="text-sm text-gray-600">
+                          {format(new Date(client.lastPurchase), 'dd/MM/yyyy')}
                         </span>
                       ) : (
                         <span className="text-gray-400">—</span>
