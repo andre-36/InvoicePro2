@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, ChevronUp, ChevronDown, Edit, DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
+import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, Edit, DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertPurchaseOrderSchema } from "@shared/schema";
@@ -169,55 +169,25 @@ function PurchaseOrderItemRow({
           </PopoverContent>
         </Popover>
       </td>
-      <td className="px-3 py-2 min-w-[100px]">
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            value={(() => {
-              const num = parseFloat(item.quantity) || 0;
-              return Number.isInteger(num) ? String(num) : item.quantity;
-            })()}
-            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-            onBlur={(e) => {
-              const num = parseFloat(e.target.value) || 1;
-              if (Number.isInteger(num)) {
-                updateItem(index, 'quantity', String(num));
-              }
-            }}
-            placeholder="1"
-            min="1"
-            step="1"
-            className="h-8 text-sm text-center font-medium w-20"
-          />
-          <div className="flex flex-col">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(item.quantity) || 0);
-                updateItem(index, 'quantity', String(currentQty + 1));
-              }}
-            >
-              <ChevronUp className="h-3 w-3" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(item.quantity) || 0);
-                if (currentQty > 1) {
-                  updateItem(index, 'quantity', String(currentQty - 1));
-                }
-              }}
-            >
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
+      <td className="px-3 py-2 min-w-[80px]">
+        <Input
+          type="number"
+          value={(() => {
+            const num = parseFloat(item.quantity) || 0;
+            return Number.isInteger(num) ? String(num) : item.quantity;
+          })()}
+          onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value) || 1;
+            if (Number.isInteger(num)) {
+              updateItem(index, 'quantity', String(num));
+            }
+          }}
+          placeholder="1"
+          min="1"
+          step="1"
+          className="h-8 text-sm text-center font-medium w-20"
+        />
       </td>
       <td className="px-3 py-2">
         {hasMultipleUnits ? (

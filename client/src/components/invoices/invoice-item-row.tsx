@@ -5,7 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductUnit {
@@ -409,57 +409,25 @@ export function InvoiceItemRow({
       </td>
 
       {/* Quantity */}
-      <td className="min-w-[100px]">
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            value={(() => {
-              const num = parseFloat(quantity) || 0;
-              return Number.isInteger(num) ? String(num) : quantity;
-            })()}
-            onChange={(e) => setQuantity(e.target.value)}
-            onBlur={(e) => {
-              const num = parseFloat(e.target.value) || 1;
-              if (Number.isInteger(num)) {
-                setQuantity(String(num));
-              }
-            }}
-            className="excel-cell-input-right flex-1 w-full text-center font-medium"
-            disabled={disabled}
-          />
-          <div className="flex flex-col">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              disabled={disabled}
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(quantity) || 0);
-                setQuantity(String(currentQty + 1));
-              }}
-            >
-              <ChevronUp className="h-3 w-3" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              disabled={disabled}
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(quantity) || 0);
-                if (currentQty > 1) {
-                  setQuantity(String(currentQty - 1));
-                }
-              }}
-            >
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
+      <td className="min-w-[80px]">
+        <Input
+          type="number"
+          min="1"
+          step="1"
+          value={(() => {
+            const num = parseFloat(quantity) || 0;
+            return Number.isInteger(num) ? String(num) : quantity;
+          })()}
+          onChange={(e) => setQuantity(e.target.value)}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value) || 1;
+            if (Number.isInteger(num)) {
+              setQuantity(String(num));
+            }
+          }}
+          className="excel-cell-input-right w-full text-center font-medium"
+          disabled={disabled}
+        />
       </td>
 
       {/* Price */}

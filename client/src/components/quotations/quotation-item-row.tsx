@@ -4,7 +4,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -289,55 +289,25 @@ export function QuotationItemRow({
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Qty
         </label>
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            placeholder="1"
-            value={(() => {
-              const num = parseFloat(quantity) || 0;
-              return Number.isInteger(num) ? String(num) : quantity;
-            })()}
-            onChange={(e) => setQuantity(e.target.value)}
-            onBlur={(e) => {
-              const num = parseFloat(e.target.value) || 1;
-              if (Number.isInteger(num)) {
-                setQuantity(String(num));
-              }
-            }}
-            className="flex-1 text-center font-medium min-w-[80px]"
-            data-testid={`input-quantity-${index}`}
-          />
-          <div className="flex flex-col">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(quantity) || 0);
-                setQuantity(String(currentQty + 1));
-              }}
-            >
-              <ChevronUp className="h-3 w-3" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-4 w-6 p-0 hover:bg-gray-100"
-              onClick={() => {
-                const currentQty = Math.floor(parseFloat(quantity) || 0);
-                if (currentQty > 1) {
-                  setQuantity(String(currentQty - 1));
-                }
-              }}
-            >
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
+        <Input
+          type="number"
+          min="1"
+          step="1"
+          placeholder="1"
+          value={(() => {
+            const num = parseFloat(quantity) || 0;
+            return Number.isInteger(num) ? String(num) : quantity;
+          })()}
+          onChange={(e) => setQuantity(e.target.value)}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value) || 1;
+            if (Number.isInteger(num)) {
+              setQuantity(String(num));
+            }
+          }}
+          className="text-center font-medium"
+          data-testid={`input-quantity-${index}`}
+        />
       </div>
 
       {/* Unit Price */}
