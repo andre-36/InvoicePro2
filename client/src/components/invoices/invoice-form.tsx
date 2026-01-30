@@ -1082,9 +1082,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="w-full">
-          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-white dark:bg-gray-900">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="-m-4 md:-m-6">
+        <div className="w-full bg-white dark:bg-gray-900">
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
             <Button
               type="button"
               variant="ghost"
