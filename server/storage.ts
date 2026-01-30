@@ -137,6 +137,7 @@ export interface IStorage {
   getReturnableInvoices(storeId: number): Promise<(Invoice & { clientName: string | null; lastPaymentDate: Date | null })[]>;
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
+  updateInvoiceWithItems(id: number, invoiceData: Partial<InsertInvoice>, items: Array<InsertInvoiceItem & { id?: number; productId: number; quantity: number | string }>): Promise<Invoice>;
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   voidInvoice(id: number): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
@@ -1614,6 +1615,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invoices.id, id))
       .returning();
     return updatedInvoice;
+  }
+
+  async updateInvoiceWithItems(id: number, invoiceData: Partial<InsertInvoice>, items: Array<InsertInvoiceItem & { id?: number; productId: number; quantity: number | string }>): Promise<Invoice> {
+    return withTransaction(async (tx) => {
+      // Check if invoice has any delivery notes with non-cancelled status
+      const existingDeliveryNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, id),
+            not(eq(deliveryNotes.status, 'cancelled'))
+          )
+        );
+
+      if (existingDeliveryNotes.length > 0) {
+        throw new Error('Cannot modify invoice items - delivery notes exist. Cancel or delete delivery notes first.');
+      }
+
+      // Update invoice metadata
+      if (Object.keys(invoiceData).length > 0) {
+        await tx
+          .update(invoices)
+          .set({ ...invoiceData, updatedAt: new Date() })
+          .where(eq(invoices.id, id));
+      }
+
+      // Delete existing invoice items
+      await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+
+      // Insert new items
+      for (const item of items) {
+        const quantityNeeded = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+
+        await tx
+          .insert(invoiceItems)
+          .values({
+            ...item,
+            id: undefined, // Ensure new ID is assigned
+            invoiceId: id,
+            quantity: quantityNeeded.toString()
+          });
+      }
+
+      // Recalculate invoice totals
+      let invoiceSubtotal = 0;
+      let invoiceTaxAmount = 0;
+
+      for (const item of items) {
+        invoiceSubtotal += parseFloat(item.subtotal.toString());
+        invoiceTaxAmount += parseFloat(item.taxAmount?.toString() || "0");
+      }
+
+      const discount = parseFloat(invoiceData.discount?.toString() || "0");
+      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount;
+
+      // Update invoice with recalculated totals
+      const [updatedInvoice] = await tx
+        .update(invoices)
+        .set({ 
+          subtotal: invoiceSubtotal.toString(),
+          taxAmount: invoiceTaxAmount.toString(),
+          totalAmount: invoiceTotalAmount.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, id))
+        .returning();
+
+      return updatedInvoice;
+    });
   }
 
   async updateInvoiceStatus(id: number, status: string): Promise<Invoice> {

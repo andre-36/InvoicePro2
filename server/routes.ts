@@ -1240,19 +1240,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
-      const validatedData = validateRequestBody(insertInvoiceSchema.partial(), req, res);
-      if (!validatedData) return;
+      const { items, ...invoiceFields } = req.body;
       
       // Prevent modification of invoice number to prevent fraud
-      if ((validatedData as any).invoiceNumber !== undefined) {
+      if (invoiceFields.invoiceNumber !== undefined) {
         return res.status(400).json({ error: "Invoice number cannot be modified" });
       }
       
-      const updatedInvoice = await storage.updateInvoice(invoiceId, validatedData);
+      let updatedInvoice;
+      
+      // If items are provided, use updateInvoiceWithItems
+      if (items && Array.isArray(items) && items.length > 0) {
+        updatedInvoice = await storage.updateInvoiceWithItems(invoiceId, invoiceFields, items);
+      } else {
+        // Otherwise just update invoice metadata
+        const validatedData = validateRequestBody(insertInvoiceSchema.partial(), { body: invoiceFields } as any, res);
+        if (!validatedData) return;
+        updatedInvoice = await storage.updateInvoice(invoiceId, validatedData);
+      }
+      
       res.json(updatedInvoice);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating invoice:", error);
-      res.status(500).json({ error: "Server error" });
+      res.status(400).json({ error: error.message || "Server error" });
     }
   });
 
