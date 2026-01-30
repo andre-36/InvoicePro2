@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, ArrowDown, ArrowUp, MoreHorizontal, FileDown, Eye, FilePenLine, Ban } from "lucide-react";
+import { Plus, Search, ArrowDown, ArrowUp, MoreHorizontal, FileDown, Eye, FilePenLine, Ban, Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,6 +34,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -69,6 +79,11 @@ export default function InvoicesPage() {
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatusFilter>("all");
   const [showVoided, setShowVoided] = useState(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [exportPaymentStatus, setExportPaymentStatus] = useState<string>("all");
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -142,6 +157,52 @@ export default function InvoicesPage() {
     }
   };
 
+  // Handle export to Excel
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      
+      const params = new URLSearchParams();
+      params.append('storeId', '1');
+      if (exportStartDate) params.append('startDate', exportStartDate);
+      if (exportEndDate) params.append('endDate', exportEndDate);
+      if (exportPaymentStatus) params.append('paymentStatus', exportPaymentStatus);
+      
+      const response = await fetch(`/api/invoices/export/xlsx?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export invoices');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoices-${exportStartDate || 'all'}-to-${exportEndDate || 'all'}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Export Berhasil",
+        description: "File Excel telah didownload",
+      });
+      
+      setExportDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal export invoice",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Toggle sort direction
   const toggleSort = () => {
     setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
@@ -208,12 +269,93 @@ export default function InvoicesPage() {
           <p className="text-sm text-gray-500 mt-1">Manage your invoices and track payments</p>
         </div>
         
-        <Link href="/invoices/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Invoice
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export Excel
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Export Invoice ke Excel</DialogTitle>
+                <DialogDescription>
+                  Pilih filter untuk data invoice yang akan di-export
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="startDate" className="text-right">
+                    Dari Tanggal
+                  </Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    className="col-span-3"
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="endDate" className="text-right">
+                    Sampai Tanggal
+                  </Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    className="col-span-3"
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="paymentStatus" className="text-right">
+                    Status Bayar
+                  </Label>
+                  <Select
+                    value={exportPaymentStatus}
+                    onValueChange={setExportPaymentStatus}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Pilih status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="unpaid">Belum Bayar</SelectItem>
+                      <SelectItem value="partial_paid">Sebagian</SelectItem>
+                      <SelectItem value="paid">Lunas</SelectItem>
+                      <SelectItem value="overdue">Jatuh Tempo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setExportDialogOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleExportExcel}
+                  disabled={isExporting}
+                >
+                  {isExporting ? "Exporting..." : "Download Excel"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Link href="/invoices/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Invoice
+            </Button>
+          </Link>
+        </div>
       </div>
       
       <Card>

@@ -3220,6 +3220,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Invoice Export (with items) - Excel format
+  app.get("/api/invoices/export/xlsx", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const paymentStatus = req.query.paymentStatus as string; // 'all', 'unpaid', 'partial_paid', 'paid', 'overdue'
+
+      // Get invoices with filters
+      const allInvoices = await storage.getInvoices(storeId);
+      
+      // Filter by date range (normalize to YYYY-MM-DD format)
+      let filteredInvoices = allInvoices;
+      if (startDate) {
+        const normalizedStart = startDate.substring(0, 10);
+        filteredInvoices = filteredInvoices.filter(inv => {
+          const invDate = String(inv.issueDate).substring(0, 10);
+          return invDate >= normalizedStart;
+        });
+      }
+      if (endDate) {
+        const normalizedEnd = endDate.substring(0, 10);
+        filteredInvoices = filteredInvoices.filter(inv => {
+          const invDate = String(inv.issueDate).substring(0, 10);
+          return invDate <= normalizedEnd;
+        });
+      }
+
+      // Exclude cancelled/void invoices
+      filteredInvoices = filteredInvoices.filter(inv => inv.status !== 'cancelled' && inv.status !== 'void' && !inv.isVoided);
+
+      // Calculate payment status for each invoice and filter
+      const invoicesWithStatus = await Promise.all(
+        filteredInvoices.map(async (inv) => {
+          const status = await storage.calculatePaymentStatus(inv.id, inv.totalAmount, inv.dueDate);
+          return { ...inv, paymentStatus: status };
+        })
+      );
+
+      // Filter by payment status
+      let finalInvoices = invoicesWithStatus;
+      if (paymentStatus && paymentStatus !== 'all') {
+        finalInvoices = invoicesWithStatus.filter(inv => inv.paymentStatus === paymentStatus);
+      }
+
+      // Get clients for lookup
+      const clients = await storage.getClients(storeId);
+      const clientMap = new Map(clients.map(c => [c.id, c]));
+
+      // Get products for lookup
+      const products = await storage.getProducts(storeId);
+      const productMap = new Map(products.map(p => [p.id, p]));
+
+      // Build export data - one row per invoice item
+      const exportData: any[] = [];
+
+      for (const invoice of finalInvoices) {
+        const items = await storage.getInvoiceItems(invoice.id);
+        const client = invoice.clientId ? clientMap.get(invoice.clientId) : null;
+
+        for (const item of items) {
+          const product = productMap.get(item.productId);
+          exportData.push({
+            'No Invoice': invoice.invoiceNumber,
+            'Tanggal': invoice.issueDate,
+            'Jatuh Tempo': invoice.dueDate,
+            'Client': client?.name || '-',
+            'Status Pembayaran': invoice.paymentStatus === 'paid' ? 'Lunas' :
+                                invoice.paymentStatus === 'partial_paid' ? 'Sebagian' :
+                                invoice.paymentStatus === 'overdue' ? 'Jatuh Tempo' : 'Belum Bayar',
+            'Kode Produk': product?.sku || '-',
+            'Nama Produk': item.description,
+            'Qty': parseFloat(item.quantity),
+            'Harga Satuan': parseFloat(item.unitPrice),
+            'Diskon Item': parseFloat(item.discount || '0'),
+            'Subtotal Item': parseFloat(item.subtotal),
+            'Total Invoice': parseFloat(invoice.totalAmount),
+            'Pajak Invoice': parseFloat(invoice.taxAmount || '0'),
+            'Diskon Invoice': parseFloat(invoice.discount || '0'),
+          });
+        }
+      }
+
+      // Create Excel workbook
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
+
+      // Auto-width columns
+      const colWidths = [
+        { wch: 15 }, // No Invoice
+        { wch: 12 }, // Tanggal
+        { wch: 12 }, // Jatuh Tempo
+        { wch: 25 }, // Client
+        { wch: 15 }, // Status Pembayaran
+        { wch: 15 }, // Kode Produk
+        { wch: 30 }, // Nama Produk
+        { wch: 10 }, // Qty
+        { wch: 15 }, // Harga Satuan
+        { wch: 12 }, // Diskon Item
+        { wch: 15 }, // Subtotal Item
+        { wch: 15 }, // Total Invoice
+        { wch: 12 }, // Pajak Invoice
+        { wch: 12 }, // Diskon Invoice
+      ];
+      worksheet['!cols'] = colWidths;
+
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = `invoices-${startDate || 'all'}-to-${endDate || 'all'}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting invoices:", error);
+      res.status(500).json({ error: "Failed to export invoices" });
+    }
+  });
+
   // Stock management routes
   app.get("/api/products/:id/stock", requireAuth, async (req, res) => {
     try {
