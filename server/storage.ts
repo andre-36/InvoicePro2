@@ -727,7 +727,7 @@ export class DatabaseStorage implements IStorage {
     const lastPurchases = await db
       .select({
         clientId: invoices.clientId,
-        lastPurchase: sql<string>`TO_CHAR(MAX(${invoices.invoiceDate}), 'YYYY-MM-DD')`.as('lastPurchase')
+        lastPurchase: sql<string>`TO_CHAR(MAX(${invoices.issueDate}), 'YYYY-MM-DD')`.as('lastPurchase')
       })
       .from(invoices)
       .where(
