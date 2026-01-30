@@ -496,6 +496,18 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     }
   });
 
+  const invalidateTransactions = () => {
+    const storeId = form.getValues('storeId');
+    if (storeId) {
+      const transactionKey = `/api/stores/${storeId}/transactions`;
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          typeof query.queryKey[0] === 'string' && 
+          query.queryKey[0] === transactionKey
+      });
+    }
+  };
+
   const createPaymentMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest('POST', `/api/goods-receipts/${goodsReceiptId}/payments`, data);
@@ -503,6 +515,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     onSuccess: () => {
       refetchPayments();
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      invalidateTransactions();
       setPaymentDialogOpen(false);
       resetPaymentForm();
       toast({ title: "Success", description: "Payment added successfully." });
@@ -519,6 +532,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     onSuccess: () => {
       refetchPayments();
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      invalidateTransactions();
       setPaymentDialogOpen(false);
       setEditingPayment(null);
       resetPaymentForm();
@@ -536,6 +550,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     onSuccess: () => {
       refetchPayments();
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts', goodsReceiptId] });
+      invalidateTransactions();
       toast({ title: "Success", description: "Payment deleted successfully." });
     },
     onError: (error) => {
@@ -1194,7 +1209,12 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
             </div>
             <div>
               <label className="text-sm font-medium">Amount *</label>
-              <Input type="number" step="0.01" placeholder="0.00" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="mt-1" />
+              <div className="flex gap-2 mt-1">
+                <Input type="number" step="0.01" placeholder="0.00" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} className="flex-1" />
+                <Button type="button" variant="outline" size="sm" onClick={() => setPaymentForm({ ...paymentForm, amount: remainingBalance.toFixed(2) })} disabled={remainingBalance <= 0}>
+                  Full
+                </Button>
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Reference</label>
