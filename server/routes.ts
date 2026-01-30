@@ -2980,6 +2980,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/stores/:storeId/dashboard/profit-overview", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const startDate = req.query.start ? new Date(req.query.start as string) : undefined;
+      const endDate = req.query.end ? new Date(req.query.end as string) : undefined;
+      const data = await storage.getProfitOverview(storeId, startDate, endDate);
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting profit overview:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Financial Reports endpoints
   app.get("/api/stores/:storeId/reports/financial", requireAuth, async (req, res) => {
     try {

@@ -346,6 +346,7 @@ export interface IStorage {
   getInventoryValueStats(storeId: number): Promise<InventoryValueStats>;
   getBatchProfitabilityAnalysis(storeId: number, productId?: number): Promise<BatchProfitabilityData[]>;
   getDeliveryProfitSummary(storeId: number, startDate?: Date, endDate?: Date): Promise<DeliveryProfitSummary>;
+  getProfitOverview(storeId: number, startDate?: Date, endDate?: Date): Promise<ProfitOverview>;
   getFinancialReport(storeId: number, dateRange: string): Promise<any>;
   getCashFlowReport(storeId: number, dateRange: string): Promise<any>;
 }
@@ -362,6 +363,19 @@ export type DeliveryProfitSummary = {
     cost: number;
     profit: number;
   }[];
+};
+
+export type ProfitOverview = {
+  realizedProfit: number;
+  realizedRevenue: number;
+  realizedCost: number;
+  projectedProfit: number;
+  projectedRevenue: number;
+  projectedCost: number;
+  totalExpectedProfit: number;
+  averageMargin: number;
+  deliveredCount: number;
+  pendingCount: number;
 };
 
 // Types for dashboard metrics
@@ -5110,6 +5124,148 @@ export class DatabaseStorage implements IStorage {
         cost: parseFloat(row.cost?.toString() || '0'),
         profit: parseFloat(row.profit?.toString() || '0')
       }))
+    };
+  }
+
+  async getProfitOverview(storeId: number, startDate?: Date, endDate?: Date): Promise<ProfitOverview> {
+    const end = endDate || new Date();
+    const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Get realized profit from delivered delivery notes
+    const realizedResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as delivered_count,
+        COALESCE(SUM(
+          (SELECT SUM(ii.unit_price::numeric * dni.delivered_quantity::numeric)
+           FROM delivery_note_items dni
+           JOIN invoice_items ii ON dni.invoice_item_id = ii.id
+           WHERE dni.delivery_note_id = dn.id)
+        ), 0) as realized_revenue,
+        COALESCE(SUM(total_cost::numeric), 0) as realized_cost,
+        COALESCE(SUM(profit::numeric), 0) as realized_profit
+      FROM ${deliveryNotes} dn
+      WHERE dn.store_id = ${storeId}
+        AND dn.status = 'delivered'
+        AND dn.delivery_date >= ${start.toISOString().split('T')[0]}
+        AND dn.delivery_date <= ${end.toISOString().split('T')[0]}
+    `);
+
+    const realized = realizedResult[0] || {};
+    const realizedRevenue = parseFloat(realized.realized_revenue?.toString() || '0');
+    const realizedCost = parseFloat(realized.realized_cost?.toString() || '0');
+    const realizedProfit = parseFloat(realized.realized_profit?.toString() || '0');
+    const deliveredCount = parseInt(realized.delivered_count?.toString() || '0');
+
+    // Get projected profit from invoices with pending delivery notes
+    // Use FIFO-based cost simulation for accurate projection
+    
+    // Step 1: Get pending items (invoice items not fully delivered) using CTE
+    const pendingItemsResult = await db.execute(sql`
+      WITH all_items AS (
+        SELECT 
+          ii.id as invoice_item_id,
+          ii.unit_price,
+          ii.product_id,
+          ii.base_quantity::numeric - COALESCE(
+            (SELECT SUM(dni.delivered_quantity::numeric) 
+             FROM delivery_note_items dni
+             JOIN delivery_notes dn ON dni.delivery_note_id = dn.id
+             WHERE dni.invoice_item_id = ii.id AND dn.status = 'delivered'),
+            0
+          ) as pending_qty
+        FROM invoice_items ii
+        JOIN invoices inv ON ii.invoice_id = inv.id
+        WHERE inv.store_id = ${storeId}
+          AND inv.status NOT IN ('cancelled', 'void')
+          AND inv.invoice_date >= ${start.toISOString().split('T')[0]}
+          AND inv.invoice_date <= ${end.toISOString().split('T')[0]}
+      )
+      SELECT * FROM all_items WHERE pending_qty > 0
+      ORDER BY invoice_item_id
+    `);
+
+    // Step 2: Get available batches for FIFO simulation (ordered by purchase date, filtered by store)
+    const batchesResult = await db.execute(sql`
+      SELECT 
+        pb.id,
+        pb.product_id,
+        pb.remaining_quantity::numeric as remaining_qty,
+        pb.capital_cost::numeric as unit_cost,
+        pb.purchase_date
+      FROM product_batches pb
+      JOIN products p ON pb.product_id = p.id
+      WHERE pb.remaining_quantity > 0
+        AND p.store_id = ${storeId}
+      ORDER BY pb.product_id, pb.purchase_date ASC
+    `);
+
+    // Step 3: Simulate FIFO allocation for projected cost
+    type PendingItem = { invoice_item_id: number; unit_price: string; product_id: number; pending_qty: string };
+    type BatchInfo = { id: number; product_id: number; remaining_qty: string; unit_cost: string; purchase_date: string };
+    
+    const pendingItems = pendingItemsResult as PendingItem[];
+    const batches = batchesResult as BatchInfo[];
+    
+    // Group batches by product for FIFO simulation
+    const batchesByProduct = new Map<number, { remainingQty: number; unitCost: number }[]>();
+    for (const batch of batches) {
+      const productId = batch.product_id;
+      if (!batchesByProduct.has(productId)) {
+        batchesByProduct.set(productId, []);
+      }
+      batchesByProduct.get(productId)!.push({
+        remainingQty: parseFloat(batch.remaining_qty),
+        unitCost: parseFloat(batch.unit_cost)
+      });
+    }
+
+    let projectedRevenue = 0;
+    let projectedCost = 0;
+    let pendingCount = 0;
+
+    for (const item of pendingItems) {
+      const pendingQty = parseFloat(item.pending_qty);
+      const unitPrice = parseFloat(item.unit_price);
+      const productId = item.product_id;
+      
+      projectedRevenue += pendingQty * unitPrice;
+      pendingCount++;
+
+      // FIFO cost allocation simulation
+      let remainingToAllocate = pendingQty;
+      const productBatches = batchesByProduct.get(productId) || [];
+      
+      for (const batch of productBatches) {
+        if (remainingToAllocate <= 0) break;
+        if (batch.remainingQty <= 0) continue;
+
+        const allocateQty = Math.min(remainingToAllocate, batch.remainingQty);
+        projectedCost += allocateQty * batch.unitCost;
+        batch.remainingQty -= allocateQty;
+        remainingToAllocate -= allocateQty;
+      }
+      
+      // If not enough batch stock, remaining items have zero cost (or could use last known cost)
+      // For now, we assume zero cost for out-of-stock projections
+    }
+
+    const projectedProfit = projectedRevenue - projectedCost;
+
+    const totalExpectedProfit = realizedProfit + projectedProfit;
+    const totalRevenue = realizedRevenue + projectedRevenue;
+    const averageMargin = totalRevenue > 0 ? (totalExpectedProfit / totalRevenue) * 100 : 0;
+
+    return {
+      realizedProfit,
+      realizedRevenue,
+      realizedCost,
+      projectedProfit,
+      projectedRevenue,
+      projectedCost,
+      totalExpectedProfit,
+      averageMargin,
+      deliveredCount,
+      pendingCount
     };
   }
 

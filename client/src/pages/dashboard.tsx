@@ -14,6 +14,7 @@ import { LowStockProducts } from "@/components/dashboard/low-stock-products";
 import { TopSellingProducts } from "@/components/dashboard/top-selling-products";
 import { UnpaidSupplierBills } from "@/components/dashboard/unpaid-supplier-bills";
 import { DeliveredUnpaidInvoices } from "@/components/dashboard/delivered-unpaid-invoices";
+import { ProfitOverview } from "@/components/dashboard/profit-overview";
 
 
 type DashboardStats = {
@@ -115,6 +116,10 @@ export default function Dashboard() {
       
       <div className="grid grid-cols-1 gap-5">
         <RevenueChart startDate={queryDates.start} endDate={queryDates.end} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5">
+        <ProfitOverview startDate={queryDates.start} endDate={queryDates.end} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
