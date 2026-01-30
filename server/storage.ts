@@ -236,6 +236,8 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction>;
   deleteTransaction(id: number): Promise<void>;
+  deleteTransactionByInvoicePaymentId(invoicePaymentId: number): Promise<void>;
+  deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void>;
 
   // Settings methods
   getSetting(storeId: number, key: string): Promise<Setting | undefined>;
@@ -3989,6 +3991,14 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransaction(id: number): Promise<void> {
     await db.delete(transactions).where(eq(transactions.id, id));
+  }
+
+  async deleteTransactionByInvoicePaymentId(invoicePaymentId: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.invoicePaymentId, invoicePaymentId));
+  }
+
+  async deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.goodsReceiptPaymentId, goodsReceiptPaymentId));
   }
 
   // Settings methods

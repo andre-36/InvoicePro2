@@ -1389,26 +1389,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             netAmount = paymentAmount - deductionAmount;
           }
           
-          // Create a transaction entry for this payment as income
-          const transactionData: any = {
-            storeId: invoice.storeId,
-            type: 'income' as const,
-            category: 'invoice_payment',
-            amount: netAmount.toFixed(2),
-            date: validatedData.paymentDate,
-            description: deductionAmount > 0 
-              ? `Payment for invoice ${invoice.invoiceNumber} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
-              : `Payment received for invoice ${invoice.invoiceNumber}`,
-            referenceNumber: `Invoice #${invoice.invoiceNumber}`,
-          };
+          // Check if store has auto transaction setting for invoice payments
+          const store = await storage.getStore(invoice.storeId);
+          const inflowCategoryId = store?.invoicePaymentCategoryId;
           
-          // Link to cash account if payment type has one
-          if (paymentType?.cashAccountId) {
-            transactionData.accountId = paymentType.cashAccountId;
+          // Only create transaction if category is configured
+          if (inflowCategoryId) {
+            // Get category name
+            const inflowCategory = await storage.getInflowCategory(inflowCategoryId);
+            const categoryName = inflowCategory?.name || 'invoice_payment';
+            
+            // Create a transaction entry for this payment as income
+            const transactionData: any = {
+              storeId: invoice.storeId,
+              type: 'income' as const,
+              category: categoryName,
+              amount: netAmount.toFixed(2),
+              date: validatedData.paymentDate,
+              description: deductionAmount > 0 
+                ? `Payment for invoice ${invoice.invoiceNumber} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
+                : `Payment received for invoice ${invoice.invoiceNumber}`,
+              referenceNumber: `Invoice #${invoice.invoiceNumber}`,
+              invoicePaymentId: newPayment.id,
+            };
+            
+            // Link to cash account if payment type has one
+            if (paymentType?.cashAccountId) {
+              transactionData.accountId = paymentType.cashAccountId;
+            }
+            
+            console.log("Creating invoice payment transaction:", transactionData);
+            await storage.createTransaction(transactionData);
           }
-          
-          console.log("Creating transaction with data:", transactionData);
-          await storage.createTransaction(transactionData);
         }
       }
       
@@ -1447,35 +1459,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteInvoicePayment(paymentId);
       
       // Delete the corresponding transaction if it exists
-      if (payment) {
-        const invoice = await storage.getInvoice(invoiceId);
-        if (invoice) {
-          // Find and delete the transaction created for this payment
-          const transactions = await storage.getTransactionsByType(invoice.storeId, 'income');
-          // Find all transactions for this invoice with category 'invoice_payment'
-          // Match by description containing the invoice number (most reliable since referenceNumber might be null)
-          const invoiceTransactions = transactions.filter(t => 
-            t.category === 'invoice_payment' &&
-            t.description.includes(invoice.invoiceNumber)
-          );
-          console.log(`Found ${invoiceTransactions.length} transactions for invoice ${invoice.invoiceNumber}`);
-          // Find the one matching this payment amount (with small tolerance for decimals)
-          const matchingTransaction = invoiceTransactions.find(t =>
-            Math.abs(parseFloat(t.amount) - parseFloat(payment.amount)) < 0.01
-          );
-          if (matchingTransaction) {
-            await storage.deleteTransaction(matchingTransaction.id);
-            console.log(`Transaction ${matchingTransaction.id} deleted for payment ${paymentId}`);
-          } else {
-            console.log(`No matching transaction found for payment ${paymentId}. Found ${invoiceTransactions.length} invoice transactions. Payment amount: ${payment.amount}`);
-            // If no exact match, delete the oldest matching transaction for this invoice (fallback)
-            if (invoiceTransactions.length > 0) {
-              await storage.deleteTransaction(invoiceTransactions[invoiceTransactions.length - 1].id);
-              console.log(`Deleted oldest matching transaction as fallback`);
-            }
-          }
-        }
-      }
+      // Use the invoicePaymentId field to directly find the transaction
+      await storage.deleteTransactionByInvoicePaymentId(paymentId);
+      console.log(`Deleted transaction linked to invoice payment ${paymentId}`);
       
       // Get the invoice and recalculate if status needs updating
       const invoice = await storage.getInvoice(invoiceId);
@@ -2488,6 +2474,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         goodsReceiptId
       });
       
+      // Get goods receipt to find store and receipt number
+      const goodsReceipt = await storage.getGoodsReceipt(goodsReceiptId);
+      if (goodsReceipt) {
+        // Check if store has auto transaction setting for goods receipt payments
+        const store = await storage.getStore(goodsReceipt.storeId);
+        const outflowCategoryId = store?.goodsReceiptPaymentCategoryId;
+        
+        if (outflowCategoryId) {
+          // Get category name
+          const outflowCategory = await storage.getOutflowCategory(outflowCategoryId);
+          const categoryName = outflowCategory?.name || 'supplier_payment';
+          
+          // Create a transaction entry for this payment as expense
+          const transactionData: any = {
+            storeId: goodsReceipt.storeId,
+            type: 'expense' as const,
+            category: categoryName,
+            amount: String(validatedData.amount),
+            date: validatedData.paymentDate,
+            description: `Payment for goods receipt ${goodsReceipt.receiptNumber}`,
+            referenceNumber: `GR #${goodsReceipt.receiptNumber}`,
+            goodsReceiptId: goodsReceiptId,
+            goodsReceiptPaymentId: newPayment.id,
+          };
+          
+          console.log("Creating goods receipt payment transaction:", transactionData);
+          await storage.createTransaction(transactionData);
+        }
+      }
+      
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating goods receipt payment:", error);
@@ -2520,6 +2536,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/goods-receipts/:goodsReceiptId/payments/:paymentId", requireAuth, async (req, res) => {
     try {
       const paymentId = parseInt(req.params.paymentId);
+      
+      // Delete the corresponding transaction first
+      await storage.deleteTransactionByGoodsReceiptPaymentId(paymentId);
+      console.log(`Deleted transaction linked to goods receipt payment ${paymentId}`);
+      
       await storage.deleteGoodsReceiptPayment(paymentId);
       res.json({ success: true });
     } catch (error) {

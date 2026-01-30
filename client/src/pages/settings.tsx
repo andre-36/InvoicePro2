@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -180,6 +180,130 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 type SecurityFormValues = z.infer<typeof securitySchema>;
 type PaymentTypeFormData = z.infer<typeof paymentTypeSchema>;
 type PaymentTermFormData = z.infer<typeof paymentTermSchema>;
+
+type Store = {
+  id: number;
+  name: string;
+  invoicePaymentCategoryId: number | null;
+  goodsReceiptPaymentCategoryId: number | null;
+};
+
+function AutoTransactionSettings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: store } = useQuery<Store>({
+    queryKey: ['/api/stores/1'],
+  });
+
+  const { data: inflowCategories } = useQuery<InflowCategory[]>({
+    queryKey: ['/api/stores/1/inflow-categories'],
+  });
+
+  const { data: outflowCategories } = useQuery<OutflowCategory[]>({
+    queryKey: ['/api/stores/1/outflow-categories'],
+  });
+
+  const [invoicePaymentCategoryId, setInvoicePaymentCategoryId] = useState<number | null>(null);
+  const [goodsReceiptPaymentCategoryId, setGoodsReceiptPaymentCategoryId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (store) {
+      setInvoicePaymentCategoryId(store.invoicePaymentCategoryId);
+      setGoodsReceiptPaymentCategoryId(store.goodsReceiptPaymentCategoryId);
+    }
+  }, [store]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await apiRequest('PUT', '/api/stores/1', {
+        invoicePaymentCategoryId,
+        goodsReceiptPaymentCategoryId
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      toast({
+        title: "Berhasil",
+        description: "Pengaturan auto transaction berhasil disimpan",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal menyimpan pengaturan",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Auto Transaction Settings</CardTitle>
+        <CardDescription>
+          Pengaturan untuk membuat transaksi otomatis saat menerima pembayaran invoice atau melakukan pembayaran ke supplier
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="invoicePaymentCategory">
+              Kategori untuk Pembayaran Invoice (Inflow)
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Setiap pembayaran invoice dari customer akan otomatis tercatat sebagai transaksi dengan kategori ini
+            </p>
+            <select
+              id="invoicePaymentCategory"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              value={invoicePaymentCategoryId || ""}
+              onChange={(e) => setInvoicePaymentCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">-- Tidak aktif --</option>
+              {inflowCategories?.filter(c => c.isActive).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="goodsReceiptPaymentCategory">
+              Kategori untuk Pembayaran Supplier (Outflow)
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Setiap pembayaran ke supplier (Goods Receipt) akan otomatis tercatat sebagai transaksi dengan kategori ini
+            </p>
+            <select
+              id="goodsReceiptPaymentCategory"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              value={goodsReceiptPaymentCategoryId || ""}
+              onChange={(e) => setGoodsReceiptPaymentCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">-- Tidak aktif --</option>
+              {outflowCategories?.filter(c => c.isActive).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Menyimpan..." : "Simpan Pengaturan"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -1195,6 +1319,10 @@ export default function SettingsPage() {
             <TabsTrigger value="cash-accounts" className="gap-2">
               <Wallet className="h-4 w-4" />
               <span>Cash Accounts</span>
+            </TabsTrigger>
+            <TabsTrigger value="auto-transaction" className="gap-2">
+              <ArrowLeftRight className="h-4 w-4" />
+              <span>Auto Transaction</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -2339,6 +2467,10 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="auto-transaction" className="space-y-6">
+          <AutoTransactionSettings />
         </TabsContent>
       </Tabs>
 
