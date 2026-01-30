@@ -52,6 +52,8 @@ export const stores = pgTable("stores", {
   phone: varchar("phone", { length: 50 }),
   email: varchar("email", { length: 100 }),
   isActive: boolean("is_active").default(true).notNull(),
+  invoicePaymentCategoryId: integer("invoice_payment_category_id"),
+  goodsReceiptPaymentCategoryId: integer("goods_receipt_payment_category_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
@@ -465,7 +467,9 @@ export const transactions = pgTable("transactions", {
   description: text("description").notNull(),
   category: varchar("category", { length: 50 }),
   invoiceId: integer("invoice_id").references(() => invoices.id),
+  invoicePaymentId: integer("invoice_payment_id"),
   goodsReceiptId: integer("goods_receipt_id"),
+  goodsReceiptPaymentId: integer("goods_receipt_payment_id"),
   returnId: integer("return_id"),
   referenceNumber: varchar("reference_number", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -476,7 +480,9 @@ export const transactions = pgTable("transactions", {
     accountIdIdx: index("transactions_account_id_idx").on(table.accountId),
     typeIdx: index("transactions_type_idx").on(table.type),
     dateIdx: index("transactions_date_idx").on(table.date),
-    invoiceIdIdx: index("transactions_invoice_id_idx").on(table.invoiceId)
+    invoiceIdIdx: index("transactions_invoice_id_idx").on(table.invoiceId),
+    invoicePaymentIdIdx: index("transactions_invoice_payment_id_idx").on(table.invoicePaymentId),
+    goodsReceiptPaymentIdIdx: index("transactions_goods_receipt_payment_id_idx").on(table.goodsReceiptPaymentId)
   };
 });
 
