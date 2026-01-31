@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -141,6 +141,93 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const items = invoiceData?.items || [];
   const client = invoiceData?.client;
   const invoicePayments = paymentsData || [];
+
+  // ==================== PRINT PAGINATION LOGIC ====================
+  // All measurements in cm, based on print template CSS
+  const PRINT_CONSTANTS = {
+    PAGE_HEIGHT: 14,           // Total page height in cm
+    PAGE_PADDING_TOP: 0.5,     // Top padding
+    PAGE_PADDING_BOTTOM: 0.3,  // Bottom padding
+    HEADER_HEIGHT: 2.8,        // Header section (logo, company, bill to)
+    TABLE_HEADER_HEIGHT: 0.7,  // Table thead height
+    ITEM_ROW_HEIGHT: 0.7,      // Height per item row
+    FOOTER_BASE_HEIGHT: 2.0,   // Base footer height (notes + subtotal + total)
+    FOOTER_ROW_HEIGHT: 0.35,  // Additional height per extra footer row (discount, shipping, tax)
+    TABLE_MARGIN: 0.25,        // Margin between table and footer
+  };
+
+  // Calculate dynamic footer height based on invoice data
+  const calculateFooterHeight = useMemo(() => {
+    if (!invoice) return PRINT_CONSTANTS.FOOTER_BASE_HEIGHT;
+    
+    let height = PRINT_CONSTANTS.FOOTER_BASE_HEIGHT;
+    
+    // Add height for discount row if present
+    if (parseFloat(invoice.discount || '0') > 0) {
+      height += PRINT_CONSTANTS.FOOTER_ROW_HEIGHT;
+    }
+    
+    // Add height for shipping row if present
+    if ((invoice as any).shipping && parseFloat((invoice as any).shipping) > 0) {
+      height += PRINT_CONSTANTS.FOOTER_ROW_HEIGHT;
+    }
+    
+    // Add height for tax/PPN row if using Faktur Pajak
+    if ((invoice as any).useFakturPajak && parseFloat(invoice.taxAmount || '0') > 0) {
+      height += PRINT_CONSTANTS.FOOTER_ROW_HEIGHT;
+    }
+    
+    return height;
+  }, [invoice]);
+
+  // Calculate max items per page
+  const calculateMaxItems = (hasFooter: boolean) => {
+    const contentHeight = PRINT_CONSTANTS.PAGE_HEIGHT - PRINT_CONSTANTS.PAGE_PADDING_TOP - PRINT_CONSTANTS.PAGE_PADDING_BOTTOM;
+    const headerSpace = PRINT_CONSTANTS.HEADER_HEIGHT + PRINT_CONSTANTS.TABLE_HEADER_HEIGHT;
+    
+    let availableSpace = contentHeight - headerSpace;
+    
+    if (hasFooter) {
+      availableSpace -= calculateFooterHeight + PRINT_CONSTANTS.TABLE_MARGIN;
+    }
+    
+    return Math.floor(availableSpace / PRINT_CONSTANTS.ITEM_ROW_HEIGHT);
+  };
+
+  // Paginate items into pages
+  const paginatedItems = useMemo(() => {
+    if (!items.length) return [{ items: [], isLastPage: true }];
+    
+    const maxItemsWithFooter = calculateMaxItems(true);
+    const maxItemsWithoutFooter = calculateMaxItems(false);
+    
+    const pages: { items: typeof items; isLastPage: boolean }[] = [];
+    let remainingItems = [...items];
+    
+    // Special case: all items fit on one page with footer
+    if (remainingItems.length <= maxItemsWithFooter) {
+      return [{ items: remainingItems, isLastPage: true }];
+    }
+    
+    // Multiple pages needed
+    while (remainingItems.length > 0) {
+      // Check if remaining items can fit on last page with footer
+      if (remainingItems.length <= maxItemsWithFooter) {
+        pages.push({ items: remainingItems, isLastPage: true });
+        remainingItems = [];
+      } else {
+        // Not the last page - use max items without footer
+        const pageItems = remainingItems.slice(0, maxItemsWithoutFooter);
+        pages.push({ items: pageItems, isLastPage: false });
+        remainingItems = remainingItems.slice(maxItemsWithoutFooter);
+      }
+    }
+    
+    return pages;
+  }, [items, calculateFooterHeight]);
+
+  const totalPages = paginatedItems.length;
+  // ==================== END PRINT PAGINATION LOGIC ====================
 
   // Helper function to get default payment type from settings
   const getDefaultPaymentType = () => {
@@ -906,174 +993,192 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   const isEditable = invoice.status !== 'paid' && invoice.status !== 'void';
 
+  // Helper to get running item number across pages
+  const getRunningItemNumber = (pageIndex: number, itemIndex: number): number => {
+    let count = 0;
+    for (let i = 0; i < pageIndex; i++) {
+      count += paginatedItems[i].items.length;
+    }
+    return count + itemIndex + 1;
+  };
+
   return (
     <>
-      {/* Print-only template */}
+      {/* Print-only template - Multi-page support */}
       <div className="print-only" style={{ display: 'none' }}>
-        <div className="print-invoice-template">
-          {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
-          <div className="print-header">
-            {/* Left column: Logo + Bill To */}
-            <div className="print-header-left" style={{ flexDirection: 'column' }}>
-              <div className="print-logo">
-                {currentUser?.logoUrl ? (
-                  <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
-                ) : (
-                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
-                    {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
-                  </div>
-                )}
-              </div>
-              <div className="print-bill-to">
-                <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
-                <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
-                {client && (
-                  <div className="print-bill-to-details">
-                    {client.address && <div>{client.address}</div>}
-                    {client.phone && <div>Phone: {client.phone}</div>}
-                  </div>
-                )}
-                {invoice.deliveryAddress && (
-                  <div className="print-bill-to-details" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ccc' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '10px' }}>Alamat Pengiriman:</div>
-                    <div>{invoice.deliveryAddress}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Center column: Company Info */}
-            <div className="print-header-center">
-              <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
-              {currentUser?.companyTagline && (
-                <div className="print-company-tagline">{currentUser.companyTagline}</div>
-              )}
-              <div className="print-company-address">
-                {currentUser?.companyAddress || "Your Company Address"}
-                {currentUser?.companyPhone && (
-                  <>
-                    <br />
-                    Phone: {currentUser.companyPhone}
-                  </>
-                )}
-                {currentUser?.companyEmail && (
-                  <>
-                    {currentUser?.companyPhone ? ' / ' : <br />}
-                    Email: {currentUser.companyEmail}
-                  </>
-                )}
-              </div>
-            </div>
-            
-            {/* Right column: Document Details */}
-            <div className="print-header-right">
-              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>INVOICE</div>
-              <div className="print-doc-details">
-                <div className="print-doc-row">
-                  <span className="print-doc-label">No.</span>
-                  <span className="print-doc-value">{invoice.invoiceNumber}</span>
+        {paginatedItems.map((page, pageIndex) => (
+          <div 
+            key={pageIndex} 
+            className="print-invoice-template"
+            style={{ pageBreakAfter: page.isLastPage ? 'auto' : 'always' }}
+          >
+            {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
+            <div className="print-header">
+              {/* Left column: Logo + Bill To */}
+              <div className="print-header-left" style={{ flexDirection: 'column' }}>
+                <div className="print-logo">
+                  {currentUser?.logoUrl ? (
+                    <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
+                  ) : (
+                    <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                      {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
+                    </div>
+                  )}
                 </div>
-                <div className="print-doc-row">
-                  <span className="print-doc-label">Date</span>
-                  <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
+                <div className="print-bill-to">
+                  <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
+                  <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
+                  {client && (
+                    <div className="print-bill-to-details">
+                      {client.address && <div>{client.address}</div>}
+                      {client.phone && <div>Phone: {client.phone}</div>}
+                    </div>
+                  )}
+                  {invoice.deliveryAddress && (
+                    <div className="print-bill-to-details" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ccc' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '10px' }}>Alamat Pengiriman:</div>
+                      <div>{invoice.deliveryAddress}</div>
+                    </div>
+                  )}
                 </div>
-                {/* Due Date only shown for non-cash payment terms (net_7, net_14, net_30, custom) */}
-                {invoice.paymentTerms !== 'cod' && (
+              </div>
+              
+              {/* Center column: Company Info */}
+              <div className="print-header-center">
+                <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
+                {currentUser?.companyTagline && (
+                  <div className="print-company-tagline">{currentUser.companyTagline}</div>
+                )}
+                <div className="print-company-address">
+                  {currentUser?.companyAddress || "Your Company Address"}
+                  {currentUser?.companyPhone && (
+                    <>
+                      <br />
+                      Phone: {currentUser.companyPhone}
+                    </>
+                  )}
+                  {currentUser?.companyEmail && (
+                    <>
+                      {currentUser?.companyPhone ? ' / ' : <br />}
+                      Email: {currentUser.companyEmail}
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Right column: Document Details */}
+              <div className="print-header-right">
+                <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>INVOICE</div>
+                <div className="print-doc-details">
                   <div className="print-doc-row">
-                    <span className="print-doc-label">Due Date</span>
-                    <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
+                    <span className="print-doc-label">No.</span>
+                    <span className="print-doc-value">{invoice.invoiceNumber}</span>
                   </div>
-                )}
-                {/* Page indicator */}
-                <div className="print-doc-row">
-                  <span className="print-doc-label">Page</span>
-                  <span className="print-doc-value">1/1</span>
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">Date</span>
+                    <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
+                  </div>
+                  {/* Due Date only shown for non-cash payment terms (net_7, net_14, net_30, custom) */}
+                  {invoice.paymentTerms !== 'cod' && (
+                    <div className="print-doc-row">
+                      <span className="print-doc-label">Due Date</span>
+                      <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
+                    </div>
+                  )}
+                  {/* Page indicator */}
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">Page</span>
+                    <span className="print-doc-value">{pageIndex + 1}/{totalPages}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Items Table - Column order: No, Kode Item, Products, QTY, Unit, Price, Total */}
-          <table className="print-items-table">
-            <thead>
-              <tr>
-                <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
-                <th style={{ width: '12%', textAlign: 'center' }}>Kode Item</th>
-                <th style={{ width: '44%', textAlign: 'center' }}>Products</th>
-                <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
-                <th style={{ width: '6%', textAlign: 'center' }}>Unit</th>
-                <th style={{ width: '13%', textAlign: 'center' }}>Price</th>
-                <th style={{ width: '15%', textAlign: 'center' }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => (
-                <tr key={index}>
-                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
-                  <td style={{ textAlign: 'left' }}>{item.description}</td>
-                  <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
+            {/* Items Table - Column order: No, Kode Item, Products, QTY, Unit, Price, Total */}
+            <table className="print-items-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
+                  <th style={{ width: '12%', textAlign: 'center' }}>Kode Item</th>
+                  <th style={{ width: '44%', textAlign: 'center' }}>Products</th>
+                  <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
+                  <th style={{ width: '6%', textAlign: 'center' }}>Unit</th>
+                  <th style={{ width: '13%', textAlign: 'center' }}>Price</th>
+                  <th style={{ width: '15%', textAlign: 'center' }}>Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {page.items.map((item, itemIndex) => (
+                  <tr key={itemIndex}>
+                    <td style={{ textAlign: 'center' }}>{getRunningItemNumber(pageIndex, itemIndex)}</td>
+                    <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
+                    <td style={{ textAlign: 'left' }}>{item.description}</td>
+                    <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
+                    <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
+                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
+                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          <div className="print-footer">
-            <div className="print-footer-left">
-              <div className="print-notes-label">Notes / Terms & Conditions:</div>
-              <div className="print-notes-text">
-                {(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
-                  <div>{currentUser?.invoiceNotes || currentUser?.defaultNotes}</div>
-                )}
-                {invoice.notes && (
-                  <div style={{ marginTop: (currentUser?.invoiceNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{invoice.notes}</div>
-                )}
-                {!invoice.notes && !(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
-                  <div>Items checked and verified upon delivery. Items cannot be returned.</div>
-                )}
-              </div>
-            </div>
-            
-            <div className="print-footer-right">
-              {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.taxAmount || '0') > 0 ? (
-                <>
-                  <div className="print-total-row">
-                    <span className="print-total-label">DPP</span>
-                    <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
+            {/* Footer - Only shown on last page */}
+            {page.isLastPage && (
+              <div className="print-footer">
+                <div className="print-footer-left">
+                  <div className="print-notes-label">Notes / Terms & Conditions:</div>
+                  <div className="print-notes-text">
+                    {(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
+                      <div>{currentUser?.invoiceNotes || currentUser?.defaultNotes}</div>
+                    )}
+                    {invoice.notes && (
+                      <div style={{ marginTop: (currentUser?.invoiceNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{invoice.notes}</div>
+                    )}
+                    {!invoice.notes && !(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
+                      <div>Items checked and verified upon delivery. Items cannot be returned.</div>
+                    )}
                   </div>
-                  <div className="print-total-row">
-                    <span className="print-total-label">PPN ({invoice.taxRate || 11}%)</span>
-                    <span className="print-total-value">{formatCurrencyAccounting(invoice.taxAmount || '0')}</span>
+                </div>
+                
+                <div className="print-footer-right">
+                  {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.taxAmount || '0') > 0 ? (
+                    <>
+                      <div className="print-total-row">
+                        <span className="print-total-label">DPP</span>
+                        <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
+                      </div>
+                      <div className="print-total-row">
+                        <span className="print-total-label">PPN ({invoice.taxRate || 11}%)</span>
+                        <span className="print-total-value">{formatCurrencyAccounting(invoice.taxAmount || '0')}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="print-total-row">
+                      <span className="print-total-label">Subtotal</span>
+                      <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
+                    </div>
+                  )}
+                  {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
+                    <div className="print-total-row">
+                      <span className="print-total-label">Discount</span>
+                      <span className="print-total-value">-{formatCurrencyAccounting(invoice.discount || '0')}</span>
+                    </div>
+                  )}
+                  {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
+                    <div className="print-total-row">
+                      <span className="print-total-label">Shipping</span>
+                      <span className="print-total-value">{formatCurrencyAccounting((invoice as any).shipping)}</span>
+                    </div>
+                  )}
+                  <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                    <span className="print-total-label">TOTAL</span>
+                    <span className="print-total-value">{formatCurrencyAccounting(invoice.totalAmount)}</span>
                   </div>
-                </>
-              ) : (
-                <div className="print-total-row">
-                  <span className="print-total-label">Subtotal</span>
-                  <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
                 </div>
-              )}
-              {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
-                <div className="print-total-row">
-                  <span className="print-total-label">Discount</span>
-                  <span className="print-total-value">-{formatCurrencyAccounting(invoice.discount || '0')}</span>
-                </div>
-              )}
-              {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
-                <div className="print-total-row">
-                  <span className="print-total-label">Shipping</span>
-                  <span className="print-total-value">{formatCurrencyAccounting((invoice as any).shipping)}</span>
-                </div>
-              )}
-              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
-                <span className="print-total-label">TOTAL</span>
-                <span className="print-total-value">{formatCurrencyAccounting(invoice.totalAmount)}</span>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        ))}
       </div>
 
       {/* Screen view */}
