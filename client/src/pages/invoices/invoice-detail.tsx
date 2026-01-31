@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, CreditCard, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign } from "lucide-react";
+import { Edit, Ban, FileDown, Send, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -323,11 +323,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   // Send invoice (change status to sent)
   const handleSendInvoice = () => {
     updateStatusMutation.mutate('sent');
-  };
-
-  // Mark as paid
-  const handleMarkAsPaid = () => {
-    updateStatusMutation.mutate('paid');
   };
 
   // Void invoice
@@ -1220,17 +1215,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             >
               <Send className="h-4 w-4" />
               <span>Send</span>
-            </Button>
-          )}
-          
-          {invoice.status === 'sent' && (
-            <Button
-              variant="outline"
-              className="gap-1"
-              onClick={handleMarkAsPaid}
-            >
-              <CreditCard className="h-4 w-4" />
-              <span>Mark as Paid</span>
             </Button>
           )}
           
