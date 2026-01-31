@@ -188,6 +188,47 @@ type Store = {
   goodsReceiptPaymentCategoryId: number | null;
 };
 
+type UserData = {
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  companyName: string | null;
+  address: string | null;
+  phone: string | null;
+  companyTagline: string | null;
+  companyAddress: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  taxNumber: string | null;
+  defaultTaxRate: string | null;
+  logoUrl: string | null;
+  quotationNotes: string | null;
+  invoiceNotes: string | null;
+  deliveryNoteNotes: string | null;
+  defaultNotes: string | null;
+};
+
+type PaymentType = {
+  id: number;
+  storeId: number;
+  name: string;
+  description: string | null;
+  cashAccountId: number | null;
+  deductionPercentage: string | null;
+  isActive: boolean;
+};
+
+type PaymentTerm = {
+  id: number;
+  storeId: number;
+  code: string;
+  name: string;
+  days: number;
+  description: string | null;
+  isActive: boolean;
+};
+
 function AutoTransactionSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -333,16 +374,16 @@ export default function SettingsPage() {
   const hasInitialized = useRef(false);
 
   // Fetch user data
-  const { data: userData, isLoading } = useQuery({
+  const { data: userData, isLoading } = useQuery<UserData>({
     queryKey: ['/api/user'],
   });
 
   // Fetch payment types and terms
-  const { data: paymentTypes } = useQuery({
+  const { data: paymentTypes } = useQuery<PaymentType[]>({
     queryKey: ['/api/stores/1/payment-types'],
   });
 
-  const { data: paymentTerms } = useQuery({
+  const { data: paymentTerms } = useQuery<PaymentTerm[]>({
     queryKey: ['/api/stores/1/payment-terms'],
   });
 
@@ -1215,10 +1256,11 @@ export default function SettingsPage() {
       const text = await file.text();
       const backupData = JSON.parse(text);
 
-      return apiRequest('POST', '/api/backup/import', {
+      const response = await apiRequest('POST', '/api/backup/import', {
         data: backupData.data,
         storeId: 1
       });
+      return response.json() as Promise<{ message: string }>;
     },
     onSuccess: (data) => {
       toast({
@@ -1551,7 +1593,7 @@ export default function SettingsPage() {
                                   return;
                                 }
 
-                                if (result.successful.length > 0) {
+                                if (result.successful && result.successful.length > 0) {
                                   const uploadedFile = result.successful[0];
                                   const uploadURL = uploadedFile.uploadURL;
 
