@@ -275,22 +275,33 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
               <th style="width: 5%">No</th>
               <th style="width: 40%">Description</th>
               <th style="width: 12%" class="text-right">Qty</th>
-              <th style="width: 18%" class="text-right">Unit Cost</th>
-              <th style="width: 10%" class="text-right">Tax</th>
+              <th style="width: 18%" class="text-right">${purchaseOrder.useFakturPajak ? 'Unit Cost Before Tax' : 'Unit Cost'}</th>
+              ${purchaseOrder.useFakturPajak ? '<th style="width: 10%" class="text-right">Tax</th>' : ''}
               <th style="width: 15%" class="text-right">Total</th>
             </tr>
           </thead>
           <tbody>
-            ${purchaseOrder.items.map((item: any, index: number) => `
+            ${purchaseOrder.items.map((item: any, index: number) => {
+              const unitCost = parseFloat(item.unitCost || '0');
+              const quantity = parseFloat(item.quantity || '0');
+              const taxRate = parseFloat(purchaseOrder.taxRate || '11');
+              
+              // Calculate unit cost before tax and tax per unit
+              const unitCostBeforeTax = purchaseOrder.useFakturPajak ? unitCost / (1 + taxRate / 100) : unitCost;
+              const taxPerUnit = purchaseOrder.useFakturPajak ? unitCost - unitCostBeforeTax : 0;
+              const totalTax = taxPerUnit * quantity;
+              const lineTotal = unitCost * quantity;
+              
+              return `
               <tr>
                 <td>${index + 1}</td>
                 <td>${item.description}</td>
-                <td class="text-right">${parseFloat(item.quantity)}</td>
-                <td class="text-right">${formatCurrency(item.unitCost)}</td>
-                <td class="text-right">${formatCurrency(item.taxAmount)}</td>
-                <td class="text-right">${formatCurrency(item.totalAmount)}</td>
+                <td class="text-right">${quantity}</td>
+                <td class="text-right">${formatCurrency(unitCostBeforeTax.toString())}</td>
+                ${purchaseOrder.useFakturPajak ? `<td class="text-right">${formatCurrency(totalTax.toString())}</td>` : ''}
+                <td class="text-right">${formatCurrency(lineTotal.toString())}</td>
               </tr>
-            `).join('')}
+            `}).join('')}
           </tbody>
         </table>
 
@@ -608,8 +619,8 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                   <TableHead>Description</TableHead>
                   <TableHead>Quantity Ordered</TableHead>
                   <TableHead>Quantity Received</TableHead>
-                  <TableHead>Unit Cost</TableHead>
-                  <TableHead>Tax</TableHead>
+                  <TableHead>{purchaseOrder.useFakturPajak ? 'Unit Cost Before Tax' : 'Unit Cost'}</TableHead>
+                  {purchaseOrder.useFakturPajak && <TableHead>Tax</TableHead>}
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -618,6 +629,14 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                   const orderedQty = parseFloat(item.quantity);
                   const receivedQty = parseFloat(item.receivedQuantity || '0');
                   const isFullyReceived = receivedQty >= orderedQty;
+                  
+                  // Calculate unit cost before tax and tax
+                  const unitCost = parseFloat(item.unitCost || '0');
+                  const taxRate = parseFloat(purchaseOrder.taxRate || '11');
+                  const unitCostBeforeTax = purchaseOrder.useFakturPajak ? unitCost / (1 + taxRate / 100) : unitCost;
+                  const taxPerUnit = purchaseOrder.useFakturPajak ? unitCost - unitCostBeforeTax : 0;
+                  const totalTax = taxPerUnit * orderedQty;
+                  const lineTotal = unitCost * orderedQty;
                   
                   return (
                     <TableRow key={item.id} className={isFullyReceived ? 'bg-green-50' : ''} data-testid={`item-row-${index}`}>
@@ -631,10 +650,12 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                           {receivedQty}
                         </span>
                       </TableCell>
-                      <TableCell data-testid={`item-unit-cost-${index}`}>{formatCurrency(item.unitCost)}</TableCell>
-                      <TableCell data-testid={`item-tax-${index}`}>{formatCurrency(item.taxAmount)}</TableCell>
+                      <TableCell data-testid={`item-unit-cost-${index}`}>{formatCurrency(unitCostBeforeTax.toString())}</TableCell>
+                      {purchaseOrder.useFakturPajak && (
+                        <TableCell data-testid={`item-tax-${index}`}>{formatCurrency(totalTax.toString())}</TableCell>
+                      )}
                       <TableCell className="text-right font-medium" data-testid={`item-total-${index}`}>
-                        {formatCurrency(item.totalAmount)}
+                        {formatCurrency(lineTotal.toString())}
                       </TableCell>
                     </TableRow>
                   );
