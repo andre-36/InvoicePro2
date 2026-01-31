@@ -277,6 +277,7 @@
   .print-header-center {
     text-align: center;
     padding: 0;
+    transform: translateX(-2cm);
   }
 
   .print-header-right {
