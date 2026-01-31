@@ -997,9 +997,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           <table className="print-items-table">
             <thead>
               <tr>
-                <th style={{ width: '3%', textAlign: 'center' }}>No.</th>
+                <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
                 <th style={{ width: '12%', textAlign: 'center' }}>Kode Item</th>
-                <th style={{ width: '45%', textAlign: 'center' }}>Products</th>
+                <th style={{ width: '44%', textAlign: 'center' }}>Products</th>
                 <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
                 <th style={{ width: '6%', textAlign: 'center' }}>Unit</th>
                 <th style={{ width: '13%', textAlign: 'center' }}>Price</th>
