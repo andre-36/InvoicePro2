@@ -1281,15 +1281,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle both nested { invoice: {...}, items: [...] } and flat structure
       const items = req.body.items;
-      const invoiceFields = req.body.invoice || (() => {
+      const rawInvoiceFields = req.body.invoice || (() => {
         const { items: _, ...rest } = req.body;
         return rest;
       })();
       
-      // Prevent modification of invoice number to prevent fraud
-      if (invoiceFields.invoiceNumber !== undefined) {
-        return res.status(400).json({ error: "Invoice number cannot be modified" });
-      }
+      // Remove invoiceNumber from update data - invoice number should never change
+      const { invoiceNumber, ...invoiceFields } = rawInvoiceFields;
       
       let updatedInvoice;
       
