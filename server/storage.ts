@@ -5285,8 +5285,8 @@ export class DatabaseStorage implements IStorage {
         JOIN invoices inv ON ii.invoice_id = inv.id
         WHERE inv.store_id = ${storeId}
           AND inv.status NOT IN ('cancelled', 'void')
-          AND inv.invoice_date >= ${start.toISOString().split('T')[0]}
-          AND inv.invoice_date <= ${end.toISOString().split('T')[0]}
+          AND inv.issue_date >= ${start.toISOString().split('T')[0]}
+          AND inv.issue_date <= ${end.toISOString().split('T')[0]}
       )
       SELECT * FROM all_items WHERE pending_qty > 0
       ORDER BY invoice_item_id
