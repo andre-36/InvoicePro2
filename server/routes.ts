@@ -1312,12 +1312,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Convert date strings to Date objects
+      // Convert date strings to proper format for database (YYYY-MM-DD for date type columns)
       if (safeFields.issueDate) {
-        invoiceFields.issueDate = new Date(safeFields.issueDate);
+        const d = new Date(safeFields.issueDate);
+        invoiceFields.issueDate = d.toISOString().split('T')[0];
       }
       if (safeFields.dueDate) {
-        invoiceFields.dueDate = new Date(safeFields.dueDate);
+        const d = new Date(safeFields.dueDate);
+        invoiceFields.dueDate = d.toISOString().split('T')[0];
       }
       
       let updatedInvoice;
