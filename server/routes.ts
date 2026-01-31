@@ -1308,6 +1308,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const field of allowedFields) {
         if (safeFields[field] !== undefined) {
+          // Skip empty string for enum fields (paymentTerms, status)
+          if ((field === 'paymentTerms' || field === 'status') && safeFields[field] === '') {
+            continue;
+          }
           invoiceFields[field] = safeFields[field];
         }
       }
