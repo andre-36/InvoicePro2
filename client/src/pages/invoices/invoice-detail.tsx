@@ -1466,6 +1466,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     <span className="text-gray-900">-{formatCurrency(invoice.discount || '0')}</span>
                   </div>
                 )}
+                {parseFloat((invoice as any).shipping || '0') > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-700">Biaya Pengiriman:</span>
+                    <span className="text-gray-900">+{formatCurrency((invoice as any).shipping || '0')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 border-t border-gray-200">
                   <span className="font-semibold text-gray-900">Total:</span>
                   <span className="font-bold text-gray-900">{formatCurrency(invoice.totalAmount)}</span>

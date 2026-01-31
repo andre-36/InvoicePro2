@@ -486,7 +486,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         dueDate: new Date(invoiceRecord.dueDate),
         subtotal: (invoiceRecord.subtotal ?? 0).toString(),
         tax: (invoiceRecord.tax ?? 0).toString(),
-        discount: (invoiceRecord.discount ?? 0).toString(),
+        discount: Math.floor(parseFloat(invoiceRecord.discount ?? '0')).toString(),
+        shipping: Math.floor(parseFloat((invoiceRecord as any).shipping ?? '0')).toString(),
         total: (invoiceRecord.total ?? 0).toString(),
         useFakturPajak: invoiceRecord.useFakturPajak || false,
         taxRate: invoiceRecord.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
@@ -578,7 +579,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       form.setValue('invoice.subtotal', subtotal.toFixed(2));
       form.setValue('invoice.tax', taxAmount.toFixed(2));
       form.setValue('invoice.taxRate', taxRate.toString());
-      form.setValue('invoice.shipping', shippingValue.toFixed(2));
+      form.setValue('invoice.shipping', Math.floor(shippingValue).toString());
       form.setValue('invoice.total', total.toFixed(2));
 
       // Update items in the form
