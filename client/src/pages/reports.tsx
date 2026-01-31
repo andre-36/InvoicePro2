@@ -1,24 +1,44 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, ComposedChart } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Download, FileDown, Calendar as CalendarIcon } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, DollarSign, CreditCard, Users, Package, FileText, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Calendar as CalendarIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { DateRange as DayPickerDateRange } from "react-day-picker";
+import { Progress } from "@/components/ui/progress";
 
-const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
 type DateRange = "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+
+type SummaryReport = {
+  totalSales: number;
+  totalReceived: number;
+  totalReceivables: number;
+  totalPayables: number;
+  totalIncome: number;
+  totalExpense: number;
+  netCashFlow: number;
+  estimatedProfit: number;
+  profitMargin: number;
+  invoiceCount: number;
+  monthlyTrend: Array<{
+    month: string;
+    sales: number;
+    expenses: number;
+    profit: number;
+  }>;
+};
 
 type FinancialReport = {
   revenue: {
@@ -65,6 +85,40 @@ type CashFlowReport = {
   endingCash: number;
 };
 
+type ProductReport = {
+  topProducts: Array<{
+    productId: number;
+    name: string;
+    quantitySold: number;
+    revenue: number;
+    avgPrice: number;
+  }>;
+  totalProductsSold: number;
+  totalRevenue: number;
+  totalQuantity: number;
+  categoryBreakdown: Array<{ name: string; value: number }>;
+};
+
+type CustomerReport = {
+  topCustomers: Array<{
+    clientId: number;
+    name: string;
+    invoiceCount: number;
+    totalPurchase: number;
+    totalPaid: number;
+    outstanding: number;
+    lastPurchaseDate: string | null;
+  }>;
+  highestReceivables: Array<{
+    clientId: number;
+    name: string;
+    outstanding: number;
+  }>;
+  totalCustomers: number;
+  totalReceivables: number;
+  avgPurchasePerCustomer: number;
+};
+
 type Transaction = {
   id: number;
   description: string;
@@ -75,7 +129,7 @@ type Transaction = {
 };
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState("profit-loss");
+  const [activeTab, setActiveTab] = useState("summary");
   const [dateRange, setDateRange] = useState<DateRange>("this_month");
   const [customDateRange, setCustomDateRange] = useState<DayPickerDateRange | undefined>(undefined);
   const [isCustomOpen, setIsCustomOpen] = useState(false);
@@ -90,6 +144,18 @@ export default function ReportsPage() {
   };
 
   const apiDateRange = getApiDateRange();
+
+  // Summary Dashboard data
+  const { data: summaryReport, isLoading: isLoadingSummary } = useQuery<SummaryReport>({
+    queryKey: ['/api/stores/1/reports/summary', apiDateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/reports/summary?dateRange=${encodeURIComponent(apiDateRange)}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch summary report');
+      return response.json();
+    },
+  });
   
   // Financial Report data
   const { data: financialReport, isLoading: isLoadingFinancial } = useQuery<FinancialReport>({
@@ -111,6 +177,30 @@ export default function ReportsPage() {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch cashflow report');
+      return response.json();
+    },
+  });
+
+  // Product Performance data
+  const { data: productReport, isLoading: isLoadingProducts } = useQuery<ProductReport>({
+    queryKey: ['/api/stores/1/reports/products', apiDateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/reports/products?dateRange=${encodeURIComponent(apiDateRange)}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch product report');
+      return response.json();
+    },
+  });
+
+  // Customer Report data
+  const { data: customerReport, isLoading: isLoadingCustomers } = useQuery<CustomerReport>({
+    queryKey: ['/api/stores/1/reports/customers', apiDateRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/1/reports/customers?dateRange=${encodeURIComponent(apiDateRange)}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch customer report');
       return response.json();
     },
   });
@@ -151,9 +241,87 @@ export default function ReportsPage() {
   const incomeByCategory = processTransactionsByCategory('income');
   const expensesByCategory = processTransactionsByCategory('expense');
 
-  const downloadReport = (reportType: string) => {
-    // Implementation for downloading reports as PDF/Excel
-    console.log(`Downloading ${reportType} report`);
+  const downloadReport = async (reportType: string) => {
+    const tabToEndpoint: Record<string, string> = {
+      'summary': 'summary',
+      'profit-loss': 'financial',
+      'cash-flow': 'cashflow',
+      'products': 'products',
+      'customers': 'customers',
+      'breakdown': 'breakdown'
+    };
+    
+    const endpoint = tabToEndpoint[reportType] || reportType;
+    
+    try {
+      const response = await fetch(`/api/stores/1/reports/${endpoint}/export?dateRange=${encodeURIComponent(apiDateRange)}`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `laporan-${endpoint}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        alert('Export untuk laporan ini belum tersedia');
+      }
+    } catch (error) {
+      console.error(`Error downloading ${reportType} report:`, error);
+      alert('Gagal mengunduh laporan');
+    }
+  };
+
+  const StatCard = ({ 
+    title, 
+    value, 
+    subtitle, 
+    icon: Icon, 
+    trend, 
+    trendValue,
+    color = "blue"
+  }: { 
+    title: string; 
+    value: string; 
+    subtitle?: string; 
+    icon: any; 
+    trend?: 'up' | 'down';
+    trendValue?: string;
+    color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple';
+  }) => {
+    const colorClasses = {
+      blue: 'bg-blue-50 text-blue-600',
+      green: 'bg-green-50 text-green-600',
+      red: 'bg-red-50 text-red-600',
+      yellow: 'bg-yellow-50 text-yellow-600',
+      purple: 'bg-purple-50 text-purple-600'
+    };
+    
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-500">{title}</p>
+              <p className="text-2xl font-bold">{value}</p>
+              {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+              {trend && trendValue && (
+                <div className={`flex items-center text-xs ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                  {trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+                  {trendValue}
+                </div>
+              )}
+            </div>
+            <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
   
   return (
@@ -161,7 +329,7 @@ export default function ReportsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Laporan Keuangan</h1>
-          <p className="text-sm text-gray-500 mt-1">Laporan keuangan lengkap sesuai standar akuntansi</p>
+          <p className="text-sm text-gray-500 mt-1">Pantau kesehatan keuangan bisnis Anda dengan mudah</p>
         </div>
         
         <div className="flex gap-2 items-center">
@@ -225,17 +393,159 @@ export default function ReportsPage() {
       </div>
       
       <Tabs
-        defaultValue="profit-loss"
+        defaultValue="summary"
         value={activeTab}
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="summary">Ringkasan</TabsTrigger>
           <TabsTrigger value="profit-loss">Laba Rugi</TabsTrigger>
           <TabsTrigger value="cash-flow">Arus Kas</TabsTrigger>
-          <TabsTrigger value="inventory">Persediaan & HPP</TabsTrigger>
+          <TabsTrigger value="products">Performa Produk</TabsTrigger>
+          <TabsTrigger value="customers">Pelanggan</TabsTrigger>
           <TabsTrigger value="breakdown">Rincian</TabsTrigger>
         </TabsList>
+
+        {/* RINGKASAN DASHBOARD */}
+        <TabsContent value="summary" className="space-y-6">
+          {isLoadingSummary ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-[130px]" />
+              ))}
+            </div>
+          ) : summaryReport ? (
+            <>
+              {/* Key Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Total Penjualan"
+                  value={formatCurrency(summaryReport.totalSales)}
+                  subtitle={`${summaryReport.invoiceCount} invoice`}
+                  icon={Receipt}
+                  color="blue"
+                />
+                <StatCard
+                  title="Uang Masuk"
+                  value={formatCurrency(summaryReport.totalIncome)}
+                  subtitle="Dari pembayaran"
+                  icon={TrendingUp}
+                  color="green"
+                />
+                <StatCard
+                  title="Uang Keluar"
+                  value={formatCurrency(summaryReport.totalExpense)}
+                  subtitle="Biaya operasional"
+                  icon={TrendingDown}
+                  color="red"
+                />
+                <StatCard
+                  title="Arus Kas Bersih"
+                  value={formatCurrency(summaryReport.netCashFlow)}
+                  subtitle={summaryReport.netCashFlow >= 0 ? "Positif" : "Negatif"}
+                  icon={Wallet}
+                  color={summaryReport.netCashFlow >= 0 ? "green" : "red"}
+                />
+              </div>
+
+              {/* Receivables & Payables */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-yellow-600" />
+                      Piutang (Belum Dibayar Pelanggan)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-yellow-600">{formatCurrency(summaryReport.totalReceivables)}</p>
+                    <p className="text-sm text-gray-500 mt-1">Total yang harus ditagih dari pelanggan</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-red-600" />
+                      Hutang (Belum Dibayar ke Supplier)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-red-600">{formatCurrency(summaryReport.totalPayables)}</p>
+                    <p className="text-sm text-gray-500 mt-1">Total yang harus dibayar ke supplier</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Monthly Trend Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tren 6 Bulan Terakhir</CardTitle>
+                  <CardDescription>Perbandingan penjualan, pengeluaran, dan keuntungan</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={summaryReport.monthlyTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(0)}jt`} />
+                        <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                        <Legend />
+                        <Bar dataKey="sales" name="Penjualan" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="expenses" name="Pengeluaran" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                        <Line type="monotone" dataKey="profit" name="Keuntungan" stroke="#10B981" strokeWidth={3} dot={{ fill: '#10B981' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Health Check */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Kesehatan Keuangan</CardTitle>
+                  <CardDescription>Indikator sederhana kondisi bisnis Anda</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Rasio Pembayaran Pelanggan</span>
+                      <span className="font-medium">
+                        {summaryReport.totalSales > 0 
+                          ? ((summaryReport.totalReceived / summaryReport.totalSales) * 100).toFixed(0)
+                          : 0}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={summaryReport.totalSales > 0 
+                        ? (summaryReport.totalReceived / summaryReport.totalSales) * 100 
+                        : 0} 
+                      className="h-2"
+                    />
+                    <p className="text-xs text-gray-500">Berapa persen penjualan yang sudah dibayar</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Margin Keuntungan</span>
+                      <span className="font-medium">{summaryReport.profitMargin.toFixed(1)}%</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(Math.max(summaryReport.profitMargin, 0), 100)} 
+                      className="h-2"
+                    />
+                    <p className="text-xs text-gray-500">Keuntungan bersih dari total penjualan</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <div className="flex justify-center items-center h-[400px]">
+              <p className="text-gray-500">Tidak ada data untuk ditampilkan</p>
+            </div>
+          )}
+        </TabsContent>
         
         {/* LAPORAN LABA RUGI */}
         <TabsContent value="profit-loss" className="space-y-4">
@@ -435,33 +745,254 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
 
-        {/* LAPORAN PERSEDIAAN & HPP */}
-        <TabsContent value="inventory" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Laporan Persediaan & HPP</CardTitle>
-              <CardDescription>Detail persediaan barang dan harga pokok penjualan</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-2">Sistem Batch Tracking</h3>
-                  <p className="text-sm text-blue-800">
-                    Sistem ini menggunakan metode FIFO (First In, First Out) untuk menghitung HPP secara otomatis.
-                    Setiap penjualan akan mengambil dari batch tertua terlebih dahulu.
-                  </p>
-                </div>
-
-                <div className="text-sm text-gray-600">
-                  <p>Untuk melihat detail persediaan dan profitabilitas per batch, silakan kunjungi:</p>
-                  <ul className="list-disc ml-5 mt-2 space-y-1">
-                    <li><a href="/products" className="text-blue-600 hover:underline">Halaman Products</a> - untuk melihat stok per produk</li>
-                    <li><a href="/dashboard" className="text-blue-600 hover:underline">Dashboard</a> - untuk melihat nilai total persediaan</li>
-                  </ul>
-                </div>
+        {/* LAPORAN PERFORMA PRODUK */}
+        <TabsContent value="products" className="space-y-4">
+          {isLoadingProducts ? (
+            <Skeleton className="h-[600px] w-full" />
+          ) : productReport ? (
+            <>
+              {/* Product Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatCard
+                  title="Total Pendapatan Produk"
+                  value={formatCurrency(productReport.totalRevenue)}
+                  icon={DollarSign}
+                  color="green"
+                />
+                <StatCard
+                  title="Total Qty Terjual"
+                  value={productReport.totalQuantity.toLocaleString('id-ID')}
+                  subtitle={`${productReport.totalProductsSold} jenis produk`}
+                  icon={Package}
+                  color="blue"
+                />
+                <StatCard
+                  title="Rata-rata per Transaksi"
+                  value={formatCurrency(productReport.totalProductsSold > 0 ? productReport.totalRevenue / productReport.totalProductsSold : 0)}
+                  icon={FileText}
+                  color="purple"
+                />
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Top Products Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Produk Terlaris
+                  </CardTitle>
+                  <CardDescription>10 produk dengan pendapatan tertinggi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {productReport.topProducts.length === 0 ? (
+                    <div className="flex justify-center items-center h-[200px]">
+                      <p className="text-gray-500">Belum ada data penjualan produk</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Nama Produk</TableHead>
+                          <TableHead className="text-right">Qty Terjual</TableHead>
+                          <TableHead className="text-right">Pendapatan</TableHead>
+                          <TableHead className="text-right">Harga Rata-rata</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {productReport.topProducts.map((product, index) => (
+                          <TableRow key={product.productId}>
+                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell className="text-right">{product.quantitySold.toLocaleString('id-ID')}</TableCell>
+                            <TableCell className="text-right font-medium text-green-600">{formatCurrency(product.revenue)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(product.avgPrice)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Product Revenue Chart */}
+              {productReport.topProducts.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Pendapatan per Produk</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[400px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={productReport.topProducts.slice(0, 10)} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}jt`} />
+                          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
+                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                          <Bar dataKey="revenue" name="Pendapatan" fill="#4F46E5" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <div className="flex justify-center items-center h-[400px]">
+              <p className="text-gray-500">Tidak ada data produk</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* LAPORAN PELANGGAN */}
+        <TabsContent value="customers" className="space-y-4">
+          {isLoadingCustomers ? (
+            <Skeleton className="h-[600px] w-full" />
+          ) : customerReport ? (
+            <>
+              {/* Customer Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatCard
+                  title="Total Pelanggan Aktif"
+                  value={customerReport.totalCustomers.toString()}
+                  icon={Users}
+                  color="blue"
+                />
+                <StatCard
+                  title="Total Piutang"
+                  value={formatCurrency(customerReport.totalReceivables)}
+                  subtitle="Belum dibayar pelanggan"
+                  icon={CreditCard}
+                  color="yellow"
+                />
+                <StatCard
+                  title="Rata-rata Pembelian"
+                  value={formatCurrency(customerReport.avgPurchasePerCustomer)}
+                  subtitle="Per pelanggan"
+                  icon={DollarSign}
+                  color="green"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Top Customers */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-green-600" />
+                      Pelanggan Terbaik
+                    </CardTitle>
+                    <CardDescription>Berdasarkan total pembelian</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {customerReport.topCustomers.length === 0 ? (
+                      <div className="flex justify-center items-center h-[200px]">
+                        <p className="text-gray-500">Belum ada data pelanggan</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Nama</TableHead>
+                            <TableHead className="text-right">Invoice</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {customerReport.topCustomers.slice(0, 10).map((customer, index) => (
+                            <TableRow key={customer.clientId}>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-medium">{customer.name}</TableCell>
+                              <TableCell className="text-right">{customer.invoiceCount}</TableCell>
+                              <TableCell className="text-right font-medium text-green-600">
+                                {formatCurrency(customer.totalPurchase)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Highest Receivables */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-yellow-600" />
+                      Piutang Tertinggi
+                    </CardTitle>
+                    <CardDescription>Pelanggan dengan hutang terbesar</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {customerReport.highestReceivables.length === 0 ? (
+                      <div className="flex justify-center items-center h-[200px]">
+                        <p className="text-gray-500">Tidak ada piutang yang belum dibayar</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Nama</TableHead>
+                            <TableHead className="text-right">Piutang</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {customerReport.highestReceivables.map((customer, index) => (
+                            <TableRow key={customer.clientId}>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-medium">{customer.name}</TableCell>
+                              <TableCell className="text-right font-medium text-yellow-600">
+                                {formatCurrency(customer.outstanding)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Customer Purchase Chart */}
+              {customerReport.topCustomers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Pembelian per Pelanggan</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={customerReport.topCustomers.slice(0, 8).map(c => ({ name: c.name, value: c.totalPurchase }))}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {customerReport.topCustomers.slice(0, 8).map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <div className="flex justify-center items-center h-[400px]">
+              <p className="text-gray-500">Tidak ada data pelanggan</p>
+            </div>
+          )}
         </TabsContent>
         
         {/* RINCIAN INCOME & EXPENSES */}

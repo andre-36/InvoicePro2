@@ -48,6 +48,44 @@ import {
 import { type InvoiceItem } from "../shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
+// Helper function to parse date range string
+function parseDateRange(dateRange: string): { startDate: Date; endDate: Date } {
+  const today = new Date();
+  let endDate = new Date(today);
+  let startDate = new Date(today);
+
+  // Handle custom date range format: "custom:YYYY-MM-DD:YYYY-MM-DD"
+  if (dateRange.startsWith('custom:')) {
+    const parts = dateRange.split(':');
+    if (parts.length === 3) {
+      startDate = new Date(parts[1]);
+      endDate = new Date(parts[2]);
+      return { startDate, endDate };
+    }
+  }
+
+  switch (dateRange) {
+    case 'this_month':
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    case 'last_month':
+      startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      endDate.setDate(0); // Last day of previous month
+      break;
+    case 'this_quarter':
+      const quarter = Math.floor(today.getMonth() / 3);
+      startDate = new Date(today.getFullYear(), quarter * 3, 1);
+      break;
+    case 'this_year':
+      startDate = new Date(today.getFullYear(), 0, 1);
+      break;
+    default:
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  }
+
+  return { startDate, endDate };
+}
+
 // Simple password hashing function
 function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
@@ -3039,6 +3077,298 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Summary Dashboard Report
+  app.get("/api/stores/:storeId/reports/summary", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const dateRange = req.query.dateRange as string || 'this_month';
+      
+      // Calculate date range
+      const { startDate, endDate } = parseDateRange(dateRange);
+      
+      // Get all invoices
+      const allInvoices = await storage.getInvoices(storeId);
+      const invoicesInRange = allInvoices.filter(inv => {
+        const invDate = new Date(inv.issueDate);
+        return invDate >= startDate && invDate <= endDate;
+      });
+      
+      // Calculate total sales revenue
+      const totalSales = invoicesInRange.reduce((sum, inv) => 
+        sum + parseFloat(inv.totalAmount || '0'), 0);
+      
+      // Get invoice payments for this period
+      let totalReceived = 0;
+      for (const inv of invoicesInRange) {
+        const payments = await storage.getInvoicePayments(inv.id);
+        const paymentTotal = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        totalReceived += paymentTotal;
+      }
+      
+      // Outstanding receivables (piutang)
+      let totalReceivables = 0;
+      for (const inv of allInvoices) {
+        const payments = await storage.getInvoicePayments(inv.id);
+        const paymentTotal = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        const outstanding = parseFloat(inv.totalAmount || '0') - paymentTotal;
+        if (outstanding > 0) totalReceivables += outstanding;
+      }
+      
+      // Get goods receipts for supplier payables (hutang)
+      const goodsReceipts = await storage.getGoodsReceipts(storeId);
+      let totalPayables = 0;
+      for (const gr of goodsReceipts) {
+        const payments = await storage.getGoodsReceiptPayments(gr.id);
+        const paymentTotal = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        const outstanding = parseFloat(gr.totalAmount || '0') - paymentTotal;
+        if (outstanding > 0) totalPayables += outstanding;
+      }
+      
+      // Get transactions for income/expense breakdown
+      const transactions = await storage.getTransactions(storeId);
+      const transactionsInRange = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate >= startDate && tDate <= endDate;
+      });
+      
+      const totalIncome = transactionsInRange
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+      
+      const totalExpense = transactionsInRange
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+      
+      // Get actual profit from delivered delivery notes using FIFO calculation
+      const profitOverview = await storage.getProfitOverview(storeId, startDate, endDate);
+      const estimatedProfit = profitOverview.realizedProfit + profitOverview.projectedProfit;
+      
+      // Monthly trend (last 6 months)
+      const monthlyData = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        
+        const monthInvoices = allInvoices.filter(inv => {
+          const invDate = new Date(inv.issueDate);
+          return invDate >= monthStart && invDate <= monthEnd;
+        });
+        
+        const monthSales = monthInvoices.reduce((sum, inv) => 
+          sum + parseFloat(inv.totalAmount || '0'), 0);
+        
+        const monthTransactions = transactions.filter(t => {
+          const tDate = new Date(t.date);
+          return tDate >= monthStart && tDate <= monthEnd;
+        });
+        
+        const monthExpenses = monthTransactions
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+        
+        monthlyData.push({
+          month: date.toLocaleString('id-ID', { month: 'short', year: 'numeric' }),
+          sales: monthSales,
+          expenses: monthExpenses,
+          profit: monthSales - monthExpenses
+        });
+      }
+      
+      res.json({
+        totalSales,
+        totalReceived,
+        totalReceivables,
+        totalPayables,
+        totalIncome,
+        totalExpense,
+        netCashFlow: totalIncome - totalExpense,
+        estimatedProfit,
+        profitMargin: totalSales > 0 ? ((totalSales - totalExpense) / totalSales * 100) : 0,
+        invoiceCount: invoicesInRange.length,
+        monthlyTrend: monthlyData
+      });
+    } catch (error) {
+      console.error("Error getting summary report:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product Performance Report
+  app.get("/api/stores/:storeId/reports/products", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const dateRange = req.query.dateRange as string || 'this_month';
+      
+      const { startDate, endDate } = parseDateRange(dateRange);
+      
+      // Get all invoices in range
+      const allInvoices = await storage.getInvoices(storeId);
+      const invoicesInRange = allInvoices.filter(inv => {
+        const invDate = new Date(inv.issueDate);
+        return invDate >= startDate && invDate <= endDate;
+      });
+      
+      // Get all products
+      const products = await storage.getProducts();
+      const productMap = new Map(products.map(p => [p.id, p]));
+      
+      // Aggregate sales by product
+      const productSales: Record<number, { 
+        productId: number, 
+        name: string, 
+        quantitySold: number, 
+        revenue: number,
+        avgPrice: number 
+      }> = {};
+      
+      for (const inv of invoicesInRange) {
+        const invoiceData = await storage.getInvoiceWithItems(inv.id);
+        if (!invoiceData) continue;
+        for (const item of invoiceData.items) {
+          if (item.productId) {
+            const product = productMap.get(item.productId);
+            if (!productSales[item.productId]) {
+              productSales[item.productId] = {
+                productId: item.productId,
+                name: product?.name || item.description,
+                quantitySold: 0,
+                revenue: 0,
+                avgPrice: 0
+              };
+            }
+            productSales[item.productId].quantitySold += parseFloat(item.quantity || '0');
+            productSales[item.productId].revenue += parseFloat(item.total || '0');
+          }
+        }
+      }
+      
+      // Calculate average price and sort by revenue
+      const productList = Object.values(productSales).map(p => ({
+        ...p,
+        avgPrice: p.quantitySold > 0 ? p.revenue / p.quantitySold : 0
+      })).sort((a, b) => b.revenue - a.revenue);
+      
+      // Top 10 products by revenue
+      const topProducts = productList.slice(0, 10);
+      
+      // Category breakdown
+      const categoryRevenue: Record<string, number> = {};
+      for (const ps of productList) {
+        const product = productMap.get(ps.productId);
+        const categoryName = 'Uncategorized'; // Could fetch category name if needed
+        categoryRevenue[categoryName] = (categoryRevenue[categoryName] || 0) + ps.revenue;
+      }
+      
+      res.json({
+        topProducts,
+        totalProductsSold: productList.length,
+        totalRevenue: productList.reduce((sum, p) => sum + p.revenue, 0),
+        totalQuantity: productList.reduce((sum, p) => sum + p.quantitySold, 0),
+        categoryBreakdown: Object.entries(categoryRevenue).map(([name, value]) => ({ name, value }))
+      });
+    } catch (error) {
+      console.error("Error getting product report:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Customer Performance Report
+  app.get("/api/stores/:storeId/reports/customers", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const dateRange = req.query.dateRange as string || 'this_month';
+      
+      const { startDate, endDate } = parseDateRange(dateRange);
+      
+      // Get all clients
+      const clients = await storage.getClients(storeId);
+      const clientMap = new Map(clients.map(c => [c.id, c]));
+      
+      // Get all invoices
+      const allInvoices = await storage.getInvoices(storeId);
+      const invoicesInRange = allInvoices.filter(inv => {
+        const invDate = new Date(inv.issueDate);
+        return invDate >= startDate && invDate <= endDate;
+      });
+      
+      // Aggregate by client
+      const clientStats: Record<number, {
+        clientId: number,
+        name: string,
+        invoiceCount: number,
+        totalPurchase: number,
+        totalPaid: number,
+        outstanding: number,
+        lastPurchaseDate: string | null
+      }> = {};
+      
+      for (const inv of allInvoices) {
+        if (!inv.clientId) continue;
+        
+        const client = clientMap.get(inv.clientId);
+        if (!clientStats[inv.clientId]) {
+          clientStats[inv.clientId] = {
+            clientId: inv.clientId,
+            name: client?.name || 'Unknown',
+            invoiceCount: 0,
+            totalPurchase: 0,
+            totalPaid: 0,
+            outstanding: 0,
+            lastPurchaseDate: null
+          };
+        }
+        
+        // Only count invoices in range for stats
+        const invDate = new Date(inv.issueDate);
+        if (invDate >= startDate && invDate <= endDate) {
+          clientStats[inv.clientId].invoiceCount++;
+          clientStats[inv.clientId].totalPurchase += parseFloat(inv.totalAmount || '0');
+          
+          if (!clientStats[inv.clientId].lastPurchaseDate || 
+              inv.issueDate > clientStats[inv.clientId].lastPurchaseDate!) {
+            clientStats[inv.clientId].lastPurchaseDate = inv.issueDate;
+          }
+        }
+        
+        // Calculate outstanding for all time
+        const payments = await storage.getInvoicePayments(inv.id);
+        const paymentTotal = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        clientStats[inv.clientId].totalPaid += paymentTotal;
+        
+        const outstanding = parseFloat(inv.totalAmount || '0') - paymentTotal;
+        if (outstanding > 0) {
+          clientStats[inv.clientId].outstanding += outstanding;
+        }
+      }
+      
+      const clientList = Object.values(clientStats);
+      
+      // Sort by total purchase (top customers)
+      const topCustomers = [...clientList].sort((a, b) => b.totalPurchase - a.totalPurchase).slice(0, 10);
+      
+      // Sort by outstanding (highest debt)
+      const highestReceivables = [...clientList]
+        .filter(c => c.outstanding > 0)
+        .sort((a, b) => b.outstanding - a.outstanding)
+        .slice(0, 10);
+      
+      res.json({
+        topCustomers,
+        highestReceivables,
+        totalCustomers: clientList.length,
+        totalReceivables: clientList.reduce((sum, c) => sum + c.outstanding, 0),
+        avgPurchasePerCustomer: clientList.length > 0 
+          ? clientList.reduce((sum, c) => sum + c.totalPurchase, 0) / clientList.length 
+          : 0
+      });
+    } catch (error) {
+      console.error("Error getting customer report:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Database backup endpoint
   app.get("/api/backup/export", requireAuth, async (req, res) => {
     try {
@@ -3298,8 +3628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const exportData: any[] = [];
 
       for (const invoice of finalInvoices) {
-        const items = await storage.getInvoiceItems(invoice.id);
+        const invoiceData = await storage.getInvoiceWithItems(invoice.id);
         const client = invoice.clientId ? clientMap.get(invoice.clientId) : null;
+        const items = invoiceData?.items || [];
 
         for (const item of items) {
           const product = productMap.get(item.productId);
