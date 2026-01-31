@@ -1620,7 +1620,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       const discount = parseFloat(invoiceData.discount?.toString() || "0");
-      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount;
+      const shipping = parseFloat((invoiceData as any).shipping?.toString() || "0");
+      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount + shipping;
 
       // Update the invoice with calculated totals (profit will be calculated when Delivery Note is delivered)
       await tx
@@ -1735,7 +1736,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       const discount = parseFloat(invoiceData.discount?.toString() || "0");
-      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount;
+      const shipping = parseFloat((invoiceData as any).shipping?.toString() || "0");
+      const invoiceTotalAmount = invoiceSubtotal + invoiceTaxAmount - discount + shipping;
 
       // Update invoice with recalculated totals
       const [updatedInvoice] = await tx
