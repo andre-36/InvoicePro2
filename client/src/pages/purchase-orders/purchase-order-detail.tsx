@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Edit, Trash2, Package, Send, Check, Clock, X, AlertTriangle, CheckCircle, ArrowLeft } from "lucide-react";
+import { Edit, Trash2, Package, Send, Check, Clock, X, AlertTriangle, CheckCircle, ArrowLeft, Printer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,58 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
   const { data: purchaseOrder, isLoading, error } = useQuery({
     queryKey: ['/api/purchase-orders', id],
   });
+
+  // Fetch current user for company information
+  const { data: currentUser } = useQuery<{
+    companyName?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    companyEmail?: string;
+    logoUrl?: string;
+  }>({
+    queryKey: ['/api/user'],
+  });
+
+  // Print PO with A4 format
+  const handlePrint = () => {
+    // Create a temporary style element for A4 page size
+    const styleElement = document.createElement('style');
+    styleElement.id = 'po-print-style';
+    styleElement.textContent = `
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      @media print {
+        body > div:not(.print-po-a4-wrapper),
+        #root > *:not(.print-po-a4-wrapper),
+        .screen-only {
+          display: none !important;
+        }
+        .print-po-a4-wrapper {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+        }
+        html, body {
+          width: 21cm !important;
+          height: 29.7cm !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    // Trigger print
+    setTimeout(() => {
+      window.print();
+      // Clean up the style element after printing
+      setTimeout(() => {
+        const el = document.getElementById('po-print-style');
+        if (el) el.remove();
+      }, 500);
+    }, 100);
+  };
 
   // Delete purchase order mutation
   const deleteMutation = useMutation({
@@ -156,6 +208,11 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
           <Button onClick={() => navigate(`/purchase-orders/${id}/edit`)} variant="outline">
             <Edit className="mr-2 h-4 w-4" />
             Edit
+          </Button>
+
+          <Button onClick={handlePrint} variant="outline">
+            <Printer className="mr-2 h-4 w-4" />
+            Print
           </Button>
           
           <AlertDialog>
@@ -373,6 +430,137 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Print Template - A4 Format */}
+      <div className="print-po-a4-wrapper" style={{ display: 'none' }}>
+        <div className="print-po-a4-template">
+          {/* Header */}
+          <div className="print-po-header">
+            <div>
+              {currentUser?.logoUrl ? (
+                <img 
+                  src={currentUser.logoUrl} 
+                  alt="Company Logo" 
+                  className="print-po-logo"
+                />
+              ) : (
+                <div className="print-po-company-name">{currentUser?.companyName || 'Company Name'}</div>
+              )}
+            </div>
+            <div className="print-po-company-info">
+              <div className="print-po-company-name">{currentUser?.companyName || 'Company Name'}</div>
+              {currentUser?.companyAddress && <div>{currentUser.companyAddress}</div>}
+              {currentUser?.companyPhone && <div>Tel: {currentUser.companyPhone}</div>}
+              {currentUser?.companyEmail && <div>Email: {currentUser.companyEmail}</div>}
+            </div>
+          </div>
+
+          {/* Title */}
+          <div className="print-po-title-section">
+            <div className="print-po-title">Purchase Order</div>
+            <div className="print-po-number">{purchaseOrder.purchaseOrderNumber}</div>
+          </div>
+
+          {/* Info Grid */}
+          <div className="print-po-info-grid">
+            <div className="print-po-info-box">
+              <h4>Supplier Information</h4>
+              <p><strong>{purchaseOrder.supplierName}</strong></p>
+              {purchaseOrder.supplierAddress && <p>{purchaseOrder.supplierAddress}</p>}
+              {purchaseOrder.supplierPhone && <p>Tel: {purchaseOrder.supplierPhone}</p>}
+              {purchaseOrder.supplierEmail && <p>Email: {purchaseOrder.supplierEmail}</p>}
+            </div>
+            <div className="print-po-info-box">
+              <h4>Order Details</h4>
+              <p><strong>Order Date:</strong> {formatDate(purchaseOrder.orderDate)}</p>
+              <p><strong>Status:</strong> {purchaseOrder.status.charAt(0).toUpperCase() + purchaseOrder.status.slice(1)}</p>
+              {purchaseOrder.useFakturPajak && (
+                <p><strong>Faktur Pajak:</strong> PPN {purchaseOrder.taxRate || 11}%</p>
+              )}
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <table className="print-po-items-table">
+            <thead>
+              <tr>
+                <th style={{ width: '5%' }}>No</th>
+                <th style={{ width: '40%' }}>Description</th>
+                <th style={{ width: '12%' }} className="text-right">Qty</th>
+                <th style={{ width: '18%' }} className="text-right">Unit Cost</th>
+                <th style={{ width: '10%' }} className="text-right">Tax</th>
+                <th style={{ width: '15%' }} className="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchaseOrder.items.map((item: any, index: number) => (
+                <tr key={item.id || index}>
+                  <td>{index + 1}</td>
+                  <td>{item.description}</td>
+                  <td className="text-right">{parseFloat(item.quantity)}</td>
+                  <td className="text-right">{formatCurrency(item.unitCost)}</td>
+                  <td className="text-right">{formatCurrency(item.taxAmount)}</td>
+                  <td className="text-right">{formatCurrency(item.totalAmount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="print-po-totals">
+            <div className="print-po-totals-box">
+              <div className="print-po-totals-row">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(purchaseOrder.subtotal)}</span>
+              </div>
+              {parseFloat(purchaseOrder.taxAmount || '0') > 0 && (
+                <div className="print-po-totals-row">
+                  <span>Tax (PPN {purchaseOrder.taxRate || 11}%):</span>
+                  <span>{formatCurrency(purchaseOrder.taxAmount)}</span>
+                </div>
+              )}
+              {parseFloat(purchaseOrder.discount || '0') > 0 && (
+                <div className="print-po-totals-row">
+                  <span>Discount:</span>
+                  <span>-{formatCurrency(purchaseOrder.discount)}</span>
+                </div>
+              )}
+              {parseFloat(purchaseOrder.shipping || '0') > 0 && (
+                <div className="print-po-totals-row">
+                  <span>Shipping:</span>
+                  <span>{formatCurrency(purchaseOrder.shipping)}</span>
+                </div>
+              )}
+              <div className="print-po-totals-row total">
+                <span>Total Amount:</span>
+                <span>{formatCurrency(purchaseOrder.totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {purchaseOrder.notes && (
+            <div className="print-po-notes">
+              <h4>Notes:</h4>
+              <p>{purchaseOrder.notes}</p>
+            </div>
+          )}
+
+          {/* Signatures */}
+          <div className="print-po-signatures">
+            <div className="print-po-signature-box">
+              <div className="print-po-signature-line">
+                Authorized Signature
+              </div>
+            </div>
+            <div className="print-po-signature-box">
+              <div className="print-po-signature-line">
+                Supplier Acknowledgment
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -549,4 +549,203 @@
     font-size: 10.5pt;
     margin-bottom: 0.15cm;
   }
+
+  /* Purchase Order A4 Print Styles */
+  .print-po-a4-wrapper {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .print-po-a4-template {
+    width: 21cm;
+    min-height: 29.7cm;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.4;
+    color: #000;
+    margin: 0;
+    padding: 1.5cm;
+    box-sizing: border-box;
+    background: white;
+    page-break-after: always;
+  }
+
+  .print-po-a4-template:last-child {
+    page-break-after: auto;
+  }
+
+  .print-po-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1cm;
+    border-bottom: 2px solid #333;
+    padding-bottom: 0.5cm;
+  }
+
+  .print-po-logo {
+    width: 4cm;
+    height: auto;
+    max-height: 2.5cm;
+    object-fit: contain;
+  }
+
+  .print-po-company-info {
+    text-align: right;
+  }
+
+  .print-po-company-name {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 0.2cm;
+  }
+
+  .print-po-title-section {
+    text-align: center;
+    margin-bottom: 0.8cm;
+  }
+
+  .print-po-title {
+    font-size: 18pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 0.3cm;
+  }
+
+  .print-po-number {
+    font-size: 13pt;
+    font-weight: 600;
+  }
+
+  .print-po-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1cm;
+    margin-bottom: 1cm;
+  }
+
+  .print-po-info-box {
+    padding: 0.4cm;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .print-po-info-box h4 {
+    font-size: 10pt;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 0.3cm;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.2cm;
+  }
+
+  .print-po-info-box p {
+    font-size: 11pt;
+    margin: 0.1cm 0;
+  }
+
+  .print-po-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1cm;
+    font-size: 10pt;
+  }
+
+  .print-po-items-table th {
+    background: #f5f5f5;
+    padding: 0.3cm 0.2cm;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid #ddd;
+  }
+
+  .print-po-items-table th.text-right {
+    text-align: right;
+  }
+
+  .print-po-items-table td {
+    padding: 0.25cm 0.2cm;
+    border: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  .print-po-items-table td.text-right {
+    text-align: right;
+  }
+
+  .print-po-totals {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1cm;
+  }
+
+  .print-po-totals-box {
+    width: 8cm;
+  }
+
+  .print-po-totals-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.15cm 0;
+    font-size: 11pt;
+  }
+
+  .print-po-totals-row.total {
+    border-top: 2px solid #333;
+    margin-top: 0.3cm;
+    padding-top: 0.3cm;
+    font-weight: bold;
+    font-size: 12pt;
+  }
+
+  .print-po-notes {
+    margin-bottom: 1cm;
+    padding: 0.4cm;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+
+  .print-po-notes h4 {
+    font-size: 10pt;
+    font-weight: 600;
+    margin-bottom: 0.2cm;
+  }
+
+  .print-po-notes p {
+    font-size: 10pt;
+    white-space: pre-line;
+  }
+
+  .print-po-signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2cm;
+    margin-top: 2cm;
+  }
+
+  .print-po-signature-box {
+    text-align: center;
+  }
+
+  .print-po-signature-line {
+    border-top: 1px solid #000;
+    margin-top: 2cm;
+    padding-top: 0.3cm;
+    font-size: 10pt;
+  }
+
+  .print-po-footer {
+    position: absolute;
+    bottom: 1cm;
+    left: 1.5cm;
+    right: 1.5cm;
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+    border-top: 1px solid #ddd;
+    padding-top: 0.3cm;
+  }
 }
+
+/* Specific page size for PO A4 print - handled via JavaScript */
