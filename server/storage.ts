@@ -5303,7 +5303,7 @@ export class DatabaseStorage implements IStorage {
       FROM product_batches pb
       JOIN products p ON pb.product_id = p.id
       WHERE pb.remaining_quantity > 0
-        AND p.store_id = ${storeId}
+        AND pb.store_id = ${storeId}
       ORDER BY pb.product_id, pb.purchase_date ASC
     `);
 
