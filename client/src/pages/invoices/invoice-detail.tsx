@@ -174,11 +174,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       height += PRINT_CONSTANTS.FOOTER_ROW_HEIGHT;
     }
     
-    // Add height for tax/PPN row if using Faktur Pajak
-    if ((invoice as any).useFakturPajak && parseFloat(invoice.taxAmount || '0') > 0) {
-      height += PRINT_CONSTANTS.FOOTER_ROW_HEIGHT;
-    }
-    
     return height;
   }, [invoice]);
 
@@ -1345,23 +1340,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 </div>
                 
                 <div className="print-footer-right">
-                  {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.taxAmount || '0') > 0 ? (
-                    <>
-                      <div className="print-total-row">
-                        <span className="print-total-label">DPP</span>
-                        <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
-                      </div>
-                      <div className="print-total-row">
-                        <span className="print-total-label">PPN ({invoice.taxRate || 11}%)</span>
-                        <span className="print-total-value">{formatCurrencyAccounting(invoice.taxAmount || '0')}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="print-total-row">
-                      <span className="print-total-label">Subtotal</span>
-                      <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
-                    </div>
-                  )}
+                  <div className="print-total-row">
+                    <span className="print-total-label">Subtotal</span>
+                    <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
+                  </div>
                   {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
                     <div className="print-total-row">
                       <span className="print-total-label">Discount</span>
@@ -1570,20 +1552,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                          invoice.paymentTerms || 'Custom'}
                       </span>
                     </div>
-                    <div className="flex justify-between md:justify-end md:flex-col">
-                      <span className="text-sm font-medium text-gray-500 md:mb-1">Faktur Pajak:</span>
-                      <span className="text-sm">
-                        {invoice.useFakturPajak ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Active ({invoice.taxRate || 11}% PPN)
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                            Inactive
-                          </Badge>
-                        )}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1639,17 +1607,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <CardFooter className="flex-col items-end p-6 border-t">
               <div className="w-full sm:w-80 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">
-                    {invoice.useFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}
-                  </span>
+                  <span className="font-medium text-gray-700">Subtotal:</span>
                   <span className="text-gray-900">{formatCurrency(invoice.subtotal || '0')}</span>
                 </div>
-                {invoice.useFakturPajak && (
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700">PPN ({invoice.taxRate || '11'}%):</span>
-                    <span className="text-gray-900">{formatCurrency(invoice.taxAmount || '0')}</span>
-                  </div>
-                )}
                 {parseFloat(invoice.discount || '0') > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-gray-700">Discount:</span>

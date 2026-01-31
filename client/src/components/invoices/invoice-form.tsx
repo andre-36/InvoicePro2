@@ -535,16 +535,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     }
   }, [invoiceData, invoiceId, form]);
 
-  // Watch faktur pajak toggle
-  const watchUseFakturPajak = form.watch('invoice.useFakturPajak');
-  const watchTaxRate = form.watch('invoice.taxRate');
+  // Watch discount and shipping
   const watchDiscount = form.watch('invoice.discount');
   const watchShipping = form.watch('invoice.shipping');
 
-  // Calculate totals whenever items or tax settings change
+  // Calculate totals whenever items or settings change
   useEffect(() => {
     if (items.length > 0) {
-      // Sum up all item totals (these are the full prices including tax if applicable)
+      // Sum up all item totals
       let itemsTotal = 0;
       items.forEach(item => {
         itemsTotal += parseFloat(item.subtotal || "0");
@@ -554,38 +552,22 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const discountValue = parseFloat(watchDiscount || "0");
       const shippingValue = parseFloat(watchShipping || "0");
 
-      // Get tax rate from user settings or form
-      const taxRate = parseFloat(watchTaxRate || currentUser?.defaultTaxRate || "11") || 11;
-      const taxMultiplier = 1 + (taxRate / 100);
-
-      let subtotal: number;
-      let taxAmount: number;
-      let total: number;
-
-      if (watchUseFakturPajak) {
-        // When using faktur pajak, prices are tax-inclusive
-        // Calculate base subtotal by dividing by tax multiplier
-        subtotal = itemsTotal / taxMultiplier;
-        taxAmount = itemsTotal - subtotal;
-        total = itemsTotal - discountValue + shippingValue;
-      } else {
-        // No tax - subtotal equals items total, no separate tax
-        subtotal = itemsTotal;
-        taxAmount = 0;
-        total = subtotal - discountValue + shippingValue;
-      }
+      // Subtotal equals items total, no separate tax
+      const subtotal = itemsTotal;
+      const taxAmount = 0;
+      const total = subtotal - discountValue + shippingValue;
 
       // Update form values
       form.setValue('invoice.subtotal', subtotal.toFixed(2));
       form.setValue('invoice.tax', taxAmount.toFixed(2));
-      form.setValue('invoice.taxRate', taxRate.toString());
+      form.setValue('invoice.taxRate', "0");
       form.setValue('invoice.shipping', Math.floor(shippingValue).toString());
       form.setValue('invoice.total', total.toFixed(2));
 
       // Update items in the form
       form.setValue('items', items);
     }
-  }, [items, form, watchUseFakturPajak, watchTaxRate, watchDiscount, watchShipping, currentUser]);
+  }, [items, form, watchDiscount, watchShipping]);
 
   // Add a new invoice item
   const addItem = () => {
@@ -1211,30 +1193,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   />
                 </div>
 
-                {/* Faktur Pajak Toggle */}
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="invoice.useFakturPajak"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel>Faktur Pajak (PPN {currentUser?.defaultTaxRate || "11"}%)</FormLabel>
-                          <FormDescription>
-                            Tampilkan DPP + PPN terpisah
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
                 {/* Delivery Type Selection */}
                 <div className="mt-4">
                   <FormField
@@ -1484,19 +1442,9 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                 <div className="sm:w-1/2 ml-auto">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="font-medium text-gray-700">
-                        {watchUseFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}
-                      </span>
+                      <span className="font-medium text-gray-700">Subtotal:</span>
                       <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.subtotal') || '0'))}</span>
                     </div>
-                    {watchUseFakturPajak && (
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium text-gray-700">
-                          PPN ({currentUser?.defaultTaxRate || "11"}%):
-                        </span>
-                        <span className="text-gray-900">{formatCurrency(parseFloat(form.watch('invoice.tax') || '0'))}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Discount:</span>
                       <div className="flex items-center space-x-2">

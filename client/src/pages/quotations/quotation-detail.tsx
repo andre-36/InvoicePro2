@@ -392,23 +392,10 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-footer-right">
-              {(quotation as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 ? (
-                <>
-                  <div className="print-total-row">
-                    <span className="print-total-label">DPP</span>
-                    <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
-                  </div>
-                  <div className="print-total-row">
-                    <span className="print-total-label">PPN ({quotation.taxRate || 11}%)</span>
-                    <span className="print-total-value">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="print-total-row">
-                  <span className="print-total-label">Subtotal</span>
-                  <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
-                </div>
-              )}
+              <div className="print-total-row">
+                <span className="print-total-label">Subtotal</span>
+                <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
+              </div>
               {printSettings?.showDiscount !== false && parseFloat(quotation.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
@@ -597,15 +584,9 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>{quotation.useFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}</span>
+                  <span>Subtotal:</span>
                   <span data-testid="text-subtotal">{formatCurrency(parseFloat(quotation.subtotal))}</span>
                 </div>
-                {quotation.useFakturPajak && (
-                  <div className="flex justify-between">
-                    <span>PPN ({quotation.taxRate || '11'}%):</span>
-                    <span data-testid="text-tax-amount">{formatCurrency(parseFloat(quotation.taxAmount || '0'))}</span>
-                  </div>
-                )}
                 {parseFloat(quotation.discount || '0') > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount:</span>
