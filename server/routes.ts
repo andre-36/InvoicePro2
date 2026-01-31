@@ -1278,7 +1278,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
-      const { items, ...invoiceFields } = req.body;
+      
+      // Handle both nested { invoice: {...}, items: [...] } and flat structure
+      const items = req.body.items;
+      const invoiceFields = req.body.invoice || (() => {
+        const { items: _, ...rest } = req.body;
+        return rest;
+      })();
       
       // Prevent modification of invoice number to prevent fraud
       if (invoiceFields.invoiceNumber !== undefined) {
