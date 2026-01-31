@@ -433,7 +433,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
       </div>
 
       {/* Print Template - A4 Format */}
-      <div className="print-po-a4-wrapper" style={{ display: 'none' }}>
+      <div className="print-po-a4-wrapper screen-hidden">
         <div className="print-po-a4-template">
           {/* Header */}
           <div className="print-po-header">
