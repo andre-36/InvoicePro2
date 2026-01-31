@@ -208,34 +208,27 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       return [{ items: [...items], isLastPage: true }];
     }
     
-    // Multiple pages needed - calculate distribution from the end
-    // Last page must have footer with max maxItemsWithFooter items
-    // Previous pages have no footer with max maxItemsWithoutFooter items
+    // Multiple pages needed - maximize items on earlier pages (without footer)
+    // Last page has footer with remaining items
     const pages: { items: typeof items; isLastPage: boolean }[] = [];
-    const allItems = [...items];
+    let remainingItems = [...items];
     
-    // Calculate how many items for the last page (with footer)
-    // and how many for non-last pages (without footer)
-    let remainingForLastPage = Math.min(maxItemsWithFooter, allItems.length);
-    let itemsForPreviousPages = allItems.length - remainingForLastPage;
-    
-    // If we have too many items for previous pages, we might need to redistribute
-    // so that last page isn't overloaded
-    while (itemsForPreviousPages > 0) {
-      const itemsThisPage = Math.min(maxItemsWithoutFooter, itemsForPreviousPages);
+    while (remainingItems.length > 0) {
+      // Check if remaining items fit on one page with footer (this becomes the last page)
+      if (remainingItems.length <= maxItemsWithFooter) {
+        pages.push({ items: remainingItems, isLastPage: true });
+        break;
+      }
+      
+      // Not the last page yet - maximize items on this page (no footer)
+      // But ensure at least 1 item remains for the last page with footer
+      const itemsToTake = Math.min(maxItemsWithoutFooter, remainingItems.length - 1);
       pages.push({ 
-        items: allItems.slice(pages.length * maxItemsWithoutFooter, pages.length * maxItemsWithoutFooter + itemsThisPage), 
+        items: remainingItems.slice(0, itemsToTake), 
         isLastPage: false 
       });
-      itemsForPreviousPages -= itemsThisPage;
+      remainingItems = remainingItems.slice(itemsToTake);
     }
-    
-    // Add the last page with footer
-    const startIndex = allItems.length - remainingForLastPage;
-    pages.push({ 
-      items: allItems.slice(startIndex), 
-      isLastPage: true 
-    });
     
     return pages;
   }, [items, calculateFooterHeight]);
