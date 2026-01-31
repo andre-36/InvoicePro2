@@ -1302,7 +1302,7 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value="payment" className="gap-2">
               <CreditCard className="h-4 w-4" />
-              <span>Payment Methods</span>
+              <span>Payment</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -1315,14 +1315,6 @@ export default function SettingsPage() {
             <TabsTrigger value="categories" className="gap-2">
               <FolderOpen className="h-4 w-4" />
               <span>Categories</span>
-            </TabsTrigger>
-            <TabsTrigger value="cash-accounts" className="gap-2">
-              <Wallet className="h-4 w-4" />
-              <span>Cash Accounts</span>
-            </TabsTrigger>
-            <TabsTrigger value="auto-transaction" className="gap-2">
-              <ArrowLeftRight className="h-4 w-4" />
-              <span>Auto Transaction</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1948,6 +1940,135 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Cash Accounts Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Cash Accounts</CardTitle>
+                <CardDescription>Manage your cash accounts and track balances</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => {
+                  transferForm.reset({
+                    fromAccountId: 0,
+                    toAccountId: 0,
+                    amount: "",
+                    date: new Date().toISOString().split('T')[0],
+                    notes: "",
+                    reference: "",
+                    storeId: 1
+                  });
+                  setTransferDialogOpen(true);
+                }} variant="outline" className="gap-2">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Transfer
+                </Button>
+                <Button onClick={() => {
+                  cashAccountForm.reset({
+                    name: "",
+                    accountType: "cash",
+                    initialBalance: "0",
+                    description: "",
+                    isActive: true,
+                    storeId: 1
+                  });
+                  setEditingCashAccount(null);
+                  setCashAccountDialogOpen(true);
+                }} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Account
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {cashAccountsLoading ? (
+                <div className="text-center py-4 text-muted-foreground">Loading...</div>
+              ) : !cashAccounts?.length ? (
+                <div className="text-center py-4 text-muted-foreground">No cash accounts yet</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {cashAccounts.map((account) => (
+                      <Card key={account.id} className="relative">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">{account.name}</CardTitle>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingCashAccount(account);
+                                  cashAccountForm.reset({
+                                    name: account.name,
+                                    accountType: account.accountType as "cash" | "bank_company" | "bank_personal" | "other",
+                                    initialBalance: account.initialBalance,
+                                    description: account.description || "",
+                                    isActive: account.isActive,
+                                    storeId: 1
+                                  });
+                                  setCashAccountDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingCashAccount(account)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                          <CardDescription>
+                            {account.accountType === 'cash' && 'Cash'}
+                            {account.accountType === 'bank_company' && 'Company Bank Account'}
+                            {account.accountType === 'bank_personal' && 'Personal Bank Account'}
+                            {account.accountType === 'other' && 'Other'}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            Rp {account.currentBalance.toLocaleString('id-ID')}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Initial Balance:</span>
+                              <span>Rp {parseFloat(account.initialBalance).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600">
+                              <span>Income:</span>
+                              <span>+Rp {account.totalIncome.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-red-600">
+                              <span>Expense:</span>
+                              <span>-Rp {account.totalExpense.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-blue-600">
+                              <span>Transfers In:</span>
+                              <span>+Rp {account.totalTransfersIn.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-orange-600">
+                              <span>Transfers Out:</span>
+                              <span>-Rp {account.totalTransfersOut.toLocaleString('id-ID')}</span>
+                            </div>
+                          </div>
+                          {!account.isActive && (
+                            <div className="mt-2 text-xs text-red-500">Inactive</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Auto Transaction Section */}
+          <AutoTransactionSettings />
         </TabsContent>
 
         <TabsContent value="security" className="space-y-6">
@@ -2342,136 +2463,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="cash-accounts" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Cash Accounts</CardTitle>
-                <CardDescription>Manage your cash accounts and track balances</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => {
-                  transferForm.reset({
-                    fromAccountId: 0,
-                    toAccountId: 0,
-                    amount: "",
-                    date: new Date().toISOString().split('T')[0],
-                    notes: "",
-                    reference: "",
-                    storeId: 1
-                  });
-                  setTransferDialogOpen(true);
-                }} variant="outline" className="gap-2">
-                  <ArrowLeftRight className="h-4 w-4" />
-                  Transfer
-                </Button>
-                <Button onClick={() => {
-                  cashAccountForm.reset({
-                    name: "",
-                    accountType: "cash",
-                    initialBalance: "0",
-                    description: "",
-                    isActive: true,
-                    storeId: 1
-                  });
-                  setEditingCashAccount(null);
-                  setCashAccountDialogOpen(true);
-                }} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Account
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {cashAccountsLoading ? (
-                <div className="text-center py-4 text-muted-foreground">Loading...</div>
-              ) : !cashAccounts?.length ? (
-                <div className="text-center py-4 text-muted-foreground">No cash accounts yet</div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {cashAccounts.map((account) => (
-                      <Card key={account.id} className="relative">
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">{account.name}</CardTitle>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingCashAccount(account);
-                                  cashAccountForm.reset({
-                                    name: account.name,
-                                    accountType: account.accountType as "cash" | "bank_company" | "bank_personal" | "other",
-                                    initialBalance: account.initialBalance,
-                                    description: account.description || "",
-                                    isActive: account.isActive,
-                                    storeId: 1
-                                  });
-                                  setCashAccountDialogOpen(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeletingCashAccount(account)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </div>
-                          <CardDescription>
-                            {account.accountType === 'cash' && 'Cash'}
-                            {account.accountType === 'bank_company' && 'Company Bank Account'}
-                            {account.accountType === 'bank_personal' && 'Personal Bank Account'}
-                            {account.accountType === 'other' && 'Other'}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            Rp {account.currentBalance.toLocaleString('id-ID')}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-2 space-y-1">
-                            <div className="flex justify-between">
-                              <span>Initial Balance:</span>
-                              <span>Rp {parseFloat(account.initialBalance).toLocaleString('id-ID')}</span>
-                            </div>
-                            <div className="flex justify-between text-green-600">
-                              <span>Income:</span>
-                              <span>+Rp {account.totalIncome.toLocaleString('id-ID')}</span>
-                            </div>
-                            <div className="flex justify-between text-red-600">
-                              <span>Expense:</span>
-                              <span>-Rp {account.totalExpense.toLocaleString('id-ID')}</span>
-                            </div>
-                            <div className="flex justify-between text-blue-600">
-                              <span>Transfers In:</span>
-                              <span>+Rp {account.totalTransfersIn.toLocaleString('id-ID')}</span>
-                            </div>
-                            <div className="flex justify-between text-orange-600">
-                              <span>Transfers Out:</span>
-                              <span>-Rp {account.totalTransfersOut.toLocaleString('id-ID')}</span>
-                            </div>
-                          </div>
-                          {!account.isActive && (
-                            <div className="mt-2 text-xs text-red-500">Inactive</div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="auto-transaction" className="space-y-6">
-          <AutoTransactionSettings />
-        </TabsContent>
       </Tabs>
 
       {/* Cash Account Add/Edit Dialog */}
