@@ -52,10 +52,13 @@ type Quotation = {
 
 type QuotationStatus = 'all' | 'draft' | 'sent' | 'converted' | 'rejected' | 'expired';
 
+type SortDirection = 'asc' | 'desc' | null;
+
 export default function QuotationsPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuotationStatus>("all");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -129,6 +132,16 @@ export default function QuotationsPage() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
+  const toggleSort = () => {
+    if (sortDirection === null) {
+      setSortDirection('asc');
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc');
+    } else {
+      setSortDirection(null);
+    }
+  };
+
   const filteredQuotations = quotations?.filter((quotation) => {
     const matchesSearch = 
       quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -143,6 +156,13 @@ export default function QuotationsPage() {
     }
     return matchesSearch && matchesStatus;
   }) || [];
+
+  const sortedQuotations = sortDirection 
+    ? [...filteredQuotations].sort((a, b) => {
+        const comparison = a.quotationNumber.localeCompare(b.quotationNumber, undefined, { numeric: true });
+        return sortDirection === 'asc' ? comparison : -comparison;
+      })
+    : filteredQuotations;
 
   const stats = {
     total: quotations?.length || 0,
@@ -265,7 +285,17 @@ export default function QuotationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Quotation Number</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 px-2 -ml-2 font-medium hover:bg-transparent"
+                      onClick={toggleSort}
+                    >
+                      Quotation Number
+                      <ArrowUpDown className={`ml-2 h-4 w-4 ${sortDirection ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </Button>
+                  </TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Issue Date</TableHead>
                   <TableHead>Expiry Date</TableHead>
@@ -275,14 +305,14 @@ export default function QuotationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotations.length === 0 ? (
+                {sortedQuotations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No quotations found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredQuotations.map((quotation) => (
+                  sortedQuotations.map((quotation) => (
                     <TableRow key={quotation.id} data-testid={`row-quotation-${quotation.id}`}>
                       <TableCell className="font-medium">
                         <Link href={`/quotations/${quotation.id}`} className="hover:underline">
