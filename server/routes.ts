@@ -3901,6 +3901,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export transactions to Excel
+  app.get("/api/transactions/export/xlsx", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const transactionType = req.query.type as string; // 'all', 'income', 'expense'
+
+      // Get all transactions
+      const allTransactions = await storage.getTransactions(storeId);
+      
+      // Filter by date range
+      let filteredTransactions = allTransactions;
+      if (startDate) {
+        const normalizedStart = startDate.substring(0, 10);
+        filteredTransactions = filteredTransactions.filter(t => {
+          const tDate = String(t.date).substring(0, 10);
+          return tDate >= normalizedStart;
+        });
+      }
+      if (endDate) {
+        const normalizedEnd = endDate.substring(0, 10);
+        filteredTransactions = filteredTransactions.filter(t => {
+          const tDate = String(t.date).substring(0, 10);
+          return tDate <= normalizedEnd;
+        });
+      }
+
+      // Filter by transaction type
+      if (transactionType && transactionType !== 'all') {
+        filteredTransactions = filteredTransactions.filter(t => t.type === transactionType);
+      }
+
+      // Sort by date descending
+      filteredTransactions.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+      // Get cash accounts for lookup
+      const cashAccounts = await storage.getCashAccounts(storeId);
+      const cashAccountMap = new Map(cashAccounts.map(a => [a.id, a.name]));
+
+      // Build export data
+      const exportData = filteredTransactions.map(t => ({
+        'Tanggal': t.date,
+        'Tipe': t.type === 'income' ? 'Pemasukan' : 'Pengeluaran',
+        'Deskripsi': t.description,
+        'Kategori': t.category || '-',
+        'Akun Kas': t.accountId ? cashAccountMap.get(t.accountId) || '-' : '-',
+        'No Referensi': t.referenceNumber || '-',
+        'Jumlah': parseFloat(t.amount),
+      }));
+
+      // Create Excel workbook
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
+
+      // Auto-width columns
+      const colWidths = [
+        { wch: 12 }, // Tanggal
+        { wch: 12 }, // Tipe
+        { wch: 40 }, // Deskripsi
+        { wch: 20 }, // Kategori
+        { wch: 20 }, // Akun Kas
+        { wch: 20 }, // No Referensi
+        { wch: 15 }, // Jumlah
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // Write to buffer
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = `transaksi-${startDate || 'all'}-to-${endDate || 'all'}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting transactions:", error);
+      res.status(500).json({ error: "Failed to export transactions" });
+    }
+  });
+
   // Stock management routes
   app.get("/api/products/:id/stock", requireAuth, async (req, res) => {
     try {

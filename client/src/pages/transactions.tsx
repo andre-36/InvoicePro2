@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle, Download, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,6 @@ import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
-import { Wallet } from "lucide-react";
 
 const transactionFormSchema = insertTransactionSchema.extend({
   date: z.string().min(1, "Date is required"),
@@ -63,6 +63,11 @@ export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [exportType, setExportType] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -205,6 +210,52 @@ export default function TransactionsPage() {
     }
   };
 
+  // Handle export to Excel
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      
+      const params = new URLSearchParams();
+      params.append('storeId', '1');
+      if (exportStartDate) params.append('startDate', exportStartDate);
+      if (exportEndDate) params.append('endDate', exportEndDate);
+      if (exportType) params.append('type', exportType);
+      
+      const response = await fetch(`/api/transactions/export/xlsx?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export transactions');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transaksi-${exportStartDate || 'all'}-to-${exportEndDate || 'all'}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Export Berhasil",
+        description: "File Excel telah didownload",
+      });
+      
+      setExportDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal export transaksi",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Calculate totals
   const totalIncome = transactions?.filter(t => t.type === 'income').reduce((sum, t) => sum + parseFloat(t.amount), 0) || 0;
   const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((sum, t) => sum + parseFloat(t.amount), 0) || 0;
@@ -217,10 +268,16 @@ export default function TransactionsPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Transactions</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Manage income and expense transactions</p>
         </div>
-        <Button onClick={handleAdd} data-testid="button-add-transaction">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Excel
+          </Button>
+          <Button onClick={handleAdd} data-testid="button-add-transaction">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -560,6 +617,62 @@ export default function TransactionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Export Transaksi ke Excel</DialogTitle>
+            <DialogDescription>
+              Pilih rentang tanggal dan tipe transaksi untuk export
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Dari Tanggal</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={exportStartDate}
+                  onChange={(e) => setExportStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endDate">Sampai Tanggal</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={exportEndDate}
+                  onChange={(e) => setExportEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exportType">Tipe Transaksi</Label>
+              <Select value={exportType} onValueChange={setExportType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tipe transaksi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="income">Pemasukan</SelectItem>
+                  <SelectItem value="expense">Pengeluaran</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleExportExcel} disabled={isExporting}>
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? "Exporting..." : "Download Excel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
