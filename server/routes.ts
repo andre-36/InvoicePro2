@@ -1299,6 +1299,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build the update object with only allowed fields and proper date conversion
       const invoiceFields: Record<string, any> = {};
       
+      // Map frontend field names to backend field names
+      if (safeFields.tax !== undefined && safeFields.taxAmount === undefined) {
+        safeFields.taxAmount = safeFields.tax;
+      }
+      if (safeFields.total !== undefined && safeFields.totalAmount === undefined) {
+        safeFields.totalAmount = safeFields.total;
+      }
+      
       // Copy safe primitive fields
       const allowedFields = [
         'clientId', 'status', 'paymentTerms', 'subtotal', 'taxRate', 'taxAmount',
