@@ -4942,9 +4942,106 @@ export class DatabaseStorage implements IStorage {
     const netFinancingCashFlow = ownerInvestment;
     const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
 
-    // Calculate beginning cash (simplified - would need a proper cash account)
-    const beginningCash = 0; // This should be tracked separately
-    const endingCash = beginningCash + netCashFlow;
+    // Calculate per-account breakdown from cash accounts
+    const allAccounts = await this.getCashAccounts(storeId);
+    const accountBreakdown: { 
+      id: number; 
+      name: string; 
+      openingBalance: number; 
+      inflow: number; 
+      outflow: number; 
+      closingBalance: number; 
+    }[] = [];
+
+    let totalBeginningCash = 0;
+    let totalEndingCash = 0;
+
+    for (const account of allAccounts) {
+      // Get transactions for this account before start date (opening balance)
+      const openingTxResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount::numeric ELSE 0 END), 0) -
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount::numeric ELSE 0 END), 0) as opening_balance
+        FROM ${transactions}
+        WHERE store_id = ${storeId}
+          AND account_id = ${account.id}
+          AND date < ${startStr}
+      `);
+      
+      // Get transfers before start date for opening balance
+      const openingTransfersInResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0) as transfers_in
+        FROM ${accountTransfers}
+        WHERE store_id = ${storeId}
+          AND to_account_id = ${account.id}
+          AND date < ${startStr}
+      `);
+      const openingTransfersOutResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0) as transfers_out
+        FROM ${accountTransfers}
+        WHERE store_id = ${storeId}
+          AND from_account_id = ${account.id}
+          AND date < ${startStr}
+      `);
+      
+      // Add initial balance from account + transactions + transfers
+      const accountInitialBalance = parseFloat(account.initialBalance?.toString() || '0');
+      const openingTxBalance = parseFloat(openingTxResult[0]?.opening_balance?.toString() || '0');
+      const openingTransfersIn = parseFloat(openingTransfersInResult[0]?.transfers_in?.toString() || '0');
+      const openingTransfersOut = parseFloat(openingTransfersOutResult[0]?.transfers_out?.toString() || '0');
+      const openingBalance = accountInitialBalance + openingTxBalance + openingTransfersIn - openingTransfersOut;
+
+      // Get inflows and outflows during the period (transactions)
+      const periodResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount::numeric ELSE 0 END), 0) as inflow,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount::numeric ELSE 0 END), 0) as outflow
+        FROM ${transactions}
+        WHERE store_id = ${storeId}
+          AND account_id = ${account.id}
+          AND date >= ${startStr}
+          AND date <= ${endStr}
+      `);
+
+      // Get transfers during the period
+      const periodTransfersInResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0) as transfers_in
+        FROM ${accountTransfers}
+        WHERE store_id = ${storeId}
+          AND to_account_id = ${account.id}
+          AND date >= ${startStr}
+          AND date <= ${endStr}
+      `);
+      const periodTransfersOutResult = await db.execute(sql`
+        SELECT COALESCE(SUM(amount::numeric), 0) as transfers_out
+        FROM ${accountTransfers}
+        WHERE store_id = ${storeId}
+          AND from_account_id = ${account.id}
+          AND date >= ${startStr}
+          AND date <= ${endStr}
+      `);
+
+      const txInflow = parseFloat(periodResult[0]?.inflow?.toString() || '0');
+      const txOutflow = parseFloat(periodResult[0]?.outflow?.toString() || '0');
+      const periodTransfersIn = parseFloat(periodTransfersInResult[0]?.transfers_in?.toString() || '0');
+      const periodTransfersOut = parseFloat(periodTransfersOutResult[0]?.transfers_out?.toString() || '0');
+      
+      const inflow = txInflow + periodTransfersIn;
+      const outflow = txOutflow + periodTransfersOut;
+      const closingBalance = openingBalance + inflow - outflow;
+
+      accountBreakdown.push({
+        id: account.id,
+        name: account.name,
+        openingBalance,
+        inflow,
+        outflow,
+        closingBalance
+      });
+
+      totalBeginningCash += openingBalance;
+      totalEndingCash += closingBalance;
+    }
 
     return {
       operating: {
@@ -4962,8 +5059,9 @@ export class DatabaseStorage implements IStorage {
         netFinancingCashFlow
       },
       netCashFlow,
-      beginningCash,
-      endingCash
+      beginningCash: totalBeginningCash,
+      endingCash: totalEndingCash,
+      accountBreakdown
     };
   }
 

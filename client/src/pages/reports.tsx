@@ -739,6 +739,50 @@ export default function ReportsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Per-Account Breakdown */}
+                  {cashFlowReport.accountBreakdown && cashFlowReport.accountBreakdown.length > 0 && (
+                    <div className="border rounded-lg p-4 bg-white">
+                      <h3 className="font-semibold text-lg mb-4">RINCIAN PER REKENING KAS</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-gray-50">
+                              <th className="text-left py-2 px-3">Rekening</th>
+                              <th className="text-right py-2 px-3">Saldo Awal</th>
+                              <th className="text-right py-2 px-3">Kas Masuk</th>
+                              <th className="text-right py-2 px-3">Kas Keluar</th>
+                              <th className="text-right py-2 px-3">Saldo Akhir</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cashFlowReport.accountBreakdown.map((account: any) => (
+                              <tr key={account.id} className="border-b hover:bg-gray-50">
+                                <td className="py-2 px-3 font-medium">{account.name}</td>
+                                <td className="py-2 px-3 text-right">{formatCurrency(account.openingBalance)}</td>
+                                <td className="py-2 px-3 text-right text-green-600">{formatCurrency(account.inflow)}</td>
+                                <td className="py-2 px-3 text-right text-red-600">({formatCurrency(account.outflow)})</td>
+                                <td className="py-2 px-3 text-right font-semibold">{formatCurrency(account.closingBalance)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-indigo-50 font-bold">
+                              <td className="py-2 px-3">TOTAL</td>
+                              <td className="py-2 px-3 text-right">{formatCurrency(cashFlowReport.beginningCash)}</td>
+                              <td className="py-2 px-3 text-right text-green-600">
+                                {formatCurrency(cashFlowReport.accountBreakdown.reduce((sum: number, a: any) => sum + a.inflow, 0))}
+                              </td>
+                              <td className="py-2 px-3 text-right text-red-600">
+                                ({formatCurrency(cashFlowReport.accountBreakdown.reduce((sum: number, a: any) => sum + a.outflow, 0))})
+                              </td>
+                              <td className="py-2 px-3 text-right">{formatCurrency(cashFlowReport.endingCash)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
