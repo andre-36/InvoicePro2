@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3, Layers, Scale } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3, Layers, Scale, ArrowUpDown } from "lucide-react";
+import { StockAdjustmentDialog } from "@/components/products/stock-adjustment-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +140,8 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [stockAdjustmentProduct, setStockAdjustmentProduct] = useState<Product | null>(null);
+  const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false);
   const [bundleComponents, setBundleComponents] = useState<BundleComponent[]>([]);
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -758,6 +761,13 @@ export default function ProductsPage() {
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setStockAdjustmentProduct(product);
+                              setIsStockAdjustmentOpen(true);
+                            }}>
+                              <ArrowUpDown className="mr-2 h-4 w-4" />
+                              <span>Stock Adjustment</span>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -1334,6 +1344,13 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <StockAdjustmentDialog
+        open={isStockAdjustmentOpen}
+        onOpenChange={setIsStockAdjustmentOpen}
+        product={stockAdjustmentProduct}
+        storeId={1}
+      />
     </div>
   );
 }

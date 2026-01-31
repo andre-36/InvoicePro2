@@ -6,7 +6,7 @@ import {
   transactions, stores, settings, categories, inflowCategories, outflowCategories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
-  returns, returnItems, creditNoteUsages,
+  returns, returnItems, creditNoteUsages, stockAdjustments,
 
   type User, type InsertUser, type Store, type InsertStore,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -29,7 +29,8 @@ import {
   type GoodsReceipt, type InsertGoodsReceipt, type GoodsReceiptItem, type InsertGoodsReceiptItem,
   type GoodsReceiptPayment, type InsertGoodsReceiptPayment,
   type Return, type InsertReturn, type ReturnItem, type InsertReturnItem,
-  type CreditNoteUsage, type InsertCreditNoteUsage
+  type CreditNoteUsage, type InsertCreditNoteUsage,
+  type StockAdjustment, type InsertStockAdjustment
 } from "../shared/schema";
 
 import session from "express-session";
@@ -238,6 +239,13 @@ export interface IStorage {
   deleteTransaction(id: number): Promise<void>;
   deleteTransactionByInvoicePaymentId(invoicePaymentId: number): Promise<void>;
   deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void>;
+
+  // Stock adjustment methods
+  getStockAdjustment(id: number): Promise<StockAdjustment | undefined>;
+  getStockAdjustments(storeId: number): Promise<StockAdjustment[]>;
+  getStockAdjustmentsByProduct(productId: number, storeId: number): Promise<StockAdjustment[]>;
+  createStockAdjustment(adjustment: InsertStockAdjustment): Promise<StockAdjustment>;
+  deleteStockAdjustment(id: number): Promise<void>;
 
   // Settings methods
   getSetting(storeId: number, key: string): Promise<Setting | undefined>;
@@ -4058,6 +4066,96 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void> {
     await db.delete(transactions).where(eq(transactions.goodsReceiptPaymentId, goodsReceiptPaymentId));
+  }
+
+  // Stock adjustment methods
+  async getStockAdjustment(id: number): Promise<StockAdjustment | undefined> {
+    const [adjustment] = await db.select().from(stockAdjustments).where(eq(stockAdjustments.id, id));
+    return adjustment;
+  }
+
+  async getStockAdjustments(storeId: number): Promise<StockAdjustment[]> {
+    return db
+      .select()
+      .from(stockAdjustments)
+      .where(eq(stockAdjustments.storeId, storeId))
+      .orderBy(desc(stockAdjustments.date));
+  }
+
+  async getStockAdjustmentsByProduct(productId: number, storeId: number): Promise<StockAdjustment[]> {
+    return db
+      .select()
+      .from(stockAdjustments)
+      .where(
+        and(
+          eq(stockAdjustments.productId, productId),
+          eq(stockAdjustments.storeId, storeId)
+        )
+      )
+      .orderBy(desc(stockAdjustments.date));
+  }
+
+  async createStockAdjustment(adjustment: InsertStockAdjustment): Promise<StockAdjustment> {
+    const [created] = await db.insert(stockAdjustments).values(adjustment).returning();
+    
+    // If a specific batch is selected, update that batch
+    if (adjustment.productBatchId) {
+      const batch = await this.getProductBatch(adjustment.productBatchId);
+      if (batch) {
+        const currentQty = parseFloat(batch.remainingQuantity.toString());
+        const adjustmentQty = parseFloat(adjustment.quantity.toString());
+        const newQty = adjustment.type === 'increase' 
+          ? currentQty + adjustmentQty 
+          : Math.max(0, currentQty - adjustmentQty);
+        
+        await this.updateProductBatch(adjustment.productBatchId, {
+          remainingQuantity: newQty.toString()
+        });
+      }
+    } else {
+      // If no specific batch, create a new adjustment batch or update the most recent batch
+      const batches = await this.getProductBatches(adjustment.productId, adjustment.storeId);
+      
+      if (adjustment.type === 'increase') {
+        // Create a new batch for stock increase
+        const today = new Date().toISOString().split('T')[0];
+        const batchNumber = `ADJ-${adjustment.productId}-${today}-${Date.now()}`;
+        
+        await this.createProductBatch({
+          productId: adjustment.productId,
+          storeId: adjustment.storeId,
+          batchNumber,
+          purchaseDate: adjustment.date,
+          capitalCost: '0',
+          initialQuantity: adjustment.quantity.toString(),
+          remainingQuantity: adjustment.quantity.toString(),
+          supplierName: 'Stock Adjustment',
+          notes: `Stock adjustment: ${adjustment.reason}`
+        });
+      } else {
+        // For decrease, use FIFO from existing batches
+        let remainingToDecrease = parseFloat(adjustment.quantity.toString());
+        
+        for (const batch of batches) {
+          if (remainingToDecrease <= 0) break;
+          
+          const batchQty = parseFloat(batch.remainingQuantity.toString());
+          if (batchQty > 0) {
+            const decreaseAmount = Math.min(batchQty, remainingToDecrease);
+            await this.updateProductBatch(batch.id, {
+              remainingQuantity: (batchQty - decreaseAmount).toString()
+            });
+            remainingToDecrease -= decreaseAmount;
+          }
+        }
+      }
+    }
+    
+    return created;
+  }
+
+  async deleteStockAdjustment(id: number): Promise<void> {
+    await db.delete(stockAdjustments).where(eq(stockAdjustments.id, id));
   }
 
   // Settings methods

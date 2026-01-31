@@ -486,6 +486,32 @@ export const transactions = pgTable("transactions", {
   };
 });
 
+// Stock Adjustment type enum
+export const stockAdjustmentTypeEnum = pgEnum('stock_adjustment_type', ['increase', 'decrease']);
+
+// Stock Adjustments table - for manual stock corrections
+export const stockAdjustments = pgTable("stock_adjustments", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  productBatchId: integer("product_batch_id").references(() => productBatches.id, { onDelete: 'cascade' }),
+  type: stockAdjustmentTypeEnum("type").notNull(),
+  quantity: numeric("quantity", { precision: 15, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  date: date("date").notNull(),
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("stock_adjustments_store_id_idx").on(table.storeId),
+    productIdIdx: index("stock_adjustments_product_id_idx").on(table.productId),
+    productBatchIdIdx: index("stock_adjustments_product_batch_id_idx").on(table.productBatchId),
+    dateIdx: index("stock_adjustments_date_idx").on(table.date)
+  };
+});
+
 // Purchase Orders table
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
@@ -840,6 +866,7 @@ export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit
 export const insertCashAccountSchema = createInsertSchema(cashAccounts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAccountTransferSchema = createInsertSchema(accountTransfers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStockAdjustmentSchema = createInsertSchema(stockAdjustments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, purchaseOrderNumber: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPurchaseOrderPaymentSchema = createInsertSchema(purchaseOrderPayments).omit({ id: true, createdAt: true, updatedAt: true });
@@ -917,6 +944,9 @@ export type InsertQuotationItem = z.infer<typeof insertQuotationItemSchema>;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type StockAdjustment = typeof stockAdjustments.$inferSelect;
+export type InsertStockAdjustment = z.infer<typeof insertStockAdjustmentSchema>;
 
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;

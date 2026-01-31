@@ -39,6 +39,7 @@ import {
   insertGoodsReceiptSchema,
   insertGoodsReceiptItemSchema,
   insertGoodsReceiptPaymentSchema,
+  insertStockAdjustmentSchema,
   loginSchema,
   updateUserProfileSchema,
   updateUserCompanySchema,
@@ -2124,6 +2125,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Adjustment routes
+  app.get("/api/stores/:storeId/stock-adjustments", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const adjustments = await storage.getStockAdjustments(storeId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error getting stock adjustments:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/products/:productId/stock-adjustments", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.productId);
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const adjustments = await storage.getStockAdjustmentsByProduct(productId, storeId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error getting product stock adjustments:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/stock-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const adjustmentId = parseInt(req.params.id);
+      const adjustment = await storage.getStockAdjustment(adjustmentId);
+      
+      if (!adjustment) {
+        return res.status(404).json({ error: "Stock adjustment not found" });
+      }
+      
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Error getting stock adjustment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/stock-adjustments", requireAuth, async (req, res) => {
+    try {
+      const validatedData = validateRequestBody(insertStockAdjustmentSchema, req, res);
+      if (!validatedData) return;
+      
+      const userId = (req.user as any)?.id;
+      
+      const adjustment = await storage.createStockAdjustment({
+        ...validatedData,
+        createdBy: userId || null
+      });
+      
+      res.status(201).json(adjustment);
+    } catch (error) {
+      console.error("Error creating stock adjustment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/stock-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const adjustmentId = parseInt(req.params.id);
+      await storage.deleteStockAdjustment(adjustmentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting stock adjustment:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Purchase Order routes
   app.get("/api/stores/:storeId/purchase-orders", requireAuth, async (req, res) => {
     try {
@@ -3575,18 +3646,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const format = req.params.format; // 'csv' or 'xlsx'
       const products = await storage.getProducts();
-
-      const productData = products.map(product => ({
-        ID: product.id,
-        Name: product.name,
-        SKU: product.sku,
-        Description: product.description || '',
-        'Current Price': product.currentSellingPrice || '0',
-        Unit: product.unit,
-        'Min Stock': product.minStock || '0',
-        Weight: product.weight || '',
-        Dimensions: product.dimensions || '',
-        'Is Active': product.isActive ? 'Yes' : 'No'
+      
+      // Get current stock for each product from batches
+      const productDataWithStock = await Promise.all(products.map(async (product) => {
+        const batches = await storage.getProductBatches(product.id, 1);
+        const currentStock = batches.reduce((sum, batch) => 
+          sum + parseFloat(batch.remainingQuantity.toString()), 0
+        );
+        
+        return {
+          ID: product.id,
+          Name: product.name,
+          SKU: product.sku,
+          Description: product.description || '',
+          'Current Price': product.currentSellingPrice || '0',
+          'Cost Price': product.costPrice || '',
+          Unit: product.unit,
+          'Current Stock': currentStock,
+          'Initial Stock': '', // Empty for template - user fills this for new imports
+          'Min Stock': product.minStock || '0',
+          Weight: product.weight || '',
+          Dimensions: product.dimensions || '',
+          'Is Active': product.isActive ? 'Yes' : 'No'
+        };
       }));
 
       if (format === 'csv') {
@@ -3597,7 +3679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { id: 'SKU', title: 'SKU' },
             { id: 'Description', title: 'Description' },
             { id: 'Current Price', title: 'Current Price' },
+            { id: 'Cost Price', title: 'Cost Price' },
             { id: 'Unit', title: 'Unit' },
+            { id: 'Current Stock', title: 'Current Stock' },
+            { id: 'Initial Stock', title: 'Initial Stock' },
             { id: 'Min Stock', title: 'Min Stock' },
             { id: 'Weight', title: 'Weight' },
             { id: 'Dimensions', title: 'Dimensions' },
@@ -3605,13 +3690,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ]
         });
 
-        const csvString = csvWriterInstance.getHeaderString() + csvWriterInstance.stringifyRecords(productData);
+        const csvString = csvWriterInstance.getHeaderString() + csvWriterInstance.stringifyRecords(productDataWithStock);
         
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.csv"`);
         res.send(csvString);
       } else if (format === 'xlsx') {
-        const worksheet = XLSX.utils.json_to_sheet(productData);
+        const worksheet = XLSX.utils.json_to_sheet(productDataWithStock);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
         
@@ -3950,9 +4035,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productData.isActive = activeValue === 'Yes' || activeValue === 'yes' || activeValue === true || activeValue === 'TRUE';
           }
 
+          // Check for Initial Stock column
+          const initialStock = row['Initial Stock'] !== undefined && row['Initial Stock'] !== '' 
+            ? parseFloat(row['Initial Stock']) 
+            : null;
+          const costPriceForBatch = row['Cost Price'] !== undefined && row['Cost Price'] !== ''
+            ? row['Cost Price']
+            : productData.costPrice || '0';
+
+          let productId: number;
+          
           if (existingProduct) {
             // Update existing product
             await storage.updateProduct(existingProduct.id, productData);
+            productId = existingProduct.id;
             updateCount++;
           } else {
             // Create new product (requires minimum fields)
@@ -3970,8 +4066,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lowestPrice: productData.lowestPrice || null
             };
             
-            await storage.createProduct(newProductData);
+            const newProduct = await storage.createProduct(newProductData);
+            productId = newProduct.id;
             successCount++;
+          }
+          
+          // Create initial stock batch if Initial Stock is provided
+          if (initialStock !== null && initialStock > 0) {
+            const today = new Date().toISOString().split('T')[0];
+            const batchNumber = `INIT-${sku}-${today}`;
+            
+            // Check if initial batch already exists for this product
+            const existingBatches = await storage.getProductBatches(productId, 1);
+            const hasInitialBatch = existingBatches.some(b => b.batchNumber.startsWith('INIT-'));
+            
+            if (!hasInitialBatch) {
+              await storage.createProductBatch({
+                productId,
+                storeId: 1,
+                batchNumber,
+                purchaseDate: today,
+                capitalCost: costPriceForBatch.toString(),
+                initialQuantity: initialStock.toString(),
+                remainingQuantity: initialStock.toString(),
+                supplierName: 'Initial Stock',
+                notes: 'Created from product import'
+              });
+            }
           }
         } catch (error: any) {
           errorCount++;
