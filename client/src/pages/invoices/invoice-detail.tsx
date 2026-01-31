@@ -144,16 +144,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   // ==================== PRINT PAGINATION LOGIC ====================
   // All measurements in cm, based on print template CSS
+  // These values are calibrated for 24cm x 14cm landscape paper (PRS half-size)
   const PRINT_CONSTANTS = {
     PAGE_HEIGHT: 14,           // Total page height in cm
     PAGE_PADDING_TOP: 0.5,     // Top padding
     PAGE_PADDING_BOTTOM: 0.3,  // Bottom padding
-    HEADER_HEIGHT: 2.8,        // Header section (logo, company, bill to)
+    HEADER_HEIGHT: 3.8,        // Header section (logo 2.2cm + company info + bill to with address)
     TABLE_HEADER_HEIGHT: 0.7,  // Table thead height
     ITEM_ROW_HEIGHT: 0.7,      // Height per item row
-    FOOTER_BASE_HEIGHT: 2.0,   // Base footer height (notes + subtotal + total)
-    FOOTER_ROW_HEIGHT: 0.35,  // Additional height per extra footer row (discount, shipping, tax)
-    TABLE_MARGIN: 0.25,        // Margin between table and footer
+    FOOTER_BASE_HEIGHT: 2.8,   // Base footer height (notes + subtotal + total with borders)
+    FOOTER_ROW_HEIGHT: 0.4,    // Additional height per extra footer row (discount, shipping, tax)
+    TABLE_MARGIN: 0.3,         // Margin between table and footer
+    SAFETY_MARGIN: 0.3,        // Safety buffer to prevent footer from being cut off
   };
 
   // Calculate dynamic footer height based on invoice data
@@ -185,7 +187,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     const contentHeight = PRINT_CONSTANTS.PAGE_HEIGHT - PRINT_CONSTANTS.PAGE_PADDING_TOP - PRINT_CONSTANTS.PAGE_PADDING_BOTTOM;
     const headerSpace = PRINT_CONSTANTS.HEADER_HEIGHT + PRINT_CONSTANTS.TABLE_HEADER_HEIGHT;
     
-    let availableSpace = contentHeight - headerSpace;
+    let availableSpace = contentHeight - headerSpace - PRINT_CONSTANTS.SAFETY_MARGIN;
     
     if (hasFooter) {
       availableSpace -= calculateFooterHeight + PRINT_CONSTANTS.TABLE_MARGIN;
@@ -201,27 +203,39 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     const maxItemsWithFooter = calculateMaxItems(true);
     const maxItemsWithoutFooter = calculateMaxItems(false);
     
-    const pages: { items: typeof items; isLastPage: boolean }[] = [];
-    let remainingItems = [...items];
-    
     // Special case: all items fit on one page with footer
-    if (remainingItems.length <= maxItemsWithFooter) {
-      return [{ items: remainingItems, isLastPage: true }];
+    if (items.length <= maxItemsWithFooter) {
+      return [{ items: [...items], isLastPage: true }];
     }
     
-    // Multiple pages needed
-    while (remainingItems.length > 0) {
-      // Check if remaining items can fit on last page with footer
-      if (remainingItems.length <= maxItemsWithFooter) {
-        pages.push({ items: remainingItems, isLastPage: true });
-        remainingItems = [];
-      } else {
-        // Not the last page - use max items without footer
-        const pageItems = remainingItems.slice(0, maxItemsWithoutFooter);
-        pages.push({ items: pageItems, isLastPage: false });
-        remainingItems = remainingItems.slice(maxItemsWithoutFooter);
-      }
+    // Multiple pages needed - calculate distribution from the end
+    // Last page must have footer with max maxItemsWithFooter items
+    // Previous pages have no footer with max maxItemsWithoutFooter items
+    const pages: { items: typeof items; isLastPage: boolean }[] = [];
+    const allItems = [...items];
+    
+    // Calculate how many items for the last page (with footer)
+    // and how many for non-last pages (without footer)
+    let remainingForLastPage = Math.min(maxItemsWithFooter, allItems.length);
+    let itemsForPreviousPages = allItems.length - remainingForLastPage;
+    
+    // If we have too many items for previous pages, we might need to redistribute
+    // so that last page isn't overloaded
+    while (itemsForPreviousPages > 0) {
+      const itemsThisPage = Math.min(maxItemsWithoutFooter, itemsForPreviousPages);
+      pages.push({ 
+        items: allItems.slice(pages.length * maxItemsWithoutFooter, pages.length * maxItemsWithoutFooter + itemsThisPage), 
+        isLastPage: false 
+      });
+      itemsForPreviousPages -= itemsThisPage;
     }
+    
+    // Add the last page with footer
+    const startIndex = allItems.length - remainingForLastPage;
+    pages.push({ 
+      items: allItems.slice(startIndex), 
+      isLastPage: true 
+    });
     
     return pages;
   }, [items, calculateFooterHeight]);
