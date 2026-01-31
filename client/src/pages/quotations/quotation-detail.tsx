@@ -597,13 +597,13 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
               
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
+                  <span>{quotation.useFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}</span>
                   <span data-testid="text-subtotal">{formatCurrency(parseFloat(quotation.subtotal))}</span>
                 </div>
-                {parseFloat(quotation.taxAmount || '0') > 0 && (
+                {quotation.useFakturPajak && (
                   <div className="flex justify-between">
-                    <span>Tax ({quotation.taxRate}%):</span>
-                    <span data-testid="text-tax-amount">{formatCurrency(parseFloat(quotation.taxAmount))}</span>
+                    <span>PPN ({quotation.taxRate || '11'}%):</span>
+                    <span data-testid="text-tax-amount">{formatCurrency(parseFloat(quotation.taxAmount || '0'))}</span>
                   </div>
                 )}
                 {parseFloat(quotation.discount || '0') > 0 && (

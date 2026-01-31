@@ -1639,13 +1639,17 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <CardFooter className="flex-col items-end p-6 border-t">
               <div className="w-full sm:w-80 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">Subtotal:</span>
+                  <span className="font-medium text-gray-700">
+                    {invoice.useFakturPajak ? 'DPP (Dasar Pengenaan Pajak):' : 'Subtotal:'}
+                  </span>
                   <span className="text-gray-900">{formatCurrency(invoice.subtotal || '0')}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">Tax:</span>
-                  <span className="text-gray-900">{formatCurrency(invoice.taxAmount || '0')}</span>
-                </div>
+                {invoice.useFakturPajak && (
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-700">PPN ({invoice.taxRate || '11'}%):</span>
+                    <span className="text-gray-900">{formatCurrency(invoice.taxAmount || '0')}</span>
+                  </div>
+                )}
                 {parseFloat(invoice.discount || '0') > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-gray-700">Discount:</span>

@@ -1307,6 +1307,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         safeFields.totalAmount = safeFields.total;
       }
       
+      // If useFakturPajak is enabled, recalculate tax from items or subtotal
+      if (safeFields.useFakturPajak === true && items && Array.isArray(items) && items.length > 0) {
+        const taxRate = parseFloat(safeFields.taxRate || '11') || 11;
+        const taxMultiplier = 1 + (taxRate / 100);
+        
+        // Calculate total from items
+        let itemsTotal = 0;
+        items.forEach((item: any) => {
+          const qty = parseFloat(item.quantity || '0');
+          const price = parseFloat(item.unitPrice || item.price || '0');
+          itemsTotal += qty * price;
+        });
+        
+        // Calculate DPP (subtotal) and PPN (tax)
+        const dpp = itemsTotal / taxMultiplier;
+        const ppn = itemsTotal - dpp;
+        const discount = parseFloat(safeFields.discount || '0');
+        const shipping = parseFloat(safeFields.shipping || '0');
+        const total = itemsTotal - discount + shipping;
+        
+        safeFields.subtotal = dpp.toFixed(2);
+        safeFields.taxAmount = ppn.toFixed(2);
+        safeFields.totalAmount = total.toFixed(2);
+      }
+      
       // Copy safe primitive fields
       const allowedFields = [
         'clientId', 'status', 'paymentTerms', 'subtotal', 'taxRate', 'taxAmount',
@@ -1866,6 +1891,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quotationId = parseInt(req.params.id);
       const { quotation: quotationData, items } = req.body;
+      
+      // Map frontend field names to backend field names
+      if (quotationData.tax !== undefined && quotationData.taxAmount === undefined) {
+        quotationData.taxAmount = quotationData.tax;
+      }
+      if (quotationData.total !== undefined && quotationData.totalAmount === undefined) {
+        quotationData.totalAmount = quotationData.total;
+      }
+      
+      // If useFakturPajak is enabled, recalculate tax from items
+      if (quotationData.useFakturPajak === true && items && Array.isArray(items) && items.length > 0) {
+        const taxRate = parseFloat(quotationData.taxRate || '11') || 11;
+        const taxMultiplier = 1 + (taxRate / 100);
+        
+        // Calculate total from items
+        let itemsTotal = 0;
+        items.forEach((item: any) => {
+          const qty = parseFloat(item.quantity || '0');
+          const price = parseFloat(item.unitPrice || item.price || '0');
+          itemsTotal += qty * price;
+        });
+        
+        // Calculate DPP (subtotal) and PPN (tax)
+        const dpp = itemsTotal / taxMultiplier;
+        const ppn = itemsTotal - dpp;
+        const discount = parseFloat(quotationData.discount || '0');
+        const shipping = parseFloat(quotationData.shipping || '0');
+        const total = itemsTotal - discount + shipping;
+        
+        quotationData.subtotal = dpp.toFixed(2);
+        quotationData.taxAmount = ppn.toFixed(2);
+        quotationData.totalAmount = total.toFixed(2);
+      }
       
       // Validate quotation data
       const validatedQuotation = insertQuotationSchema.partial().safeParse(quotationData);
