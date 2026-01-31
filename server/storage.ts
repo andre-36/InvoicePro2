@@ -124,7 +124,7 @@ export interface IStorage {
 
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
-  getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: InvoiceItem[], client?: Client } | undefined>;
+  getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: (InvoiceItem & { productCode?: string; productSku?: string; unitLabel?: string })[], client?: Client } | undefined>;
   getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
   getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
     clientName: string | null; 
@@ -1360,7 +1360,7 @@ export class DatabaseStorage implements IStorage {
     return this.checkAndUpdateOverdueStatus(invoice);
   }
 
-  async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: InvoiceItem[]; client?: Client } | undefined> {
+  async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: (InvoiceItem & { productCode?: string; productSku?: string; unitLabel?: string })[]; client?: Client } | undefined> {
     let [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
 
     if (!invoice) {
@@ -1370,11 +1370,61 @@ export class DatabaseStorage implements IStorage {
     // Check and update overdue status
     invoice = await this.checkAndUpdateOverdueStatus(invoice);
 
-    const items = await db
-      .select()
+    // Single query with JOINs to get items with product and unit info
+    const enrichedItems = await db
+      .select({
+        // Invoice item fields
+        id: invoiceItems.id,
+        invoiceId: invoiceItems.invoiceId,
+        productId: invoiceItems.productId,
+        productUnitId: invoiceItems.productUnitId,
+        description: invoiceItems.description,
+        quantity: invoiceItems.quantity,
+        baseQuantity: invoiceItems.baseQuantity,
+        unitPrice: invoiceItems.unitPrice,
+        taxRate: invoiceItems.taxRate,
+        taxAmount: invoiceItems.taxAmount,
+        discount: invoiceItems.discount,
+        subtotal: invoiceItems.subtotal,
+        totalAmount: invoiceItems.totalAmount,
+        profit: invoiceItems.profit,
+        createdAt: invoiceItems.createdAt,
+        updatedAt: invoiceItems.updatedAt,
+        // Product fields
+        productSku: products.sku,
+        productBaseUnit: products.unit,
+        // Product unit fields (for multi-unit)
+        selectedUnitLabel: productUnits.unitLabel,
+      })
       .from(invoiceItems)
+      .leftJoin(products, eq(invoiceItems.productId, products.id))
+      .leftJoin(productUnits, eq(invoiceItems.productUnitId, productUnits.id))
       .where(eq(invoiceItems.invoiceId, id))
       .orderBy(invoiceItems.id);
+
+    // Transform to add derived fields
+    const items = enrichedItems.map(item => ({
+      id: item.id,
+      invoiceId: item.invoiceId,
+      productId: item.productId,
+      productUnitId: item.productUnitId,
+      description: item.description,
+      quantity: item.quantity,
+      baseQuantity: item.baseQuantity,
+      unitPrice: item.unitPrice,
+      taxRate: item.taxRate,
+      taxAmount: item.taxAmount,
+      discount: item.discount,
+      subtotal: item.subtotal,
+      totalAmount: item.totalAmount,
+      profit: item.profit,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      // Enriched fields
+      productCode: item.productSku || undefined,
+      productSku: item.productSku || undefined,
+      unitLabel: item.selectedUnitLabel || item.productBaseUnit || undefined,
+    }));
 
     let client;
     if (invoice.clientId) {

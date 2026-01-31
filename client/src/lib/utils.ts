@@ -133,3 +133,37 @@ export function generateInvoiceNumber(lastInvoiceNumber: string): string {
   
   return `${prefix}${nextNumber}`;
 }
+
+// Format currency in accounting style (right-aligned with Rp prefix)
+export function formatCurrencyAccounting(amount: string | number): string {
+  const value = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  if (isNaN(value)) return 'Rp 0';
+  
+  // Format with thousand separators (Indonesian style: dots)
+  const formatted = Math.abs(value).toLocaleString('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  });
+  
+  // Return with Rp prefix, right-aligned style
+  return `Rp ${formatted}`;
+}
+
+// Format quantity - hide decimals if it's a whole number
+export function formatQuantity(qty: string | number): string {
+  const value = typeof qty === 'string' ? parseFloat(qty) : qty;
+  
+  if (isNaN(value)) return '0';
+  
+  // Check if it's a whole number
+  if (Number.isInteger(value)) {
+    return value.toString();
+  }
+  
+  // Show decimals only if there are decimal places
+  return value.toLocaleString('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+}

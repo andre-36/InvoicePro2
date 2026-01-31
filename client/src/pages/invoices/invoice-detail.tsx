@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, formatCurrencyAccounting, formatQuantity } from "@/lib/utils";
 import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote, Return } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -977,14 +977,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <span className="print-doc-label">Date</span>
                   <span className="print-doc-value">{formatDate(invoice.issueDate)}</span>
                 </div>
-                <div className="print-doc-row">
-                  <span className="print-doc-label">Due Date</span>
-                  <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
-                </div>
-                {printSettings?.showPONumber !== false && (
+                {/* Due Date only shown for non-cash payment terms (net_7, net_14, net_30, custom) */}
+                {invoice.paymentTerms !== 'cod' && (
                   <div className="print-doc-row">
-                    <span className="print-doc-label">PO Number</span>
-                    <span className="print-doc-value">{(invoice as any).poNumber || '_______'}</span>
+                    <span className="print-doc-label">Due Date</span>
+                    <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
                   </div>
                 )}
                 {/* Page indicator */}
@@ -996,27 +993,29 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </div>
           </div>
 
-          {/* Items Table */}
+          {/* Items Table - Column order: No, Kode Item, Products, QTY, Unit, Price, Total */}
           <table className="print-items-table">
             <thead>
               <tr>
                 <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
-                <th style={{ width: '8%', textAlign: 'center' }}>Code</th>
-                <th style={{ width: '52%', textAlign: 'center' }}>Description</th>
-                <th style={{ width: '5%', textAlign: 'center' }}>QTY</th>
-                <th style={{ width: '15%', textAlign: 'center' }}>Rate</th>
-                <th style={{ width: '16%', textAlign: 'center' }}>Total</th>
+                <th style={{ width: '10%', textAlign: 'center' }}>Kode Item</th>
+                <th style={{ width: '38%', textAlign: 'left' }}>Products</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>Unit</th>
+                <th style={{ width: '16%', textAlign: 'right' }}>Price</th>
+                <th style={{ width: '16%', textAlign: 'right' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
                   <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).sku || `ITEM${index + 1}`}</td>
-                  <td>{item.description}</td>
-                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
+                  <td style={{ textAlign: 'left' }}>{item.description}</td>
+                  <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
+                  <td style={{ textAlign: 'right' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1039,38 +1038,38 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </div>
             
             <div className="print-footer-right">
-              {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.tax || '0') > 0 ? (
+              {(invoice as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(invoice.taxAmount || '0') > 0 ? (
                 <>
                   <div className="print-total-row">
                     <span className="print-total-label">DPP</span>
-                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
+                    <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
                   </div>
                   <div className="print-total-row">
-                    <span className="print-total-label">PPN ({(invoice as any).taxRate || 11}%)</span>
-                    <span className="print-total-value">{formatCurrency(parseFloat(invoice.tax))}</span>
+                    <span className="print-total-label">PPN ({invoice.taxRate || 11}%)</span>
+                    <span className="print-total-value">{formatCurrencyAccounting(invoice.taxAmount || '0')}</span>
                   </div>
                 </>
               ) : (
                 <div className="print-total-row">
                   <span className="print-total-label">Subtotal</span>
-                  <span className="print-total-value">{formatCurrency(parseFloat(invoice.subtotal))}</span>
+                  <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
                 </div>
               )}
               {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
-                  <span className="print-total-value">-{formatCurrency(parseFloat(invoice.discount))}</span>
+                  <span className="print-total-value">-{formatCurrencyAccounting(invoice.discount || '0')}</span>
                 </div>
               )}
               {(invoice as any).shipping && parseFloat((invoice as any).shipping) > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Shipping</span>
-                  <span className="print-total-value">{formatCurrency(parseFloat((invoice as any).shipping))}</span>
+                  <span className="print-total-value">{formatCurrencyAccounting((invoice as any).shipping)}</span>
                 </div>
               )}
               <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
                 <span className="print-total-label">TOTAL</span>
-                <span className="print-total-value">{formatCurrency(parseFloat(invoice.totalAmount))}</span>
+                <span className="print-total-value">{formatCurrencyAccounting(invoice.totalAmount)}</span>
               </div>
             </div>
           </div>
