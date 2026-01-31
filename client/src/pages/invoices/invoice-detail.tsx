@@ -675,6 +675,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       printFrame.style.left = '-9999px';
       document.body.appendChild(printFrame);
 
+      const accentColor = printSettings?.accentColor || '#000';
+
       const printContent = `
         <!DOCTYPE html>
         <html>
@@ -682,157 +684,281 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           <title>Delivery Note - ${deliveryNote.deliveryNumber}</title>
           <style>
             @page {
-              size: 21.7cm 13.8cm landscape;
-              margin: 0.5cm;
+              size: 24cm 14cm landscape;
+              margin: 0.4cm;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
             }
             body {
               font-family: 'Times New Roman', Times, serif;
-              font-size: 11pt;
-              margin: 0;
-              padding: 10px;
-              width: 21.7cm;
-              height: 13.8cm;
-              box-sizing: border-box;
+              font-size: 10pt;
+              width: 23cm;
+              height: 13.2cm;
+              padding: 0.3cm;
+              position: relative;
             }
-            .header {
+            .print-header {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 10px;
-              border-bottom: 1px solid #333;
-              padding-bottom: 8px;
+              align-items: flex-start;
+              margin-bottom: 0.3cm;
+              gap: 0.3cm;
             }
-            .company-info h1 {
-              font-size: 15pt;
-              margin: 0 0 3px 0;
+            .print-header-left {
+              display: flex;
+              flex-direction: column;
+              gap: 0.2cm;
+              min-width: 5.5cm;
             }
-            .company-info p {
-              margin: 2px 0;
-              font-size: 10pt;
+            .print-logo-circle {
+              width: 1.5cm;
+              height: 1.5cm;
+              border: 2px solid ${accentColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              font-size: 12pt;
             }
-            .doc-info {
-              text-align: right;
+            .print-logo-image {
+              max-height: 1.5cm;
+              max-width: 2.5cm;
+              object-fit: contain;
             }
-            .doc-info h2 {
-              font-size: 14pt;
-              margin: 0 0 5px 0;
+            .print-bill-to-label {
+              font-size: 9pt;
+              font-weight: bold;
+              border-bottom: 2px solid ${accentColor};
+              padding-bottom: 2px;
+              margin-bottom: 3px;
+              display: inline-block;
             }
-            .doc-info p {
-              margin: 2px 0;
-              font-size: 10pt;
-            }
-            .client-section {
-              margin-bottom: 10px;
-            }
-            .client-section h3 {
+            .print-bill-to-name {
+              font-weight: bold;
               font-size: 11pt;
-              margin: 0 0 5px 0;
+            }
+            .print-bill-to-details {
+              font-size: 9pt;
+              line-height: 1.25;
+            }
+            .print-header-center {
+              text-align: center;
+              flex: 1;
+              transform: translateX(-2cm);
+            }
+            .print-company-name {
+              font-size: 15pt;
+              font-weight: bold;
+              margin-bottom: 2px;
+            }
+            .print-company-tagline {
+              font-size: 13pt;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .print-company-address {
+              font-size: 11pt;
+              line-height: 1.25;
+            }
+            .print-header-right {
+              display: flex;
+              flex-direction: column;
+              align-items: stretch;
+              min-width: 5cm;
+            }
+            .print-doc-type {
+              font-size: 14pt;
+              font-weight: bold;
+              text-align: center;
+              padding: 4px 10px;
+              border: 2px solid ${accentColor};
+              margin-bottom: 5px;
+            }
+            .print-doc-details {
+              font-size: 9pt;
+            }
+            .print-doc-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 1px 0;
+            }
+            .print-doc-label {
+              font-weight: bold;
             }
             table {
-              width: 95%;
-              margin: 0 auto;
+              width: 100%;
               border-collapse: collapse;
               font-size: 10pt;
+              table-layout: fixed;
             }
             th, td {
               border: 1px solid #333;
-              padding: 4px 8px;
-              text-align: left;
+              padding: 4px 6px;
             }
             th {
               background-color: #f0f0f0;
+              font-weight: bold;
             }
-            .text-right {
-              text-align: right;
+            .text-center { text-align: center; }
+            .text-left { text-align: left; }
+            .check-box {
+              width: 14px;
+              height: 14px;
+              border: 1.5px solid #333;
+              display: inline-block;
             }
-            .footer {
-              margin-top: 15px;
+            .print-footer {
+              margin-top: 0.3cm;
+            }
+            .print-notes-label {
+              font-weight: bold;
+              font-size: 9pt;
+              margin-bottom: 3px;
+            }
+            .print-notes-text {
+              font-size: 9pt;
+              line-height: 1.3;
+            }
+            .signature-section {
               display: flex;
               justify-content: space-between;
+              margin-top: 0.5cm;
             }
             .signature-box {
-              width: 45%;
+              width: 30%;
               text-align: center;
+            }
+            .signature-label {
+              font-weight: bold;
+              font-size: 10pt;
+              margin-bottom: 0.8cm;
             }
             .signature-line {
               border-top: 1px solid #333;
-              margin-top: 40px;
               padding-top: 5px;
+              font-size: 9pt;
             }
             @media print {
-              body { -webkit-print-color-adjust: exact; }
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="company-info">
-              <h1>${currentUser?.companyName || 'Company Name'}</h1>
-              ${currentUser?.companyTagline ? `<p><em>${currentUser.companyTagline}</em></p>` : ''}
-              ${currentUser?.companyAddress ? `<p>${currentUser.companyAddress}</p>` : ''}
-              ${currentUser?.companyPhone ? `<p>Tel: ${currentUser.companyPhone}</p>` : ''}
-            </div>
-            <div class="doc-info">
-              <h2>SURAT JALAN</h2>
-              <p><strong>No: ${deliveryNote.deliveryNumber}</strong></p>
-              <p>Tanggal: ${formatDate(deliveryNote.deliveryDate)}</p>
-            </div>
-          </div>
-          
-          <div class="client-section">
-            <h3>Kepada:</h3>
-            <p><strong>${client?.name || ''}</strong></p>
-            ${client?.address ? `<p>${client.address}</p>` : ''}
-            ${invoice?.deliveryAddress ? `
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc;">
-                <p style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">Alamat Pengiriman:</p>
-                <p>${invoice.deliveryAddress}</p>
+          <div class="print-header">
+            <div class="print-header-left">
+              <div class="print-logo">
+                ${currentUser?.logoUrl 
+                  ? `<img src="${currentUser.logoUrl}" alt="Logo" class="print-logo-image" />`
+                  : `<div class="print-logo-circle">${(currentUser?.companyName || 'CO').substring(0, 2).toUpperCase()}</div>`
+                }
               </div>
-            ` : ''}
+              <div class="print-bill-to">
+                <div class="print-bill-to-label">Kepada</div>
+                <div class="print-bill-to-name">${client?.name || 'N/A'}</div>
+                <div class="print-bill-to-details">
+                  ${client?.address ? `<div>${client.address}</div>` : ''}
+                  ${client?.phone ? `<div>Phone: ${client.phone}</div>` : ''}
+                </div>
+                ${invoice?.deliveryAddress ? `
+                  <div class="print-bill-to-details" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">
+                    <div style="font-weight: bold; font-size: 9px;">Alamat Pengiriman:</div>
+                    <div>${invoice.deliveryAddress}</div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+            
+            <div class="print-header-center">
+              <div class="print-company-name">${currentUser?.companyName || 'YOUR COMPANY NAME'}</div>
+              ${currentUser?.companyTagline ? `<div class="print-company-tagline">${currentUser.companyTagline}</div>` : ''}
+              <div class="print-company-address">
+                ${currentUser?.companyAddress || 'Your Company Address'}
+                ${currentUser?.companyPhone ? `<br />Phone: ${currentUser.companyPhone}` : ''}
+              </div>
+            </div>
+            
+            <div class="print-header-right">
+              <div class="print-doc-type">SURAT JALAN</div>
+              <div class="print-doc-details">
+                <div class="print-doc-row">
+                  <span class="print-doc-label">No.</span>
+                  <span>${deliveryNote.deliveryNumber}</span>
+                </div>
+                <div class="print-doc-row">
+                  <span class="print-doc-label">Tanggal</span>
+                  <span>${formatDate(deliveryNote.deliveryDate)}</span>
+                </div>
+                <div class="print-doc-row">
+                  <span class="print-doc-label">Invoice</span>
+                  <span>${invoice?.invoiceNumber || '-'}</span>
+                </div>
+                <div class="print-doc-row">
+                  <span class="print-doc-label">Page</span>
+                  <span>1/1</span>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <p><strong>Invoice: ${invoice?.invoiceNumber || ''}</strong></p>
-
-          <p style="margin-bottom: 8px;"><strong>Tipe Pengiriman:</strong> ${dnData.deliveryNote?.deliveryType === 'self_pickup' ? 'Diambil Sendiri' : 'Dikirim'}</p>
 
           <table>
             <thead>
               <tr>
-                <th style="width: 30px">No</th>
-                <th>Keterangan</th>
-                <th style="width: 80px" class="text-right">Jumlah</th>
-                <th style="width: 120px">Catatan</th>
+                <th style="width: 5%;" class="text-center">No.</th>
+                <th style="width: 15%;" class="text-center">Kode Item</th>
+                <th style="width: 50%;" class="text-center">Keterangan</th>
+                <th style="width: 10%;" class="text-center">QTY</th>
+                <th style="width: 10%;" class="text-center">Unit</th>
+                <th style="width: 10%;" class="text-center">Check</th>
               </tr>
             </thead>
             <tbody>
               ${(dnData.items || []).map((item: any, idx: number) => `
                 <tr>
-                  <td>${idx + 1}</td>
-                  <td>${item.invoiceItemDescription || item.description || ''}</td>
-                  <td class="text-right">${item.deliveredQuantity}</td>
-                  <td>${item.remarks || ''}</td>
+                  <td class="text-center">${idx + 1}</td>
+                  <td class="text-center">${item.productCode || item.productSku || '-'}</td>
+                  <td class="text-left">${item.invoiceItemDescription || item.description || ''}</td>
+                  <td class="text-center">${item.deliveredQuantity}</td>
+                  <td class="text-center">${item.unitLabel || '-'}</td>
+                  <td class="text-center"><span class="check-box"></span></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
-          ${deliveryNote.notes ? `<p style="margin-top: 10px;"><strong>Catatan:</strong> ${deliveryNote.notes}</p>` : ''}
-          
-          ${deliveryNote.vehicleInfo || deliveryNote.driverName ? `
-            <p style="margin-top: 10px;">
-              ${deliveryNote.vehicleInfo ? `Kendaraan: ${deliveryNote.vehicleInfo}` : ''}
-              ${deliveryNote.vehicleInfo && deliveryNote.driverName ? ' | ' : ''}
-              ${deliveryNote.driverName ? `Pengirim: ${deliveryNote.driverName}` : ''}
-            </p>
-          ` : ''}
+          <div class="print-footer">
+            ${deliveryNote.notes || currentUser?.deliveryNoteNotes ? `
+              <div class="print-notes-label">Catatan:</div>
+              <div class="print-notes-text">
+                ${currentUser?.deliveryNoteNotes ? `<div>${currentUser.deliveryNoteNotes}</div>` : ''}
+                ${deliveryNote.notes ? `<div>${deliveryNote.notes}</div>` : ''}
+              </div>
+            ` : ''}
+            
+            ${deliveryNote.vehicleInfo || deliveryNote.driverName ? `
+              <div style="font-size: 9pt; margin-top: 5px;">
+                ${deliveryNote.vehicleInfo ? `Kendaraan: ${deliveryNote.vehicleInfo}` : ''}
+                ${deliveryNote.vehicleInfo && deliveryNote.driverName ? ' | ' : ''}
+                ${deliveryNote.driverName ? `Pengirim: ${deliveryNote.driverName}` : ''}
+              </div>
+            ` : ''}
 
-          <div class="footer">
-            <div class="signature-box">
-              <p>Pengirim</p>
-              <div class="signature-line">${deliveryNote.driverName || '_______________'}</div>
-            </div>
-            <div class="signature-box">
-              <p>Penerima</p>
-              <div class="signature-line">${deliveryNote.recipientName || '_______________'}</div>
+            <div class="signature-section">
+              <div class="signature-box">
+                <div class="signature-label">Checked By</div>
+                <div class="signature-line">( _______________ )</div>
+              </div>
+              <div class="signature-box">
+                <div class="signature-label">Pengirim</div>
+                <div class="signature-line">( ${deliveryNote.driverName || '_______________'} )</div>
+              </div>
+              <div class="signature-box">
+                <div class="signature-label">Received By</div>
+                <div class="signature-line">( ${deliveryNote.recipientName || '_______________'} )</div>
+              </div>
             </div>
           </div>
         </body>
