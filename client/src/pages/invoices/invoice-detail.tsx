@@ -676,6 +676,182 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       document.body.appendChild(printFrame);
 
       const accentColor = printSettings?.accentColor || '#000';
+      const items = dnData.items || [];
+      
+      // Pagination constants for 24cm x 14cm paper
+      const MAX_ITEMS_WITHOUT_FOOTER = 13;
+      const MAX_ITEMS_WITH_FOOTER = 8;
+      
+      // Calculate pages using similar logic to invoice template
+      const pages: { items: any[], isLastPage: boolean, startIndex: number }[] = [];
+      const totalItems = items.length;
+      
+      if (totalItems === 0) {
+        pages.push({ items: [], isLastPage: true, startIndex: 0 });
+      } else if (totalItems <= MAX_ITEMS_WITH_FOOTER) {
+        // All items fit on one page with footer
+        pages.push({ items: [...items], isLastPage: true, startIndex: 0 });
+      } else {
+        // Need multiple pages - maximize items on early pages, reserve space for footer on last page
+        let remaining = [...items];
+        let runningIndex = 0;
+        
+        while (remaining.length > 0) {
+          if (remaining.length <= MAX_ITEMS_WITH_FOOTER) {
+            // Last page with footer
+            pages.push({ 
+              items: remaining, 
+              isLastPage: true, 
+              startIndex: runningIndex 
+            });
+            break;
+          } else if (remaining.length <= MAX_ITEMS_WITHOUT_FOOTER) {
+            // Items fit on this page but need to check if footer fits
+            // Put all on this page without footer, then empty page with footer
+            pages.push({ 
+              items: remaining, 
+              isLastPage: true, 
+              startIndex: runningIndex 
+            });
+            break;
+          } else {
+            // Fill this page with max items (no footer)
+            const pageItems = remaining.slice(0, MAX_ITEMS_WITHOUT_FOOTER);
+            pages.push({ 
+              items: pageItems, 
+              isLastPage: false, 
+              startIndex: runningIndex 
+            });
+            runningIndex += pageItems.length;
+            remaining = remaining.slice(MAX_ITEMS_WITHOUT_FOOTER);
+          }
+        }
+      }
+      
+      const totalPages = pages.length;
+      
+      // Generate header HTML function
+      const generateHeader = (pageIdx: number) => `
+        <div class="print-header">
+          <div class="print-header-left">
+            <div class="print-logo">
+              ${currentUser?.logoUrl 
+                ? `<img src="${currentUser.logoUrl}" alt="Logo" class="print-logo-image" />`
+                : `<div class="print-logo-circle">${(currentUser?.companyName || 'CO').substring(0, 2).toUpperCase()}</div>`
+              }
+            </div>
+            <div class="print-bill-to">
+              <div class="print-bill-to-label">Kepada</div>
+              <div class="print-bill-to-name">${client?.name || 'N/A'}</div>
+              <div class="print-bill-to-details">
+                ${client?.address ? `<div>${client.address}</div>` : ''}
+                ${client?.phone ? `<div>Phone: ${client.phone}</div>` : ''}
+              </div>
+              ${invoice?.deliveryAddress ? `
+                <div class="print-bill-to-details" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">
+                  <div style="font-weight: bold; font-size: 9px;">Alamat Pengiriman:</div>
+                  <div>${invoice.deliveryAddress}</div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          
+          <div class="print-header-center">
+            <div class="print-company-name">${currentUser?.companyName || 'YOUR COMPANY NAME'}</div>
+            ${currentUser?.companyTagline ? `<div class="print-company-tagline">${currentUser.companyTagline}</div>` : ''}
+            <div class="print-company-address">
+              ${currentUser?.companyAddress || 'Your Company Address'}
+              ${currentUser?.companyPhone ? `<br />Phone: ${currentUser.companyPhone}` : ''}
+            </div>
+          </div>
+          
+          <div class="print-header-right">
+            <div class="print-doc-type">SURAT JALAN</div>
+            <div class="print-doc-details">
+              <div class="print-doc-row">
+                <span class="print-doc-label">No.</span>
+                <span>${deliveryNote.deliveryNumber}</span>
+              </div>
+              <div class="print-doc-row">
+                <span class="print-doc-label">Tanggal</span>
+                <span>${formatDate(deliveryNote.deliveryDate)}</span>
+              </div>
+              <div class="print-doc-row">
+                <span class="print-doc-label">Invoice</span>
+                <span>${invoice?.invoiceNumber || '-'}</span>
+              </div>
+              <div class="print-doc-row">
+                <span class="print-doc-label">Page</span>
+                <span>${pageIdx + 1}/${totalPages}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Generate table HTML for a page
+      const generateTable = (pageItems: any[], startIdx: number) => `
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 5%;" class="text-center">No.</th>
+              <th style="width: 15%;" class="text-center">Kode Item</th>
+              <th style="width: 50%;" class="text-center">Nama Produk</th>
+              <th style="width: 10%;" class="text-center">QTY</th>
+              <th style="width: 10%;" class="text-center">Unit</th>
+              <th style="width: 10%;" class="text-center">Check</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pageItems.map((item: any, idx: number) => `
+              <tr>
+                <td class="text-center">${startIdx + idx + 1}</td>
+                <td class="text-center">${item.invoiceItem?.product?.sku || '-'}</td>
+                <td class="text-left">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</td>
+                <td class="text-center">${item.deliveredQuantity}</td>
+                <td class="text-center">${item.invoiceItem?.unitLabel || '-'}</td>
+                <td class="text-center"><span class="check-box"></span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      
+      // Generate footer HTML
+      const generateFooter = () => `
+        <div class="print-footer">
+          ${deliveryNote.notes || currentUser?.deliveryNoteNotes ? `
+            <div class="print-notes-label">Catatan:</div>
+            <div class="print-notes-text">
+              ${currentUser?.deliveryNoteNotes ? `<div>${currentUser.deliveryNoteNotes}</div>` : ''}
+              ${deliveryNote.notes ? `<div>${deliveryNote.notes}</div>` : ''}
+            </div>
+          ` : ''}
+          
+          ${deliveryNote.vehicleInfo || deliveryNote.driverName ? `
+            <div style="font-size: 9pt; margin-top: 5px;">
+              ${deliveryNote.vehicleInfo ? `Kendaraan: ${deliveryNote.vehicleInfo}` : ''}
+              ${deliveryNote.vehicleInfo && deliveryNote.driverName ? ' | ' : ''}
+              ${deliveryNote.driverName ? `Pengirim: ${deliveryNote.driverName}` : ''}
+            </div>
+          ` : ''}
+
+          <div class="signature-section">
+            <div class="signature-box">
+              <div class="signature-label">Checked By</div>
+              <div class="signature-line">( _______________ )</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-label">Pengirim</div>
+              <div class="signature-line">( ${deliveryNote.driverName || '_______________'} )</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-label">Received By</div>
+              <div class="signature-line">( ${deliveryNote.recipientName || '_______________'} )</div>
+            </div>
+          </div>
+        </div>
+      `;
 
       const printContent = `
         <!DOCTYPE html>
@@ -695,10 +871,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             body {
               font-family: 'Times New Roman', Times, serif;
               font-size: 10pt;
+            }
+            .page {
               width: 23cm;
               height: 13.2cm;
               padding: 0.3cm;
               position: relative;
+              page-break-after: always;
+            }
+            .page:last-child {
+              page-break-after: auto;
             }
             .print-header {
               display: flex;
@@ -848,119 +1030,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           </style>
         </head>
         <body>
-          <div class="print-header">
-            <div class="print-header-left">
-              <div class="print-logo">
-                ${currentUser?.logoUrl 
-                  ? `<img src="${currentUser.logoUrl}" alt="Logo" class="print-logo-image" />`
-                  : `<div class="print-logo-circle">${(currentUser?.companyName || 'CO').substring(0, 2).toUpperCase()}</div>`
-                }
-              </div>
-              <div class="print-bill-to">
-                <div class="print-bill-to-label">Kepada</div>
-                <div class="print-bill-to-name">${client?.name || 'N/A'}</div>
-                <div class="print-bill-to-details">
-                  ${client?.address ? `<div>${client.address}</div>` : ''}
-                  ${client?.phone ? `<div>Phone: ${client.phone}</div>` : ''}
-                </div>
-                ${invoice?.deliveryAddress ? `
-                  <div class="print-bill-to-details" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">
-                    <div style="font-weight: bold; font-size: 9px;">Alamat Pengiriman:</div>
-                    <div>${invoice.deliveryAddress}</div>
-                  </div>
-                ` : ''}
-              </div>
+          ${pages.map((page, pageIdx) => `
+            <div class="page">
+              ${generateHeader(pageIdx)}
+              ${generateTable(page.items, page.startIndex)}
+              ${page.isLastPage ? generateFooter() : ''}
             </div>
-            
-            <div class="print-header-center">
-              <div class="print-company-name">${currentUser?.companyName || 'YOUR COMPANY NAME'}</div>
-              ${currentUser?.companyTagline ? `<div class="print-company-tagline">${currentUser.companyTagline}</div>` : ''}
-              <div class="print-company-address">
-                ${currentUser?.companyAddress || 'Your Company Address'}
-                ${currentUser?.companyPhone ? `<br />Phone: ${currentUser.companyPhone}` : ''}
-              </div>
-            </div>
-            
-            <div class="print-header-right">
-              <div class="print-doc-type">SURAT JALAN</div>
-              <div class="print-doc-details">
-                <div class="print-doc-row">
-                  <span class="print-doc-label">No.</span>
-                  <span>${deliveryNote.deliveryNumber}</span>
-                </div>
-                <div class="print-doc-row">
-                  <span class="print-doc-label">Tanggal</span>
-                  <span>${formatDate(deliveryNote.deliveryDate)}</span>
-                </div>
-                <div class="print-doc-row">
-                  <span class="print-doc-label">Invoice</span>
-                  <span>${invoice?.invoiceNumber || '-'}</span>
-                </div>
-                <div class="print-doc-row">
-                  <span class="print-doc-label">Page</span>
-                  <span>1/1</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 5%;" class="text-center">No.</th>
-                <th style="width: 15%;" class="text-center">Kode Item</th>
-                <th style="width: 50%;" class="text-center">Keterangan</th>
-                <th style="width: 10%;" class="text-center">QTY</th>
-                <th style="width: 10%;" class="text-center">Unit</th>
-                <th style="width: 10%;" class="text-center">Check</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(dnData.items || []).map((item: any, idx: number) => `
-                <tr>
-                  <td class="text-center">${idx + 1}</td>
-                  <td class="text-center">${item.productCode || item.productSku || '-'}</td>
-                  <td class="text-left">${item.invoiceItemDescription || item.description || ''}</td>
-                  <td class="text-center">${item.deliveredQuantity}</td>
-                  <td class="text-center">${item.unitLabel || '-'}</td>
-                  <td class="text-center"><span class="check-box"></span></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div class="print-footer">
-            ${deliveryNote.notes || currentUser?.deliveryNoteNotes ? `
-              <div class="print-notes-label">Catatan:</div>
-              <div class="print-notes-text">
-                ${currentUser?.deliveryNoteNotes ? `<div>${currentUser.deliveryNoteNotes}</div>` : ''}
-                ${deliveryNote.notes ? `<div>${deliveryNote.notes}</div>` : ''}
-              </div>
-            ` : ''}
-            
-            ${deliveryNote.vehicleInfo || deliveryNote.driverName ? `
-              <div style="font-size: 9pt; margin-top: 5px;">
-                ${deliveryNote.vehicleInfo ? `Kendaraan: ${deliveryNote.vehicleInfo}` : ''}
-                ${deliveryNote.vehicleInfo && deliveryNote.driverName ? ' | ' : ''}
-                ${deliveryNote.driverName ? `Pengirim: ${deliveryNote.driverName}` : ''}
-              </div>
-            ` : ''}
-
-            <div class="signature-section">
-              <div class="signature-box">
-                <div class="signature-label">Checked By</div>
-                <div class="signature-line">( _______________ )</div>
-              </div>
-              <div class="signature-box">
-                <div class="signature-label">Pengirim</div>
-                <div class="signature-line">( ${deliveryNote.driverName || '_______________'} )</div>
-              </div>
-              <div class="signature-box">
-                <div class="signature-label">Received By</div>
-                <div class="signature-line">( ${deliveryNote.recipientName || '_______________'} )</div>
-              </div>
-            </div>
-          </div>
+          `).join('')}
         </body>
         </html>
       `;

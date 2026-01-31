@@ -165,7 +165,7 @@ export interface IStorage {
 
   // Delivery note methods
   getDeliveryNote(id: number): Promise<DeliveryNote | undefined>;
-  getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[] } | undefined>;
+  getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product; unitLabel?: string } })[] } | undefined>;
   getDeliveryNotesByInvoice(invoiceId: number): Promise<DeliveryNote[]>;
   getDeliveryNotes(storeId: number): Promise<DeliveryNote[]>;
   getDeliveryNotesWithDetails(storeId: number, status?: string): Promise<(DeliveryNote & { invoice: Invoice & { client: Client | null }, itemCount: number })[]>;
@@ -2186,26 +2186,33 @@ export class DatabaseStorage implements IStorage {
     return deliveryNote;
   }
 
-  async getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[] } | undefined> {
+  async getDeliveryNoteWithItems(id: number): Promise<{ deliveryNote: DeliveryNote, items: (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product; unitLabel?: string } })[] } | undefined> {
     const [deliveryNote] = await db.select().from(deliveryNotes).where(eq(deliveryNotes.id, id));
     if (!deliveryNote) {
       return undefined;
     }
 
     const rawItems = await db
-      .select()
+      .select({
+        deliveryNoteItem: deliveryNoteItems,
+        invoiceItem: invoiceItems,
+        product: products,
+        selectedUnitLabel: productUnits.unitLabel,
+      })
       .from(deliveryNoteItems)
       .innerJoin(invoiceItems, eq(deliveryNoteItems.invoiceItemId, invoiceItems.id))
       .innerJoin(products, eq(invoiceItems.productId, products.id))
+      .leftJoin(productUnits, eq(invoiceItems.productUnitId, productUnits.id))
       .where(eq(deliveryNoteItems.deliveryNoteId, id));
 
     const items = rawItems.map(row => ({
-      ...row.delivery_note_items,
+      ...row.deliveryNoteItem,
       invoiceItem: {
-        ...row.invoice_items,
-        product: row.products
+        ...row.invoiceItem,
+        product: row.product,
+        unitLabel: row.selectedUnitLabel || row.product.unit || undefined
       }
-    })) as (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product } })[];
+    })) as (DeliveryNoteItem & { invoiceItem: InvoiceItem & { product: Product; unitLabel?: string } })[];
 
     return { deliveryNote, items };
   }
