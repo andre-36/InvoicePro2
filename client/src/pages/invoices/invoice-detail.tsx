@@ -997,13 +997,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           <table className="print-items-table">
             <thead>
               <tr>
-                <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
-                <th style={{ width: '10%', textAlign: 'center' }}>Kode Item</th>
-                <th style={{ width: '38%', textAlign: 'left' }}>Products</th>
-                <th style={{ width: '8%', textAlign: 'center' }}>QTY</th>
-                <th style={{ width: '8%', textAlign: 'center' }}>Unit</th>
-                <th style={{ width: '16%', textAlign: 'right' }}>Price</th>
-                <th style={{ width: '16%', textAlign: 'right' }}>Total</th>
+                <th style={{ width: '3%', textAlign: 'center' }}>No.</th>
+                <th style={{ width: '8%', textAlign: 'center' }}>Kode Item</th>
+                <th style={{ width: '49%', textAlign: 'center' }}>Products</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>Unit</th>
+                <th style={{ width: '13%', textAlign: 'center' }}>Price</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -1014,8 +1014,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   <td style={{ textAlign: 'left' }}>{item.description}</td>
                   <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
                   <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
+                  <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
                 </tr>
               ))}
             </tbody>

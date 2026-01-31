@@ -437,8 +437,8 @@
     height: 0.7cm;
     max-height: 0.7cm;
     overflow: hidden;
-    white-space: nowrap;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
   .print-items-table tbody tr {
