@@ -1903,7 +1903,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // If useFakturPajak is enabled, recalculate tax from items
-      if (quotationData.useFakturPajak === true && items && Array.isArray(items) && items.length > 0) {
+      // Handle both boolean true and string "true" since form data may send it as string
+      const useFakturPajakEnabled = quotationData.useFakturPajak === true || quotationData.useFakturPajak === 'true';
+      if (useFakturPajakEnabled && items && Array.isArray(items) && items.length > 0) {
         const taxRate = parseFloat(quotationData.taxRate || '11') || 11;
         const taxMultiplier = 1 + (taxRate / 100);
         
