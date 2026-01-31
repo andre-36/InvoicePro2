@@ -1514,6 +1514,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const inflowCategory = await storage.getInflowCategory(inflowCategoryId);
             const categoryName = inflowCategory?.name || 'invoice_payment';
             
+            // Get client name for description
+            let clientName = '';
+            if (invoice.clientId) {
+              const client = await storage.getClient(invoice.clientId);
+              clientName = client?.name || '';
+            }
+            
             // Create a transaction entry for this payment as income
             const transactionData: any = {
               storeId: invoice.storeId,
@@ -1522,8 +1529,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               amount: netAmount.toFixed(2),
               date: validatedData.paymentDate,
               description: deductionAmount > 0 
-                ? `Payment for invoice ${invoice.invoiceNumber} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
-                : `Payment received for invoice ${invoice.invoiceNumber}`,
+                ? `Payment for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ''} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
+                : `Payment received for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ''}`,
               referenceNumber: `Invoice #${invoice.invoiceNumber}`,
               invoicePaymentId: newPayment.id,
             };
@@ -2706,6 +2713,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const outflowCategory = await storage.getOutflowCategory(outflowCategoryId);
           const categoryName = outflowCategory?.name || 'supplier_payment';
           
+          // Get supplier name for description
+          let supplierName = '';
+          if (goodsReceipt.supplierId) {
+            const supplier = await storage.getSupplier(goodsReceipt.supplierId);
+            supplierName = supplier?.name || '';
+          }
+          
           // Create a transaction entry for this payment as expense
           const transactionData: any = {
             storeId: goodsReceipt.storeId,
@@ -2713,7 +2727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             category: categoryName,
             amount: String(validatedData.amount),
             date: validatedData.paymentDate,
-            description: `Payment for goods receipt ${goodsReceipt.receiptNumber}`,
+            description: `Payment for goods receipt ${goodsReceipt.receiptNumber}${supplierName ? ` - ${supplierName}` : ''}`,
             referenceNumber: `GR #${goodsReceipt.receiptNumber}`,
             goodsReceiptId: goodsReceiptId,
             goodsReceiptPaymentId: newPayment.id,
