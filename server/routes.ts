@@ -1287,7 +1287,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })();
       
       // Remove invoiceNumber from update data - invoice number should never change
-      const { invoiceNumber, ...invoiceFields } = rawInvoiceFields;
+      const { invoiceNumber, ...rawFields } = rawInvoiceFields;
+      
+      // Convert date strings to Date objects for database
+      const invoiceFields = {
+        ...rawFields,
+        ...(rawFields.issueDate && { issueDate: new Date(rawFields.issueDate) }),
+        ...(rawFields.dueDate && { dueDate: new Date(rawFields.dueDate) }),
+      };
       
       let updatedInvoice;
       
