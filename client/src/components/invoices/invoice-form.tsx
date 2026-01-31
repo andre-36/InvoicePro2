@@ -633,15 +633,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       if (field === 'quantity' || field === 'price' || field === 'taxRate') {
         const quantity = parseFloat(newItems[index].quantity) || 0;
         const price = parseFloat(newItems[index].price) || 0;
-        const taxRate = parseFloat(newItems[index].taxRate) || 0;
 
+        // When useFakturPajak is enabled, prices are tax-inclusive
+        // Don't calculate tax per item - tax is calculated at invoice level
         const subtotal = quantity * price;
-        const tax = (subtotal * taxRate) / 100;
-        const total = subtotal + tax;
-
+        
+        // Item-level tax is always 0 when useFakturPajak is enabled
+        // Tax calculation happens at invoice level
         newItems[index].subtotal = subtotal.toFixed(2);
-        newItems[index].tax = tax.toFixed(2);
-        newItems[index].total = total.toFixed(2);
+        newItems[index].tax = "0";
+        newItems[index].total = subtotal.toFixed(2);
       }
 
       return newItems;
@@ -685,10 +686,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       const quantity = items[index].quantity || "1";
       // Use currentSellingPrice if available, otherwise fall back to price
       const price = (product.currentSellingPrice || product.price || "0").toString();
-      const taxRate = "0"; // Default to 0% tax
+      const taxRate = "0"; // Tax is calculated at invoice level, not per item
       const subtotal = (parseFloat(quantity) * parseFloat(price)).toFixed(2);
-      const tax = (parseFloat(subtotal) * parseFloat(taxRate) / 100).toFixed(2);
-      const total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
+      // Item-level tax is always 0 - tax calculation happens at invoice level when useFakturPajak is enabled
+      const tax = "0";
+      const total = subtotal; // Total = subtotal since tax is calculated at invoice level
 
       const updatedItem: InvoiceItem = {
         ...items[index],
