@@ -1501,13 +1501,18 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           control={form.control}
                           name="invoice.discount"
                           render={({ field }) => (
-                            <FormItem className="w-20">
+                            <FormItem className="w-28">
                               <FormControl>
                                 <Input 
                                   {...field} 
                                   type="number"
                                   min="0"
+                                  step="1"
                                   className="text-right h-8"
+                                  onChange={(e) => {
+                                    const value = Math.floor(parseFloat(e.target.value) || 0);
+                                    field.onChange(value.toString());
+                                  }}
                                 />
                               </FormControl>
                             </FormItem>
@@ -1523,13 +1528,18 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           control={form.control}
                           name="invoice.shipping"
                           render={({ field }) => (
-                            <FormItem className="w-20">
+                            <FormItem className="w-28">
                               <FormControl>
                                 <Input 
                                   {...field} 
                                   type="number"
                                   min="0"
+                                  step="1"
                                   className="text-right h-8"
+                                  onChange={(e) => {
+                                    const value = Math.floor(parseFloat(e.target.value) || 0);
+                                    field.onChange(value.toString());
+                                  }}
                                 />
                               </FormControl>
                             </FormItem>

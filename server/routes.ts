@@ -1302,7 +1302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Copy safe primitive fields
       const allowedFields = [
         'clientId', 'status', 'paymentTerms', 'subtotal', 'taxRate', 'taxAmount',
-        'discount', 'totalAmount', 'amountPaid', 'notes', 'isVoided', 'voidReason',
+        'discount', 'shipping', 'totalAmount', 'amountPaid', 'notes', 'isVoided', 'voidReason',
         'useFakturPajak', 'fakturPajakNumber', 'deliveryAddress', 'deliveryAddressLink'
       ];
       
