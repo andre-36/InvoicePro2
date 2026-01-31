@@ -338,12 +338,6 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                   <span className="print-doc-label">Valid Until</span>
                   <span className="print-doc-value">{formatDate(quotation.expiryDate) || 'N/A'}</span>
                 </div>
-                {printSettings?.showPONumber !== false && (
-                  <div className="print-doc-row">
-                    <span className="print-doc-label">PO Number</span>
-                    <span className="print-doc-value">_______</span>
-                  </div>
-                )}
                 {/* Page indicator */}
                 <div className="print-doc-row">
                   <span className="print-doc-label">Page</span>
