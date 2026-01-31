@@ -1286,15 +1286,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return rest;
       })();
       
-      // Remove invoiceNumber from update data - invoice number should never change
-      const { invoiceNumber, ...rawFields } = rawInvoiceFields;
+      // Remove fields that should never be updated via this endpoint
+      const {
+        invoiceNumber,  // Invoice number should never change
+        id,             // ID is immutable
+        createdAt,      // Created timestamp is immutable
+        updatedAt,      // Updated timestamp is managed by backend
+        storeId,        // Store ID should not change
+        ...safeFields
+      } = rawInvoiceFields;
       
-      // Convert date strings to Date objects for database
-      const invoiceFields = {
-        ...rawFields,
-        ...(rawFields.issueDate && { issueDate: new Date(rawFields.issueDate) }),
-        ...(rawFields.dueDate && { dueDate: new Date(rawFields.dueDate) }),
-      };
+      // Build the update object with only allowed fields and proper date conversion
+      const invoiceFields: Record<string, any> = {};
+      
+      // Copy safe primitive fields
+      const allowedFields = [
+        'clientId', 'status', 'paymentTerms', 'subtotal', 'taxRate', 'taxAmount',
+        'discount', 'totalAmount', 'amountPaid', 'notes', 'isVoided', 'voidReason',
+        'useFakturPajak', 'fakturPajakNumber', 'deliveryAddress', 'deliveryAddressLink'
+      ];
+      
+      for (const field of allowedFields) {
+        if (safeFields[field] !== undefined) {
+          invoiceFields[field] = safeFields[field];
+        }
+      }
+      
+      // Convert date strings to Date objects
+      if (safeFields.issueDate) {
+        invoiceFields.issueDate = new Date(safeFields.issueDate);
+      }
+      if (safeFields.dueDate) {
+        invoiceFields.dueDate = new Date(safeFields.dueDate);
+      }
       
       let updatedInvoice;
       
