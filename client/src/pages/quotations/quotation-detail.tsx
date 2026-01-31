@@ -274,19 +274,6 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       {/* Print-only template */}
       <div className="print-only" style={{ display: 'none' }}>
         <div className="print-invoice-template">
-          {/* Watermark - repeating pattern */}
-          <div className="print-watermark">
-            <div className="print-watermark-inner">
-              {[...Array(8)].map((_, rowIndex) => (
-                <div key={rowIndex} className="print-watermark-row">
-                  {[...Array(5)].map((_, colIndex) => (
-                    <span key={colIndex}>{currentUser?.companyName || ''}</span>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-          
           {/* Header - 3 columns: Logo+BillTo | Company Info | Doc Details */}
           <div className="print-header">
             {/* Left column: Logo + Bill To */}
@@ -349,7 +336,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                 </div>
                 <div className="print-doc-row">
                   <span className="print-doc-label">Valid Until</span>
-                  <span className="print-doc-value">{formatDate(quotation.expiryDate)}</span>
+                  <span className="print-doc-value">{formatDate(quotation.expiryDate) || 'N/A'}</span>
                 </div>
                 {printSettings?.showPONumber !== false && (
                   <div className="print-doc-row">
@@ -357,7 +344,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                     <span className="print-doc-value">_______</span>
                   </div>
                 )}
-                {/* Page indicator moved here */}
+                {/* Page indicator */}
                 <div className="print-doc-row">
                   <span className="print-doc-label">Page</span>
                   <span className="print-doc-value">1/1</span>
@@ -366,25 +353,27 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
           </div>
 
-          {/* Items Table */}
+          {/* Items Table - Same format as Invoice */}
           <table className="print-items-table">
             <thead>
               <tr>
                 <th style={{ width: '4%', textAlign: 'center' }}>No.</th>
-                <th style={{ width: '8%', textAlign: 'center' }}>Code</th>
-                <th style={{ width: '52%', textAlign: 'center' }}>Description</th>
-                <th style={{ width: '5%', textAlign: 'center' }}>QTY</th>
-                <th style={{ width: '15%', textAlign: 'center' }}>Rate</th>
-                <th style={{ width: '16%', textAlign: 'center' }}>Total</th>
+                <th style={{ width: '12%', textAlign: 'center' }}>Kode Item</th>
+                <th style={{ width: '44%', textAlign: 'center' }}>Products</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>QTY</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>Unit</th>
+                <th style={{ width: '13%', textAlign: 'center' }}>Price</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
                   <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ textAlign: 'center' }}>ITEM{index + 1}</td>
-                  <td>{item.description}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
+                  <td style={{ textAlign: 'left' }}>{item.description}</td>
                   <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
                   <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
                   <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
                 </tr>
@@ -409,7 +398,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
             </div>
             
             <div className="print-footer-right">
-              {quotation.useFakturPajak && printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 ? (
+              {(quotation as any).useFakturPajak && printSettings?.showTax !== false && parseFloat(quotation.taxAmount || '0') > 0 ? (
                 <>
                   <div className="print-total-row">
                     <span className="print-total-label">DPP</span>
