@@ -52,45 +52,312 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
     queryKey: ['/api/user'],
   });
 
-  // Print PO with A4 format
+  // Print PO with A4 format using iframe
   const handlePrint = () => {
-    // Create a temporary style element for A4 page size
-    const styleElement = document.createElement('style');
-    styleElement.id = 'po-print-style';
-    styleElement.textContent = `
-      @page {
-        size: A4 portrait;
-        margin: 0;
-      }
-      @media print {
-        body > div:not(.print-po-a4-wrapper),
-        #root > *:not(.print-po-a4-wrapper),
-        .screen-only {
-          display: none !important;
-        }
-        .print-po-a4-wrapper {
-          display: block !important;
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-        }
-        html, body {
-          width: 21cm !important;
-          height: 29.7cm !important;
-        }
-      }
-    `;
-    document.head.appendChild(styleElement);
+    if (!purchaseOrder) return;
+    
+    // Create hidden iframe for printing
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'absolute';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = 'none';
+    printFrame.style.left = '-9999px';
+    document.body.appendChild(printFrame);
 
-    // Trigger print
-    setTimeout(() => {
-      window.print();
-      // Clean up the style element after printing
+    const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (!printDoc) return;
+
+    // Generate print content
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Purchase Order - ${purchaseOrder.purchaseOrderNumber}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            background: white;
+            width: 21cm;
+            min-height: 29.7cm;
+            padding: 1.5cm;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1cm;
+            border-bottom: 2px solid #333;
+            padding-bottom: 0.5cm;
+          }
+          .logo img {
+            width: 4cm;
+            height: auto;
+            max-height: 2.5cm;
+            object-fit: contain;
+          }
+          .company-info {
+            text-align: right;
+          }
+          .company-name {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 0.2cm;
+          }
+          .title-section {
+            text-align: center;
+            margin-bottom: 0.8cm;
+          }
+          .title {
+            font-size: 18pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 0.3cm;
+          }
+          .po-number {
+            font-size: 13pt;
+            font-weight: 600;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1cm;
+            margin-bottom: 1cm;
+          }
+          .info-box {
+            padding: 0.4cm;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+          }
+          .info-box h4 {
+            font-size: 10pt;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 0.3cm;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.2cm;
+          }
+          .info-box p {
+            font-size: 11pt;
+            margin: 0.1cm 0;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1cm;
+            font-size: 10pt;
+          }
+          th {
+            background: #f5f5f5;
+            padding: 0.3cm 0.2cm;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #ddd;
+          }
+          th.text-right {
+            text-align: right;
+          }
+          td {
+            padding: 0.25cm 0.2cm;
+            border: 1px solid #ddd;
+            vertical-align: top;
+          }
+          td.text-right {
+            text-align: right;
+          }
+          .totals {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1cm;
+          }
+          .totals-box {
+            width: 8cm;
+          }
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.15cm 0;
+            font-size: 11pt;
+          }
+          .totals-row.total {
+            border-top: 2px solid #333;
+            margin-top: 0.3cm;
+            padding-top: 0.3cm;
+            font-weight: bold;
+            font-size: 12pt;
+          }
+          .notes {
+            margin-bottom: 1cm;
+            padding: 0.4cm;
+            background: #f9f9f9;
+            border-radius: 4px;
+          }
+          .notes h4 {
+            font-size: 10pt;
+            font-weight: 600;
+            margin-bottom: 0.2cm;
+          }
+          .notes p {
+            font-size: 10pt;
+            white-space: pre-line;
+          }
+          .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2cm;
+            margin-top: 2cm;
+          }
+          .signature-box {
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 2cm;
+            padding-top: 0.3cm;
+            font-size: 10pt;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">
+            ${currentUser?.logoUrl 
+              ? `<img src="${currentUser.logoUrl}" alt="Logo" />`
+              : `<div class="company-name">${currentUser?.companyName || 'Company Name'}</div>`
+            }
+          </div>
+          <div class="company-info">
+            <div class="company-name">${currentUser?.companyName || 'Company Name'}</div>
+            ${currentUser?.companyAddress ? `<div>${currentUser.companyAddress}</div>` : ''}
+            ${currentUser?.companyPhone ? `<div>Tel: ${currentUser.companyPhone}</div>` : ''}
+            ${currentUser?.companyEmail ? `<div>Email: ${currentUser.companyEmail}</div>` : ''}
+          </div>
+        </div>
+
+        <div class="title-section">
+          <div class="title">Purchase Order</div>
+          <div class="po-number">${purchaseOrder.purchaseOrderNumber}</div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-box">
+            <h4>Supplier Information</h4>
+            <p><strong>${purchaseOrder.supplierName}</strong></p>
+            ${purchaseOrder.supplierAddress ? `<p>${purchaseOrder.supplierAddress}</p>` : ''}
+            ${purchaseOrder.supplierPhone ? `<p>Tel: ${purchaseOrder.supplierPhone}</p>` : ''}
+            ${purchaseOrder.supplierEmail ? `<p>Email: ${purchaseOrder.supplierEmail}</p>` : ''}
+          </div>
+          <div class="info-box">
+            <h4>Order Details</h4>
+            <p><strong>Order Date:</strong> ${formatDate(purchaseOrder.orderDate)}</p>
+            <p><strong>Status:</strong> ${purchaseOrder.status.charAt(0).toUpperCase() + purchaseOrder.status.slice(1)}</p>
+            ${purchaseOrder.useFakturPajak ? `<p><strong>Faktur Pajak:</strong> PPN ${purchaseOrder.taxRate || 11}%</p>` : ''}
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 5%">No</th>
+              <th style="width: 40%">Description</th>
+              <th style="width: 12%" class="text-right">Qty</th>
+              <th style="width: 18%" class="text-right">Unit Cost</th>
+              <th style="width: 10%" class="text-right">Tax</th>
+              <th style="width: 15%" class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${purchaseOrder.items.map((item: any, index: number) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${item.description}</td>
+                <td class="text-right">${parseFloat(item.quantity)}</td>
+                <td class="text-right">${formatCurrency(item.unitCost)}</td>
+                <td class="text-right">${formatCurrency(item.taxAmount)}</td>
+                <td class="text-right">${formatCurrency(item.totalAmount)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div class="totals-box">
+            <div class="totals-row">
+              <span>Subtotal:</span>
+              <span>${formatCurrency(purchaseOrder.subtotal)}</span>
+            </div>
+            ${parseFloat(purchaseOrder.taxAmount || '0') > 0 ? `
+              <div class="totals-row">
+                <span>Tax (PPN ${purchaseOrder.taxRate || 11}%):</span>
+                <span>${formatCurrency(purchaseOrder.taxAmount)}</span>
+              </div>
+            ` : ''}
+            ${parseFloat(purchaseOrder.discount || '0') > 0 ? `
+              <div class="totals-row">
+                <span>Discount:</span>
+                <span>-${formatCurrency(purchaseOrder.discount)}</span>
+              </div>
+            ` : ''}
+            ${parseFloat(purchaseOrder.shipping || '0') > 0 ? `
+              <div class="totals-row">
+                <span>Shipping:</span>
+                <span>${formatCurrency(purchaseOrder.shipping)}</span>
+              </div>
+            ` : ''}
+            <div class="totals-row total">
+              <span>Total Amount:</span>
+              <span>${formatCurrency(purchaseOrder.totalAmount)}</span>
+            </div>
+          </div>
+        </div>
+
+        ${purchaseOrder.notes ? `
+          <div class="notes">
+            <h4>Notes:</h4>
+            <p>${purchaseOrder.notes}</p>
+          </div>
+        ` : ''}
+
+        <div class="signatures">
+          <div class="signature-box">
+            <div class="signature-line">Authorized Signature</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-line">Supplier Acknowledgment</div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printDoc.open();
+    printDoc.write(printContent);
+    printDoc.close();
+
+    // Wait for content to load, then print
+    printFrame.onload = () => {
       setTimeout(() => {
-        const el = document.getElementById('po-print-style');
-        if (el) el.remove();
-      }, 500);
-    }, 100);
+        printFrame.contentWindow?.print();
+        // Remove iframe after printing
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+        }, 1000);
+      }, 250);
+    };
   };
 
   // Delete purchase order mutation
@@ -432,136 +699,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
         </Card>
       </div>
 
-      {/* Print Template - A4 Format */}
-      <div className="print-po-a4-wrapper screen-hidden">
-        <div className="print-po-a4-template">
-          {/* Header */}
-          <div className="print-po-header">
-            <div>
-              {currentUser?.logoUrl ? (
-                <img 
-                  src={currentUser.logoUrl} 
-                  alt="Company Logo" 
-                  className="print-po-logo"
-                />
-              ) : (
-                <div className="print-po-company-name">{currentUser?.companyName || 'Company Name'}</div>
-              )}
-            </div>
-            <div className="print-po-company-info">
-              <div className="print-po-company-name">{currentUser?.companyName || 'Company Name'}</div>
-              {currentUser?.companyAddress && <div>{currentUser.companyAddress}</div>}
-              {currentUser?.companyPhone && <div>Tel: {currentUser.companyPhone}</div>}
-              {currentUser?.companyEmail && <div>Email: {currentUser.companyEmail}</div>}
-            </div>
-          </div>
-
-          {/* Title */}
-          <div className="print-po-title-section">
-            <div className="print-po-title">Purchase Order</div>
-            <div className="print-po-number">{purchaseOrder.purchaseOrderNumber}</div>
-          </div>
-
-          {/* Info Grid */}
-          <div className="print-po-info-grid">
-            <div className="print-po-info-box">
-              <h4>Supplier Information</h4>
-              <p><strong>{purchaseOrder.supplierName}</strong></p>
-              {purchaseOrder.supplierAddress && <p>{purchaseOrder.supplierAddress}</p>}
-              {purchaseOrder.supplierPhone && <p>Tel: {purchaseOrder.supplierPhone}</p>}
-              {purchaseOrder.supplierEmail && <p>Email: {purchaseOrder.supplierEmail}</p>}
-            </div>
-            <div className="print-po-info-box">
-              <h4>Order Details</h4>
-              <p><strong>Order Date:</strong> {formatDate(purchaseOrder.orderDate)}</p>
-              <p><strong>Status:</strong> {purchaseOrder.status.charAt(0).toUpperCase() + purchaseOrder.status.slice(1)}</p>
-              {purchaseOrder.useFakturPajak && (
-                <p><strong>Faktur Pajak:</strong> PPN {purchaseOrder.taxRate || 11}%</p>
-              )}
-            </div>
-          </div>
-
-          {/* Items Table */}
-          <table className="print-po-items-table">
-            <thead>
-              <tr>
-                <th style={{ width: '5%' }}>No</th>
-                <th style={{ width: '40%' }}>Description</th>
-                <th style={{ width: '12%' }} className="text-right">Qty</th>
-                <th style={{ width: '18%' }} className="text-right">Unit Cost</th>
-                <th style={{ width: '10%' }} className="text-right">Tax</th>
-                <th style={{ width: '15%' }} className="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchaseOrder.items.map((item: any, index: number) => (
-                <tr key={item.id || index}>
-                  <td>{index + 1}</td>
-                  <td>{item.description}</td>
-                  <td className="text-right">{parseFloat(item.quantity)}</td>
-                  <td className="text-right">{formatCurrency(item.unitCost)}</td>
-                  <td className="text-right">{formatCurrency(item.taxAmount)}</td>
-                  <td className="text-right">{formatCurrency(item.totalAmount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Totals */}
-          <div className="print-po-totals">
-            <div className="print-po-totals-box">
-              <div className="print-po-totals-row">
-                <span>Subtotal:</span>
-                <span>{formatCurrency(purchaseOrder.subtotal)}</span>
-              </div>
-              {parseFloat(purchaseOrder.taxAmount || '0') > 0 && (
-                <div className="print-po-totals-row">
-                  <span>Tax (PPN {purchaseOrder.taxRate || 11}%):</span>
-                  <span>{formatCurrency(purchaseOrder.taxAmount)}</span>
-                </div>
-              )}
-              {parseFloat(purchaseOrder.discount || '0') > 0 && (
-                <div className="print-po-totals-row">
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(purchaseOrder.discount)}</span>
-                </div>
-              )}
-              {parseFloat(purchaseOrder.shipping || '0') > 0 && (
-                <div className="print-po-totals-row">
-                  <span>Shipping:</span>
-                  <span>{formatCurrency(purchaseOrder.shipping)}</span>
-                </div>
-              )}
-              <div className="print-po-totals-row total">
-                <span>Total Amount:</span>
-                <span>{formatCurrency(purchaseOrder.totalAmount)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {purchaseOrder.notes && (
-            <div className="print-po-notes">
-              <h4>Notes:</h4>
-              <p>{purchaseOrder.notes}</p>
-            </div>
-          )}
-
-          {/* Signatures */}
-          <div className="print-po-signatures">
-            <div className="print-po-signature-box">
-              <div className="print-po-signature-line">
-                Authorized Signature
-              </div>
-            </div>
-            <div className="print-po-signature-box">
-              <div className="print-po-signature-line">
-                Supplier Acknowledgment
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
