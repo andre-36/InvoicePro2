@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, TrendingDown, DollarSign, CreditCard, Users, Package, FileText, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Calendar as CalendarIcon } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, DollarSign, CreditCard, Users, Package, FileText, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Calendar as CalendarIcon, Banknote } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { DateRange as DayPickerDateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
+import type { CashAccount } from "@shared/schema";
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
@@ -217,6 +218,11 @@ export default function ReportsPage() {
     },
   });
   
+  // Cash accounts for Cash Daily Report
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ['/api/stores/1/cash-accounts'],
+  });
+
   // Process transaction data for charts
   const processTransactionsByCategory = (type: 'income' | 'expense') => {
     if (!transactions) return [];
@@ -240,6 +246,74 @@ export default function ReportsPage() {
   
   const incomeByCategory = processTransactionsByCategory('income');
   const expensesByCategory = processTransactionsByCategory('expense');
+
+  // Process cash daily report data
+  const processCashDailyReport = () => {
+    if (!transactions || !cashAccounts) return { byDate: [], byAccount: [], totals: { income: 0, expense: 0, net: 0 } };
+    
+    // Filter transactions that have a cash account
+    const cashTransactions = transactions.filter(t => t.accountId !== null);
+    
+    // Group by date
+    const byDateMap: Record<string, { date: string; income: number; expense: number; transactions: typeof cashTransactions }> = {};
+    
+    cashTransactions.forEach(t => {
+      if (!byDateMap[t.date]) {
+        byDateMap[t.date] = { date: t.date, income: 0, expense: 0, transactions: [] };
+      }
+      const amount = parseFloat(t.amount);
+      if (t.type === 'income') {
+        byDateMap[t.date].income += amount;
+      } else {
+        byDateMap[t.date].expense += amount;
+      }
+      byDateMap[t.date].transactions.push(t);
+    });
+    
+    const byDate = Object.values(byDateMap).sort((a, b) => b.date.localeCompare(a.date));
+    
+    // Group by cash account
+    const byAccountMap: Record<number, { accountId: number; accountName: string; income: number; expense: number }> = {};
+    
+    cashTransactions.forEach(t => {
+      const accountId = t.accountId!;
+      if (!byAccountMap[accountId]) {
+        const account = cashAccounts.find(a => a.id === accountId);
+        byAccountMap[accountId] = { 
+          accountId, 
+          accountName: account?.name || 'Unknown', 
+          income: 0, 
+          expense: 0 
+        };
+      }
+      const amount = parseFloat(t.amount);
+      if (t.type === 'income') {
+        byAccountMap[accountId].income += amount;
+      } else {
+        byAccountMap[accountId].expense += amount;
+      }
+    });
+    
+    const byAccount = Object.values(byAccountMap);
+    
+    // Calculate totals
+    const totals = {
+      income: cashTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + parseFloat(t.amount), 0),
+      expense: cashTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + parseFloat(t.amount), 0),
+      net: 0
+    };
+    totals.net = totals.income - totals.expense;
+    
+    return { byDate, byAccount, totals };
+  };
+  
+  const cashDailyReport = processCashDailyReport();
+  
+  const getCashAccountName = (accountId: number | null | undefined) => {
+    if (!accountId || !cashAccounts) return '-';
+    const account = cashAccounts.find(a => a.id === accountId);
+    return account?.name || '-';
+  };
 
   const downloadReport = async (reportType: string) => {
     const tabToEndpoint: Record<string, string> = {
@@ -402,6 +476,7 @@ export default function ReportsPage() {
           <TabsTrigger value="summary">Ringkasan</TabsTrigger>
           <TabsTrigger value="profit-loss">Laba Rugi</TabsTrigger>
           <TabsTrigger value="cash-flow">Arus Kas</TabsTrigger>
+          <TabsTrigger value="cash-daily">Kas Harian</TabsTrigger>
           <TabsTrigger value="products">Performa Produk</TabsTrigger>
           <TabsTrigger value="customers">Pelanggan</TabsTrigger>
           <TabsTrigger value="breakdown">Rincian</TabsTrigger>
@@ -787,6 +862,155 @@ export default function ReportsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* LAPORAN KAS HARIAN */}
+        <TabsContent value="cash-daily" className="space-y-4">
+          {isLoadingTransactions ? (
+            <Skeleton className="h-[600px] w-full" />
+          ) : (
+            <>
+              {/* Cash Daily Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ArrowUpRight className="h-5 w-5 text-green-600" />
+                      Total Kas Masuk
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-green-600">{formatCurrency(cashDailyReport.totals.income)}</p>
+                    <p className="text-sm text-gray-500 mt-1">Periode yang dipilih</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ArrowDownRight className="h-5 w-5 text-red-600" />
+                      Total Kas Keluar
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-red-600">{formatCurrency(cashDailyReport.totals.expense)}</p>
+                    <p className="text-sm text-gray-500 mt-1">Periode yang dipilih</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Banknote className="h-5 w-5 text-indigo-600" />
+                      Selisih Kas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className={`text-3xl font-bold ${cashDailyReport.totals.net >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      {formatCurrency(cashDailyReport.totals.net)}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">Kas Masuk - Kas Keluar</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Per Account Summary */}
+              {cashDailyReport.byAccount.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Wallet className="h-5 w-5" />
+                      Ringkasan Per Akun Kas
+                    </CardTitle>
+                    <CardDescription>Rincian kas masuk dan keluar per akun</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Akun Kas</TableHead>
+                          <TableHead className="text-right">Kas Masuk</TableHead>
+                          <TableHead className="text-right">Kas Keluar</TableHead>
+                          <TableHead className="text-right">Selisih</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cashDailyReport.byAccount.map((account) => (
+                          <TableRow key={account.accountId}>
+                            <TableCell className="font-medium">{account.accountName}</TableCell>
+                            <TableCell className="text-right text-green-600">{formatCurrency(account.income)}</TableCell>
+                            <TableCell className="text-right text-red-600">{formatCurrency(account.expense)}</TableCell>
+                            <TableCell className={`text-right font-semibold ${account.income - account.expense >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                              {formatCurrency(account.income - account.expense)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Daily Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="h-5 w-5" />
+                    Rincian Kas Harian
+                  </CardTitle>
+                  <CardDescription>Detail transaksi kas per tanggal untuk rekonsiliasi laci kasir</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {cashDailyReport.byDate.length === 0 ? (
+                    <div className="flex justify-center items-center h-[200px]">
+                      <p className="text-gray-500">Tidak ada transaksi kas pada periode ini</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {cashDailyReport.byDate.map((day) => (
+                        <div key={day.date} className="border rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                            <div className="font-semibold">
+                              {format(new Date(day.date), 'EEEE, dd MMMM yyyy', { locale: id })}
+                            </div>
+                            <div className="flex gap-4 text-sm">
+                              <span className="text-green-600">Masuk: {formatCurrency(day.income)}</span>
+                              <span className="text-red-600">Keluar: {formatCurrency(day.expense)}</span>
+                              <span className={`font-semibold ${day.income - day.expense >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                                Selisih: {formatCurrency(day.income - day.expense)}
+                              </span>
+                            </div>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Deskripsi</TableHead>
+                                <TableHead>Kategori</TableHead>
+                                <TableHead>Akun Kas</TableHead>
+                                <TableHead>Referensi</TableHead>
+                                <TableHead className="text-right">Jumlah</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {day.transactions.map((t) => (
+                                <TableRow key={t.id}>
+                                  <TableCell>{t.description}</TableCell>
+                                  <TableCell>{t.category || '-'}</TableCell>
+                                  <TableCell>{getCashAccountName(t.accountId)}</TableCell>
+                                  <TableCell className="text-gray-500">{t.referenceNumber || '-'}</TableCell>
+                                  <TableCell className={`text-right font-medium ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {t.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(t.amount))}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* LAPORAN PERFORMA PRODUK */}
