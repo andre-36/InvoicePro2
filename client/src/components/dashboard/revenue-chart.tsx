@@ -98,17 +98,27 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
               margin={{
                 top: 10,
                 right: 30,
-                left: 0,
+                left: 20,
                 bottom: 0,
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis 
-                tickFormatter={(value) => formatCurrency(value)}
+                tickFormatter={(value) => {
+                  // Format large numbers with abbreviations for chart readability
+                  if (value >= 1000000000) {
+                    return `Rp ${(value / 1000000000).toFixed(1)}M`;
+                  } else if (value >= 1000000) {
+                    return `Rp ${(value / 1000000).toFixed(1)}Jt`;
+                  } else if (value >= 1000) {
+                    return `Rp ${(value / 1000).toFixed(0)}K`;
+                  }
+                  return formatCurrency(value);
+                }}
                 tickLine={false}
                 axisLine={false}
-                width={100}
+                width={120}
               />
               <Tooltip 
                 formatter={(value) => [formatCurrency(typeof value === 'number' ? value : 0), '']}
