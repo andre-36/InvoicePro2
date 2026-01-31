@@ -44,15 +44,17 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTransactionSchema, type Transaction, type InsertTransaction } from "@shared/schema";
+import { insertTransactionSchema, type Transaction, type InsertTransaction, type CashAccount } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { Wallet } from "lucide-react";
 
 const transactionFormSchema = insertTransactionSchema.extend({
   date: z.string().min(1, "Date is required"),
   amount: z.string().min(1, "Amount is required"),
+  accountId: z.number().nullable().optional(),
 });
 
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
@@ -68,6 +70,10 @@ export default function TransactionsPage() {
     queryKey: ['/api/stores/1/transactions'],
   });
 
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ['/api/stores/1/cash-accounts'],
+  });
+
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
@@ -78,6 +84,7 @@ export default function TransactionsPage() {
       description: "",
       category: "",
       referenceNumber: "",
+      accountId: null,
     },
   });
   
@@ -89,6 +96,7 @@ export default function TransactionsPage() {
         category: data.category || null,
         referenceNumber: data.referenceNumber || null,
         invoiceId: editingTransaction?.invoiceId ?? null,
+        accountId: data.accountId || null,
       };
       
       if (id) {
@@ -109,6 +117,7 @@ export default function TransactionsPage() {
         description: "",
         category: "",
         referenceNumber: "",
+        accountId: null,
       });
       toast({
         title: editingTransaction ? "Transaction updated" : "Transaction created",
@@ -157,6 +166,7 @@ export default function TransactionsPage() {
       description: transaction.description,
       category: transaction.category ?? "",
       referenceNumber: transaction.referenceNumber ?? "",
+      accountId: transaction.accountId ?? null,
     });
     setIsDialogOpen(true);
   };
@@ -171,8 +181,15 @@ export default function TransactionsPage() {
       description: "",
       category: "",
       referenceNumber: "",
+      accountId: null,
     });
     setIsDialogOpen(true);
+  };
+  
+  const getCashAccountName = (accountId: number | null | undefined) => {
+    if (!accountId || !cashAccounts) return '-';
+    const account = cashAccounts.find(a => a.id === accountId);
+    return account?.name || '-';
   };
 
   const onSubmit = (data: TransactionFormData) => {
@@ -277,6 +294,7 @@ export default function TransactionsPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Cash Account</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -303,6 +321,12 @@ export default function TransactionsPage() {
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
                       <TableCell>{transaction.category || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Wallet className="h-3 w-3 text-gray-400" />
+                          {getCashAccountName(transaction.accountId)}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-gray-500 dark:text-gray-400">{transaction.referenceNumber || '-'}</TableCell>
                       <TableCell className={`text-right font-semibold ${transaction.type === 'income' ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
@@ -403,6 +427,35 @@ export default function TransactionsPage() {
                         data-testid="input-amount" 
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cash Account (Optional)</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))} 
+                      value={field.value ? String(field.value) : "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cash-account">
+                          <SelectValue placeholder="Select cash account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No account selected</SelectItem>
+                        {cashAccounts?.map((account) => (
+                          <SelectItem key={account.id} value={String(account.id)}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
