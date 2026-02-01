@@ -167,15 +167,12 @@ function App() {
             open={sidebarOpen} 
             onToggle={toggleSidebar}
             mobileView={isMobile}
+            currentStoreId={user?.role === 'staff' && user?.storeId ? user.storeId : currentStoreId}
+            onStoreChange={setCurrentStoreId}
           />
 
           <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
-            <Header 
-              toggleSidebar={toggleSidebar}
-              user={user}
-              currentStoreId={user?.role === 'staff' && user?.storeId ? user.storeId : currentStoreId}
-              onStoreChange={setCurrentStoreId}
-            />
+            <Header toggleSidebar={toggleSidebar} />
 
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900">
               <Switch>

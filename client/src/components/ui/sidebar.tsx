@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart2,
   FileText,
@@ -22,6 +23,8 @@ import {
   User,
   Key,
   ChevronUp,
+  ChevronDown,
+  Store,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +48,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+type StoreType = {
+  id: number;
+  name: string;
+};
+
 interface SidebarProps {
   user: {
     id?: number;
@@ -58,10 +66,20 @@ interface SidebarProps {
   open: boolean;
   onToggle: () => void;
   mobileView: boolean;
+  currentStoreId?: number;
+  onStoreChange?: (storeId: number) => void;
 }
 
-export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
+export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onStoreChange }: SidebarProps) {
   const [location] = useLocation();
+  
+  const { data: stores } = useQuery<StoreType[]>({
+    queryKey: ['/api/stores'],
+  });
+  
+  const currentStore = stores?.find(s => s.id === currentStoreId);
+  const userStore = stores?.find(s => s.id === user.storeId);
+  const isOwner = user.role === 'owner';
   const { toast } = useToast();
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -440,6 +458,44 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
               </div>
             )}
           </nav>
+          
+          {/* Store Selector Section */}
+          <div className="border-t border-border p-2">
+            {isOwner && stores && stores.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center w-full p-2 rounded-md hover:bg-accent transition-colors">
+                    <Store className="h-5 w-5 text-muted-foreground mr-3" />
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {currentStore?.name || 'Pilih Cabang'}
+                      </p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="w-56">
+                  {stores.map((store) => (
+                    <DropdownMenuItem
+                      key={store.id}
+                      onClick={() => onStoreChange?.(store.id)}
+                      className={currentStoreId === store.id ? 'bg-accent' : ''}
+                    >
+                      <Store className="h-4 w-4 mr-2" />
+                      {store.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center p-2">
+                <Store className="h-5 w-5 text-muted-foreground mr-3" />
+                <p className="text-sm text-foreground truncate">
+                  {userStore?.name || 'Tidak ada cabang'}
+                </p>
+              </div>
+            )}
+          </div>
           
           {/* User Profile Section with Dropdown */}
           <div className="border-t border-border p-2">
