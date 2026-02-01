@@ -42,6 +42,7 @@ import CreateReturnPage from "@/pages/returns/create";
 import ReturnDetailPage from "@/pages/returns/detail";
 import LoginPage from "@/pages/login";
 import SetupPage from "@/pages/setup";
+import { ProtectedRoute } from "@/components/protected-route";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -62,6 +63,7 @@ function App() {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [currentStoreId, setCurrentStoreId] = useState<number>(1);
 
   useEffect(() => {
     async function checkAuthAndSetup() {
@@ -168,12 +170,25 @@ function App() {
           />
 
           <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
-            <Header toggleSidebar={toggleSidebar} />
+            <Header 
+              toggleSidebar={toggleSidebar}
+              user={user}
+              currentStoreId={user?.role === 'staff' && user?.storeId ? user.storeId : currentStoreId}
+              onStoreChange={setCurrentStoreId}
+            />
 
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900">
               <Switch>
-                <Route path="/dashboard" component={Dashboard} />
-                <Route path="/invoices" component={InvoicesPage} />
+                <Route path="/dashboard">
+                  <ProtectedRoute permission="dashboard.view" user={user}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/invoices">
+                  <ProtectedRoute permission="invoices.view" user={user}>
+                    <InvoicesPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/invoices/create" component={CreateInvoicePage} />
                 <Route path="/invoices/new" component={CreateInvoicePage} />
                 <Route path="/invoices/:id/edit">
@@ -194,7 +209,11 @@ function App() {
                     return <InvoiceDetailPage id={id} />;
                   }}
                 </Route>
-                <Route path="/quotations" component={QuotationsPage} />
+                <Route path="/quotations">
+                  <ProtectedRoute permission="quotations.view" user={user}>
+                    <QuotationsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/quotations/create" component={CreateQuotationPage} />
                 <Route path="/quotations/:id/edit">
                   {params => <EditQuotationPage id={parseInt(params.id)} />}
@@ -202,9 +221,17 @@ function App() {
                 <Route path="/quotations/:id">
                   {params => <QuotationDetailPage id={parseInt(params.id)} />}
                 </Route>
-                <Route path="/delivery-notes" component={DeliveryNotesPage} />
+                <Route path="/delivery-notes">
+                  <ProtectedRoute permission="delivery_notes.view" user={user}>
+                    <DeliveryNotesPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/delivery-notes/planning" component={DeliveryPlanningPage} />
-                <Route path="/purchase-orders" component={PurchaseOrdersPage} />
+                <Route path="/purchase-orders">
+                  <ProtectedRoute permission="purchase_orders.view" user={user}>
+                    <PurchaseOrdersPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/purchase-orders/create" component={CreatePurchaseOrderPage} />
                 <Route path="/purchase-orders/:id/edit">
                   {params => <EditPurchaseOrderPage id={parseInt(params.id)} />}
@@ -212,24 +239,56 @@ function App() {
                 <Route path="/purchase-orders/:id">
                   {params => <PurchaseOrderDetailPage id={parseInt(params.id)} />}
                 </Route>
-                <Route path="/goods-receipts" component={GoodsReceiptsPage} />
+                <Route path="/goods-receipts">
+                  <ProtectedRoute permission="goods_receipts.view" user={user}>
+                    <GoodsReceiptsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/goods-receipts/create" component={CreateGoodsReceiptPage} />
                 <Route path="/goods-receipts/:id/edit" component={GoodsReceiptDetailPage} />
                 <Route path="/goods-receipts/:id" component={GoodsReceiptDetailPage} />
-                <Route path="/returns" component={ReturnsPage} />
+                <Route path="/returns">
+                  <ProtectedRoute permission="returns.view" user={user}>
+                    <ReturnsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/returns/create" component={CreateReturnPage} />
                 <Route path="/returns/:id" component={ReturnDetailPage} />
-                <Route path="/clients" component={ClientsPage} />
+                <Route path="/clients">
+                  <ProtectedRoute permission="clients.view" user={user}>
+                    <ClientsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/clients/create" component={CreateClientPage} />
                 <Route path="/clients/:id" component={ClientDetailPage} />
-                <Route path="/products" component={ProductsPage} />
+                <Route path="/products">
+                  <ProtectedRoute permission="products.view" user={user}>
+                    <ProductsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/products/:id/dashboard">
                   {params => <ProductDashboard id={parseInt(params.id)} />}
                 </Route>
-                <Route path="/suppliers" component={SuppliersPage} />
-                <Route path="/transactions" component={TransactionsPage} />
-                <Route path="/reports" component={ReportsPage} />
-                <Route path="/settings" component={SettingsPage} />
+                <Route path="/suppliers">
+                  <ProtectedRoute permission="suppliers.view" user={user}>
+                    <SuppliersPage />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/transactions">
+                  <ProtectedRoute permission="transactions.view" user={user}>
+                    <TransactionsPage />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/reports">
+                  <ProtectedRoute permission="reports.view" user={user}>
+                    <ReportsPage />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/settings">
+                  <ProtectedRoute permission="settings.view" user={user}>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                </Route>
                 <Route path="/print-settings" component={PrintSettingsPage} />
                 <Route path="/payment-methods" component={PaymentMethodsPage} />
                 <Route path="/payment-types" component={PaymentTypesPage} />
