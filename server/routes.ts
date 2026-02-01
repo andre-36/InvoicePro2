@@ -175,17 +175,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(401).json({ error: "Authentication required" });
   };
 
+  // Permission check middleware factory
+  const requirePermission = (permission: string) => {
+    return (req: Request, res: Response, next: Function) => {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const user = req.user as any;
+      // Owner has all permissions
+      if (user.role === 'owner') {
+        return next();
+      }
+      // Check if staff has the specific permission
+      if (user.permissions && user.permissions.includes(permission)) {
+        return next();
+      }
+      return res.status(403).json({ error: "Permission denied" });
+    };
+  };
+
+  // Owner-only middleware
+  const requireOwner = (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const user = req.user as any;
+    if (user.role !== 'owner') {
+      return res.status(403).json({ error: "Owner access required" });
+    }
+    return next();
+  };
+
+  // Check if initial setup is needed (no users exist)
+  app.get("/api/auth/setup-status", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const needsSetup = !users || users.length === 0;
+      res.json({ needsSetup });
+    } catch (error) {
+      console.error("Error checking setup status:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Initial owner setup (only works if no users exist)
+  app.post("/api/auth/setup", async (req, res) => {
+    try {
+      // Check if any users already exist
+      const existingUsers = await storage.getAllUsers();
+      if (existingUsers && existingUsers.length > 0) {
+        return res.status(400).json({ error: "Setup already completed" });
+      }
+
+      const { username, password, fullName, email, companyName } = req.body;
+      
+      if (!username || !password || !fullName || !email) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+
+      // Create the owner user
+      const hashedPassword = hashPassword(password);
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        fullName,
+        email,
+        role: 'owner',
+        storeId: null,
+        permissions: [],
+        isActive: true,
+        companyName: companyName || null,
+      });
+
+      // Create a default store
+      const defaultStore = await storage.createStore({
+        name: companyName || 'Main Store',
+        address: null,
+        phone: null,
+        email: null,
+        isActive: true,
+      });
+
+      // Auto-login the new owner
+      req.logIn(newUser, (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Authentication error" });
+        }
+        return res.status(201).json({
+          id: newUser.id,
+          username: newUser.username,
+          fullName: newUser.fullName,
+          role: newUser.role,
+          storeId: newUser.storeId,
+          permissions: newUser.permissions,
+          defaultStoreId: defaultStore.id
+        });
+      });
+    } catch (error) {
+      console.error("Setup error:", error);
+      res.status(500).json({ error: "Server error during setup" });
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/login", (req, res, next) => {
     const validatedData = validateRequestBody(loginSchema, req, res);
     if (!validatedData) return;
     
-    passport.authenticate("local", (err: Error, user: any, info: any) => {
+    passport.authenticate("local", async (err: Error, user: any, info: any) => {
       if (err) {
         return next(err);
       }
       if (!user) {
         return res.status(401).json({ error: info.message });
+      }
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Account is deactivated" });
       }
       req.logIn(user, (err) => {
         if (err) {
@@ -195,7 +301,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id, 
           username: user.username, 
           fullName: user.fullName,
-          role: user.role
+          role: user.role,
+          storeId: user.storeId,
+          permissions: user.permissions || []
         });
       });
     })(req, res, next);
@@ -207,14 +315,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/user", (req, res) => {
+  app.get("/api/auth/user", async (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as any;
+      // Get fresh user data from database
+      const freshUser = await storage.getUser(user.id);
+      if (!freshUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
       res.json({ 
-        id: user.id, 
-        username: user.username, 
-        fullName: user.fullName,
-        role: user.role
+        id: freshUser.id, 
+        username: freshUser.username, 
+        fullName: freshUser.fullName,
+        email: freshUser.email,
+        role: freshUser.role,
+        storeId: freshUser.storeId,
+        permissions: freshUser.permissions || [],
+        companyName: freshUser.companyName,
+        companyTagline: freshUser.companyTagline,
+        companyAddress: freshUser.companyAddress,
+        companyPhone: freshUser.companyPhone,
+        companyEmail: freshUser.companyEmail,
+        logoUrl: freshUser.logoUrl,
       });
     } else {
       res.status(401).json({ error: "Not authenticated" });
@@ -456,6 +578,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating password:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Staff/User Management routes (owner only)
+  app.get("/api/staff", requireOwner, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Return users without passwords
+      const usersWithoutPasswords = allUsers.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error getting staff:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/staff", requireOwner, async (req, res) => {
+    try {
+      const { username, password, fullName, email, storeId, permissions, isActive } = req.body;
+      
+      if (!username || !password || !fullName || !email) {
+        return res.status(400).json({ error: "Username, password, full name, and email are required" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const hashedPassword = hashPassword(password);
+      const newStaff = await storage.createUser({
+        username,
+        password: hashedPassword,
+        fullName,
+        email,
+        role: 'staff',
+        storeId: storeId || null,
+        permissions: permissions || [],
+        isActive: isActive !== false,
+      });
+
+      const { password: _, ...staffData } = newStaff;
+      res.status(201).json(staffData);
+    } catch (error) {
+      console.error("Error creating staff:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/staff/:id", requireOwner, async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.id);
+      const { fullName, email, storeId, permissions, isActive } = req.body;
+
+      const existingUser = await storage.getUser(staffId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+
+      // Don't allow editing owner through this endpoint
+      if (existingUser.role === 'owner') {
+        return res.status(403).json({ error: "Cannot edit owner through this endpoint" });
+      }
+
+      const updatedStaff = await storage.updateUser(staffId, {
+        fullName,
+        email,
+        storeId: storeId || null,
+        permissions: permissions || [],
+        isActive,
+      });
+
+      const { password: _, ...staffData } = updatedStaff;
+      res.json(staffData);
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Reset staff password (owner only)
+  app.put("/api/staff/:id/reset-password", requireOwner, async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.id);
+      const { newPassword } = req.body;
+
+      if (!newPassword) {
+        return res.status(400).json({ error: "New password is required" });
+      }
+
+      const existingUser = await storage.getUser(staffId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+
+      if (existingUser.role === 'owner') {
+        return res.status(403).json({ error: "Cannot reset owner password through this endpoint" });
+      }
+
+      const hashedPassword = hashPassword(newPassword);
+      await storage.updateUser(staffId, { password: hashedPassword });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error resetting staff password:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/staff/:id", requireOwner, async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.id);
+      
+      const existingUser = await storage.getUser(staffId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "Staff not found" });
+      }
+
+      if (existingUser.role === 'owner') {
+        return res.status(403).json({ error: "Cannot delete owner" });
+      }
+
+      await storage.deleteUser(staffId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting staff:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

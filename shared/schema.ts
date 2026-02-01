@@ -18,6 +18,9 @@ export const goodsReceiptStatusEnum = pgEnum('goods_receipt_status', ['draft', '
 export const returnStatusEnum = pgEnum('return_status', ['none', 'pending', 'returned']);
 export const deliveryTypeEnum = pgEnum('delivery_type', ['self_pickup', 'delivery', 'combination']);
 
+// Role enum for users
+export const userRoleEnum = pgEnum('user_role', ['owner', 'staff']);
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -25,7 +28,10 @@ export const users = pgTable("users", {
   password: varchar("password", { length: 100 }).notNull(),
   fullName: varchar("full_name", { length: 100 }).notNull(),
   email: varchar("email", { length: 100 }).notNull(),
-  role: varchar("role", { length: 50 }).default("user").notNull(),
+  role: userRoleEnum("role").default("staff").notNull(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'set null' }),
+  permissions: text("permissions").array().default([]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   companyName: varchar("company_name", { length: 200 }),
   companyTagline: varchar("company_tagline", { length: 200 }),
   companyAddress: text("company_address"),
@@ -816,6 +822,68 @@ export const creditNoteUsages = pgTable("credit_note_usages", {
     invoicePaymentIdIdx: index("credit_note_usages_invoice_payment_id_idx").on(table.invoicePaymentId)
   };
 });
+
+// Define available permissions for role-based access control
+export const AVAILABLE_PERMISSIONS = [
+  'products.view',
+  'products.create',
+  'products.edit',
+  'products.delete',
+  'products.stock_adjust',
+  'products.import',
+  'invoices.view',
+  'invoices.create',
+  'invoices.edit',
+  'invoices.delete',
+  'invoices.print',
+  'invoices.payment',
+  'quotations.view',
+  'quotations.create',
+  'quotations.edit',
+  'quotations.delete',
+  'quotations.print',
+  'purchase_orders.view',
+  'purchase_orders.create',
+  'purchase_orders.edit',
+  'purchase_orders.delete',
+  'purchase_orders.print',
+  'goods_receipts.view',
+  'goods_receipts.create',
+  'goods_receipts.edit',
+  'goods_receipts.delete',
+  'goods_receipts.payment',
+  'delivery_notes.view',
+  'delivery_notes.create',
+  'delivery_notes.edit',
+  'delivery_notes.delete',
+  'delivery_notes.print',
+  'returns.view',
+  'returns.create',
+  'returns.edit',
+  'returns.delete',
+  'transactions.view',
+  'transactions.create',
+  'transactions.edit',
+  'transactions.delete',
+  'transactions.export',
+  'clients.view',
+  'clients.create',
+  'clients.edit',
+  'clients.delete',
+  'suppliers.view',
+  'suppliers.create',
+  'suppliers.edit',
+  'suppliers.delete',
+  'reports.view',
+  'settings.view',
+  'settings.edit',
+  'users.view',
+  'users.create',
+  'users.edit',
+  'users.delete',
+] as const;
+
+export type Permission = typeof AVAILABLE_PERMISSIONS[number];
 
 // Define the insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
