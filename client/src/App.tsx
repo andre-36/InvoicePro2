@@ -4,7 +4,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import { useState, useEffect } from "react";
-import { apiRequest } from "./lib/queryClient";
 import { Sidebar } from "@/components/ui/sidebar";
 import { Header } from "@/components/ui/header";
 import Dashboard from "@/pages/dashboard";
@@ -41,6 +40,8 @@ import DeliveryPlanningPage from "@/pages/delivery-notes/planning";
 import ReturnsPage from "@/pages/returns";
 import CreateReturnPage from "@/pages/returns/create";
 import ReturnDetailPage from "@/pages/returns/detail";
+import LoginPage from "@/pages/login";
+import SetupPage from "@/pages/setup";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -49,18 +50,37 @@ type User = {
   username: string;
   fullName: string;
   email: string;
+  role: 'owner' | 'staff';
+  storeId: number | null;
+  permissions: string[];
 };
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
 
   useEffect(() => {
-    async function checkAuth() {
+    async function checkAuthAndSetup() {
       try {
+        // First check if setup is needed
+        const setupRes = await fetch('/api/auth/setup-status', {
+          credentials: 'include'
+        });
+        
+        if (setupRes.ok) {
+          const setupData = await setupRes.json();
+          if (setupData.needsSetup) {
+            setNeedsSetup(true);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Check if user is authenticated
         const res = await fetch('/api/auth/user', {
           credentials: 'include'
         });
@@ -73,30 +93,8 @@ function App() {
           if (location === '/') {
             setLocation('/dashboard');
           }
-        } else {
-          // Auto login for demo purposes - in a real application, we'd redirect to login
-          try {
-            const loginRes = await apiRequest('POST', '/api/auth/login', {
-              username: 'admin',
-              password: 'password'
-            });
-
-            if (loginRes.ok) {
-              const userData = await loginRes.json();
-              setUser(userData);
-              
-              // Invalidate cached user data to ensure fresh data on settings page
-              queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-
-              // If we're at the root path, redirect to dashboard
-              if (location === '/') {
-                setLocation('/dashboard');
-              }
-            }
-          } catch (error) {
-            console.error('Auto login failed:', error);
-          }
         }
+        // If not authenticated, user will be shown login page
       } catch (error) {
         console.error('Auth check failed:', error);
       } finally {
@@ -104,8 +102,21 @@ function App() {
       }
     }
 
-    checkAuth();
-  }, [location, setLocation]);
+    checkAuthAndSetup();
+  }, []);
+
+  const handleLoginSuccess = (userData: User) => {
+    setUser(userData);
+    queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+    setLocation('/dashboard');
+  };
+
+  const handleSetupComplete = (userData: User) => {
+    setNeedsSetup(false);
+    setUser(userData);
+    queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+    setLocation('/dashboard');
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -121,14 +132,26 @@ function App() {
     );
   }
 
-  if (!user) {
-    // Auto-login is still in progress or failed
-    // For this demo, we'll just show a loading state since we're auto-logging in
+  // Show setup page if no users exist
+  if (needsSetup) {
     return (
       <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
-        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-        </div>
+        <QueryClientProvider client={queryClient}>
+          <SetupPage onSetupComplete={handleSetupComplete} />
+          <Toaster />
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!user) {
+    return (
+      <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
+        <QueryClientProvider client={queryClient}>
+          <LoginPage onLoginSuccess={handleLoginSuccess} />
+          <Toaster />
+        </QueryClientProvider>
       </ThemeProvider>
     );
   }
