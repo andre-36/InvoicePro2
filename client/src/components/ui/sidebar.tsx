@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import {
   BarChart2,
   FileText,
@@ -18,17 +19,41 @@ import {
   Building2,
   Truck,
   RotateCcw,
+  User,
+  Key,
+  ChevronUp,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface SidebarProps {
   user: {
+    id?: number;
+    username?: string;
     fullName: string;
     email: string;
     role?: 'owner' | 'staff';
     permissions?: string[];
+    storeId?: number | null;
   };
   open: boolean;
   onToggle: () => void;
@@ -38,6 +63,12 @@ interface SidebarProps {
 export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
   const [location] = useLocation();
   const { toast } = useToast();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const isActive = (path: string) => {
     return location === path;
@@ -60,6 +91,44 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
       });
     }
   };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast({ title: "Error", description: "Mohon isi semua field", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Password baru tidak cocok", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password minimal 6 karakter", variant: "destructive" });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await apiRequest("POST", "/api/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+      toast({ title: "Berhasil", description: "Password berhasil diubah" });
+      setPasswordOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Gagal mengubah password", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const userInitial = user.fullName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || 'U';
 
   // If mobile and sidebar is closed, don't render sidebar
   if (mobileView && !open) {
@@ -98,242 +167,254 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
             </div>
             <div className="flex items-center space-x-2">
               {/* Notifications */}
-              <button className="p-1.5 text-muted-foreground hover:text-foreground focus:outline-none relative">
+              <button className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-accent">
                 <Bell className="h-5 w-5" />
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-amber-500"></span>
               </button>
-              
-              {/* Dark Mode Toggle */}
+              {/* Theme Toggle */}
               <ThemeToggle />
-              
-              {/* Mobile Menu Toggle */}
-              <button 
-                className="md:hidden rounded-md p-2 text-muted-foreground hover:text-foreground focus:outline-none"
-                onClick={onToggle}
-              >
-                <Menu className="h-5 w-5" />
-              </button>
             </div>
           </div>
           
           {/* Navigation */}
-          <nav className="flex-1 pt-4 pb-4 overflow-y-auto">
-            <div className="px-2 space-y-1">
-              {hasPermission("dashboard.view") && (
-                <Link 
-                  href="/dashboard"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/dashboard") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <BarChart2 className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/dashboard") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Dashboard</span>
-                </Link>
-              )}
-              
-              {hasPermission("invoices.view") && (
-                <Link 
-                  href="/invoices"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/invoices") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <FileText className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/invoices") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Invoices</span>
-                </Link>
-              )}
-              
-              {hasPermission("quotations.view") && (
-                <Link 
-                  href="/quotations"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/quotations") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <FileEdit className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/quotations") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Quotations</span>
-                </Link>
-              )}
-              
-              {hasPermission("delivery_notes.view") && (
-                <Link 
-                  href="/delivery-notes"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/delivery-notes") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Truck className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Delivery Notes</span>
-                </Link>
-              )}
-              
-              {hasPermission("returns.view") && (
-                <Link 
-                  href="/returns"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/returns") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <RotateCcw className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/returns") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Retur</span>
-                </Link>
-              )}
-              
-              {hasPermission("clients.view") && (
-                <Link 
-                  href="/clients"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/clients") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Users className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/clients") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Clients</span>
-                </Link>
-              )}
-              
-              {hasPermission("transactions.view") && (
-                <Link 
-                  href="/transactions"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/transactions") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <DollarSign className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/transactions") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Transactions</span>
-                </Link>
-              )}
-              
-              {hasPermission("reports.view") && (
-                <Link 
-                  href="/reports"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/reports") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <PieChart className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/reports") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Reports</span>
-                </Link>
-              )}
-              
-              {hasPermission("products.view") && (
-                <Link 
-                  href="/products"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/products") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Package2 className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Products</span>
-                </Link>
-              )}
-
-              {hasPermission("suppliers.view") && (
-                <Link 
-                  href="/suppliers"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/suppliers") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Building2 className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/suppliers") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Suppliers</span>
-                </Link>
-              )}
-              
-              {hasPermission("purchase_orders.view") && (
-                <Link 
-                  href="/purchase-orders"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/purchase-orders") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Package className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Purchase Orders</span>
-                </Link>
-              )}
-              
-              {hasPermission("goods_receipts.view") && (
-                <Link 
-                  href="/goods-receipts"
-                  className={cn(
-                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                    isActive("/goods-receipts") 
-                      ? "text-primary-foreground bg-primary" 
-                      : "text-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Package className={cn(
-                    "mr-3 h-5 w-5",
-                    isActive("/goods-receipts") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                  )} />
-                  <span>Goods Receipt</span>
-                </Link>
-              )}
+          <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+            {hasPermission("dashboard.view") && (
+              <Link 
+                href="/dashboard"
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                  isActive("/dashboard") 
+                    ? "text-primary-foreground bg-primary" 
+                    : "text-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                <BarChart2 className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive("/dashboard") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>Dashboard</span>
+              </Link>
+            )}
+            
+            {/* Sales Section */}
+            <div className="mt-6">
+              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sales</h3>
+              <div className="mt-2 space-y-1">
+                {hasPermission("invoices.view") && (
+                  <Link 
+                    href="/invoices"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/invoices") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <FileText className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/invoices") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Invoices</span>
+                  </Link>
+                )}
+                
+                {hasPermission("quotations.view") && (
+                  <Link 
+                    href="/quotations"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/quotations") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <FileEdit className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/quotations") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Quotations</span>
+                  </Link>
+                )}
+                
+                {hasPermission("delivery_notes.view") && (
+                  <Link 
+                    href="/delivery-notes"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/delivery-notes") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Truck className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Delivery Notes</span>
+                  </Link>
+                )}
+                
+                {hasPermission("returns.view") && (
+                  <Link 
+                    href="/returns"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/returns") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <RotateCcw className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/returns") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Returns</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            
+            {/* Management Section */}
+            <div className="mt-6">
+              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Management</h3>
+              <div className="mt-2 space-y-1">
+                {hasPermission("clients.view") && (
+                  <Link 
+                    href="/clients"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/clients") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Users className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/clients") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Clients</span>
+                  </Link>
+                )}
+                
+                {hasPermission("suppliers.view") && (
+                  <Link 
+                    href="/suppliers"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/suppliers") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Building2 className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/suppliers") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Suppliers</span>
+                  </Link>
+                )}
+                
+                {hasPermission("products.view") && (
+                  <Link 
+                    href="/products"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/products") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Package2 className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Products</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            
+            {/* Financial Section */}
+            <div className="mt-6">
+              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Financial</h3>
+              <div className="mt-2 space-y-1">
+                {hasPermission("transactions.view") && (
+                  <Link 
+                    href="/transactions"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/transactions") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <DollarSign className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/transactions") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Transactions</span>
+                  </Link>
+                )}
+                
+                {hasPermission("reports.view") && (
+                  <Link 
+                    href="/reports"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/reports") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <PieChart className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/reports") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Reports</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            
+            {/* Purchasing Section */}
+            <div className="mt-6">
+              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Purchasing</h3>
+              <div className="mt-2 space-y-1">
+                {hasPermission("purchase_orders.view") && (
+                  <Link 
+                    href="/purchase-orders"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/purchase-orders") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Package className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Purchase Orders</span>
+                  </Link>
+                )}
+                
+                {hasPermission("goods_receipts.view") && (
+                  <Link 
+                    href="/goods-receipts"
+                    className={cn(
+                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                      isActive("/goods-receipts") 
+                        ? "text-primary-foreground bg-primary" 
+                        : "text-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Package className={cn(
+                      "mr-3 h-5 w-5",
+                      isActive("/goods-receipts") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>Goods Receipt</span>
+                  </Link>
+                )}
+              </div>
             </div>
             
             {hasPermission("settings.view") && (
@@ -360,27 +441,136 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
             )}
           </nav>
           
-          {/* User Profile Section */}
-          <div className="flex items-center p-4 border-t border-border">
-            <div className="flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-                {user.fullName.charAt(0)}
-              </div>
-            </div>
-            <div className="ml-3 overflow-hidden">
-              <p className="text-sm font-medium text-foreground truncate">{user.fullName}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="ml-auto p-1 text-muted-foreground hover:text-foreground focus:outline-none"
-              aria-label="Logout"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
+          {/* User Profile Section with Dropdown */}
+          <div className="border-t border-border p-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center w-full p-2 rounded-md hover:bg-accent transition-colors">
+                  <div className="flex-shrink-0">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {userInitial}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="ml-3 overflow-hidden flex-1 text-left">
+                    <p className="text-sm font-medium text-foreground truncate">{user.fullName || user.username}</p>
+                    <p className="text-xs text-muted-foreground truncate capitalize">
+                      {user.role === 'owner' ? 'Pemilik' : 'Staff'}
+                    </p>
+                  </div>
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-56">
+                <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                  <User className="h-4 w-4 mr-2" />
+                  Profil Saya
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+                  <Key className="h-4 w-4 mr-2" />
+                  Ganti Password
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
+
+      {/* Profile Dialog */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Profil Saya</DialogTitle>
+            <DialogDescription>Informasi akun Anda</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                  {userInitial}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="text-lg font-semibold">{user.fullName || user.username}</h3>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {user.role === 'owner' ? 'Pemilik' : 'Staff'}
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <div className="flex justify-between py-2 border-b">
+                <span className="text-muted-foreground">Username</span>
+                <span className="font-medium">{user.username}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span className="text-muted-foreground">Email</span>
+                <span className="font-medium">{user.email || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span className="text-muted-foreground">Role</span>
+                <span className="font-medium capitalize">
+                  {user.role === 'owner' ? 'Pemilik' : 'Staff'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ganti Password</DialogTitle>
+            <DialogDescription>Masukkan password lama dan password baru Anda</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Password Saat Ini</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Masukkan password saat ini"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Password Baru</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Masukkan password baru"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Ulangi password baru"
+              />
+            </div>
+            <Button 
+              onClick={handleChangePassword} 
+              className="w-full"
+              disabled={isChangingPassword}
+            >
+              {isChangingPassword ? "Menyimpan..." : "Simpan Password"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -348,7 +348,7 @@ function AutoTransactionSettings() {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState("company");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [isTermDialogOpen, setIsTermDialogOpen] = useState(false);
@@ -1324,17 +1324,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs 
-        defaultValue="profile" 
+        defaultValue="company" 
         value={activeTab}
         onValueChange={setActiveTab}
         className="space-y-6"
       >
         <div className="border-b">
           <TabsList className="w-full justify-start">
-            <TabsTrigger value="profile" className="gap-2">
-              <User className="h-4 w-4" />
-              <span>Profile</span>
-            </TabsTrigger>
             <TabsTrigger value="company" className="gap-2">
               <Building className="h-4 w-4" />
               <span>Company</span>
@@ -1346,10 +1342,6 @@ export default function SettingsPage() {
             <TabsTrigger value="payment" className="gap-2">
               <CreditCard className="h-4 w-4" />
               <span>Payment</span>
-            </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2">
-              <Settings className="h-4 w-4" />
-              <span>Security</span>
             </TabsTrigger>
             <TabsTrigger value="backup" className="gap-2">
               <Database className="h-4 w-4" />
@@ -1365,128 +1357,6 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
         </div>
-
-        <TabsContent value="profile" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information and how others see you on the platform</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="text-lg bg-primary text-white">
-                    {getUserInitials(userData?.fullName)}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div>
-                  <Button variant="outline" className="gap-2">
-                    <Upload className="h-4 w-4" />
-                    <span>Upload Image</span>
-                  </Button>
-                  <p className="text-xs text-gray-500 mt-2">
-                    JPG, GIF or PNG. Max file size 1MB.
-                  </p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={profileForm.control}
-                      name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your full name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={profileForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your email" type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={profileForm.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your username" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={profileForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your phone number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={profileForm.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter your address" 
-                            rows={3}
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end">
-                    <Button 
-                      type="submit" 
-                      disabled={profileMutation.isPending || !profileForm.formState.isDirty}
-                      className="gap-2"
-                    >
-                      <Save className="h-4 w-4" />
-                      <span>Save Changes</span>
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="company" className="space-y-6">
           <Card>
@@ -2116,77 +1986,6 @@ export default function SettingsPage() {
 
           {/* Auto Transaction Section */}
           <AutoTransactionSettings />
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your password and account security</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...securityForm}>
-                <form onSubmit={securityForm.handleSubmit(onSecuritySubmit)} className="space-y-6">
-                  <h3 className="text-lg font-medium mb-4">Change Password</h3>
-
-                  <FormField
-                    control={securityForm.control}
-                    name="currentPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Current Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="Enter current password" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={securityForm.control}
-                      name="newPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Enter new password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={securityForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Confirm new password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button 
-                      type="submit" 
-                      disabled={passwordMutation.isPending || !securityForm.formState.isDirty}
-                      className="gap-2"
-                    >
-                      <Check className="h-4 w-4" />
-                      <span>Update Password</span>
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="backup" className="space-y-6">

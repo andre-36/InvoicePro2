@@ -175,7 +175,6 @@ function App() {
               user={user}
               currentStoreId={user?.role === 'staff' && user?.storeId ? user.storeId : currentStoreId}
               onStoreChange={setCurrentStoreId}
-              onLogout={() => setUser(null)}
             />
 
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900">
