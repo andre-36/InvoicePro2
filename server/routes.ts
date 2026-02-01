@@ -315,6 +315,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.post("/api/auth/change-password", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Tidak terautentikasi" });
+    }
+    
+    const { currentPassword, newPassword } = req.body;
+    const user = req.user as any;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Password lama dan baru harus diisi" });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password minimal 6 karakter" });
+    }
+    
+    const crypto = await import("crypto");
+    const hashedCurrentPassword = crypto.createHash("sha256").update(currentPassword).digest("hex");
+    const dbUser = await storage.getUser(user.id);
+    
+    if (!dbUser || dbUser.password !== hashedCurrentPassword) {
+      return res.status(400).json({ message: "Password saat ini salah" });
+    }
+    
+    const hashedNewPassword = crypto.createHash("sha256").update(newPassword).digest("hex");
+    await storage.updateUser(user.id, { password: hashedNewPassword });
+    
+    res.json({ success: true, message: "Password berhasil diubah" });
+  });
+
   app.get("/api/auth/user", async (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as any;
