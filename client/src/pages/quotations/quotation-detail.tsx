@@ -54,6 +54,7 @@ type QuotationWithItems = {
     notes: string;
     convertedToInvoiceId?: number;
     rejectionReason?: string;
+    createdByName?: string;
   };
   items: Array<{
     id: number;
@@ -541,6 +542,12 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                     {formatDate(quotation.expiryDate)}
                   </p>
                 </div>
+                {quotation.createdByName && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Created By</p>
+                    <p className="font-medium">{quotation.createdByName}</p>
+                  </div>
+                )}
               </div>
               
               {quotation.notes && (
