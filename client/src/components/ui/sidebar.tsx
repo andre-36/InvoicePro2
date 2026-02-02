@@ -87,6 +87,9 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [editUsername, setEditUsername] = useState(user.username || "");
+  const [editFullName, setEditFullName] = useState(user.fullName || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const isActive = (path: string) => {
     return location === path;
@@ -143,6 +146,37 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
       });
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editUsername || editUsername.trim().length < 3) {
+      toast({ title: "Error", description: "Username minimal 3 karakter", variant: "destructive" });
+      return;
+    }
+    if (!editFullName || editFullName.trim().length < 2) {
+      toast({ title: "Error", description: "Nama minimal 2 karakter", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/profile", {
+        username: editUsername.trim(),
+        fullName: editFullName.trim(),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Berhasil", description: "Profil berhasil diperbarui" });
+        setProfileOpen(false);
+        window.location.reload();
+      } else {
+        toast({ title: "Error", description: data.message || "Gagal menyimpan profil", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Gagal menyimpan profil", variant: "destructive" });
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -539,41 +573,60 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
       </div>
 
       {/* Profile Dialog */}
-      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+      <Dialog open={profileOpen} onOpenChange={(open) => {
+        setProfileOpen(open);
+        if (open) {
+          setEditUsername(user.username || "");
+          setEditFullName(user.fullName || "");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Profil Saya</DialogTitle>
-            <DialogDescription>Informasi akun Anda</DialogDescription>
+            <DialogTitle>Edit Profil</DialogTitle>
+            <DialogDescription>Ubah username dan nama Anda</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 pb-4 border-b">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {userInitial}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-lg font-semibold">{user.fullName || user.username}</h3>
                 <p className="text-sm text-muted-foreground capitalize">
                   {user.role === 'owner' ? 'Pemilik' : 'Staff'}
                 </p>
               </div>
             </div>
-            <div className="grid gap-2">
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Username</span>
-                <span className="font-medium">{user.username}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Email</span>
-                <span className="font-medium">{user.email || '-'}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Role</span>
-                <span className="font-medium capitalize">
-                  {user.role === 'owner' ? 'Pemilik' : 'Staff'}
-                </span>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="editUsername">Username (untuk login)</Label>
+              <Input
+                id="editUsername"
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value)}
+                placeholder="Username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editFullName">Nama (untuk panggilan)</Label>
+              <Input
+                id="editFullName"
+                value={editFullName}
+                onChange={(e) => setEditFullName(e.target.value)}
+                placeholder="Nama lengkap"
+              />
+            </div>
+            <div className="flex justify-between py-2 border-t">
+              <span className="text-muted-foreground">Email</span>
+              <span className="font-medium">{user.email || '-'}</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setProfileOpen(false)}>
+                Batal
+              </Button>
+              <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
+                {isSavingProfile ? "Menyimpan..." : "Simpan"}
+              </Button>
             </div>
           </div>
         </DialogContent>
