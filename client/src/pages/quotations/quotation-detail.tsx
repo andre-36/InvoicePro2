@@ -338,6 +338,13 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                   <span className="print-doc-label">Valid Until</span>
                   <span className="print-doc-value">{formatDate(quotation.expiryDate) || 'N/A'}</span>
                 </div>
+                {/* Created By */}
+                {quotation.createdByName && (
+                  <div className="print-doc-row">
+                    <span className="print-doc-label">Created By</span>
+                    <span className="print-doc-value">{quotation.createdByName}</span>
+                  </div>
+                )}
                 {/* Page indicator */}
                 <div className="print-doc-row">
                   <span className="print-doc-label">Page</span>
