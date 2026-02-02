@@ -379,7 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { username, fullName } = req.body;
+      const { username, fullName, email } = req.body;
       const userId = (req.user as any).id;
 
       if (!username || username.trim().length < 3) {
@@ -390,6 +390,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Nama minimal 2 karakter" });
       }
 
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return res.status(400).json({ message: "Format email tidak valid" });
+      }
+
       const existingUser = await storage.getUserByUsername(username.trim());
       if (existingUser && existingUser.id !== userId) {
         return res.status(400).json({ message: "Username sudah digunakan" });
@@ -398,6 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUser(userId, {
         username: username.trim(),
         fullName: fullName.trim(),
+        email: email.trim(),
       });
 
       res.json({ 

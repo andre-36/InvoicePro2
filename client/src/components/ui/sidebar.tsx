@@ -89,6 +89,7 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [editUsername, setEditUsername] = useState(user.username || "");
   const [editFullName, setEditFullName] = useState(user.fullName || "");
+  const [editEmail, setEditEmail] = useState(user.email || "");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const isActive = (path: string) => {
@@ -158,12 +159,17 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
       toast({ title: "Error", description: "Nama minimal 2 karakter", variant: "destructive" });
       return;
     }
+    if (!editEmail || !editEmail.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      toast({ title: "Error", description: "Format email tidak valid", variant: "destructive" });
+      return;
+    }
 
     setIsSavingProfile(true);
     try {
       const response = await apiRequest("POST", "/api/auth/profile", {
         username: editUsername.trim(),
         fullName: editFullName.trim(),
+        email: editEmail.trim(),
       });
       const data = await response.json();
       if (data.success) {
@@ -578,6 +584,7 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
         if (open) {
           setEditUsername(user.username || "");
           setEditFullName(user.fullName || "");
+          setEditEmail(user.email || "");
         }
       }}>
         <DialogContent>
@@ -616,9 +623,15 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
                 placeholder="Nama lengkap"
               />
             </div>
-            <div className="flex justify-between py-2 border-t">
-              <span className="text-muted-foreground">Email</span>
-              <span className="font-medium">{user.email || '-'}</span>
+            <div className="space-y-2">
+              <Label htmlFor="editEmail">Email</Label>
+              <Input
+                id="editEmail"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="Email"
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setProfileOpen(false)}>
