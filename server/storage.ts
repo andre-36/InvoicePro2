@@ -6,7 +6,7 @@ import {
   transactions, stores, settings, categories, inflowCategories, outflowCategories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
-  returns, returnItems, creditNoteUsages, stockAdjustments, roles,
+  returns, returnItems, creditNoteUsages, stockAdjustments, roles, companySettings,
 
   type User, type InsertUser, type Store, type InsertStore, type Role, type InsertRole,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -30,7 +30,8 @@ import {
   type GoodsReceiptPayment, type InsertGoodsReceiptPayment,
   type Return, type InsertReturn, type ReturnItem, type InsertReturnItem,
   type CreditNoteUsage, type InsertCreditNoteUsage,
-  type StockAdjustment, type InsertStockAdjustment
+  type StockAdjustment, type InsertStockAdjustment,
+  type CompanySettings, type InsertCompanySettings
 } from "../shared/schema";
 
 import session from "express-session";
@@ -63,6 +64,10 @@ export interface IStorage {
   createRole(role: InsertRole): Promise<Role>;
   updateRole(id: number, role: Partial<InsertRole>): Promise<Role>;
   deleteRole(id: number): Promise<void>;
+
+  // Company Settings methods
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings>;
 
   // Client methods
   getClient(id: number): Promise<Client | undefined>;
@@ -780,6 +785,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRole(id: number): Promise<void> {
     await db.delete(roles).where(eq(roles.id, id));
+  }
+
+  // Company Settings methods
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [result] = await db.select().from(companySettings).limit(1);
+    return result;
+  }
+
+  async updateCompanySettings(settingsData: Partial<InsertCompanySettings>): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings();
+    if (existing) {
+      const [updated] = await db
+        .update(companySettings)
+        .set({ ...settingsData, updatedAt: new Date() })
+        .where(eq(companySettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(companySettings)
+        .values(settingsData as InsertCompanySettings)
+        .returning();
+      return created;
+    }
   }
 
   // Client methods

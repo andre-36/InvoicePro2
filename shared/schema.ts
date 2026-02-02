@@ -1242,3 +1242,21 @@ export const creditNoteUsagesRelations = relations(creditNoteUsages, ({ one }) =
   return: one(returns, { fields: [creditNoteUsages.returnId], references: [returns.id] }),
   invoicePayment: one(invoicePayments, { fields: [creditNoteUsages.invoicePaymentId], references: [invoicePayments.id] })
 }));
+
+// Company Settings table (global settings - single row)
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  companyName: varchar("company_name", { length: 200 }).default("Mitra Indo Aluminium").notNull(),
+  logoUrl: varchar("logo_url", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;

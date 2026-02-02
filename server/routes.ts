@@ -960,6 +960,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company Settings routes (public for login page, update requires auth)
+  app.get("/api/company-settings", async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      if (!settings) {
+        return res.json({ companyName: "Mitra Indo Aluminium", logoUrl: null });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error getting company settings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/company-settings", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const { companyName, logoUrl } = req.body;
+      const updated = await storage.updateCompanySettings({ companyName, logoUrl });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Client routes
   // Get next client number preview - MUST be before /:id route
   app.get("/api/clients/next-number", requireAuth, async (req, res) => {
