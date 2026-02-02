@@ -108,7 +108,6 @@ async function seedDefaultOwner(): Promise<void> {
         role: "owner",
         storeId: null,
         phone: null,
-        permissions: null,
         companyName: null,
         companyAddress: null,
         companyPhone: null,
