@@ -1692,8 +1692,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
       
+      const invoiceWithCreator = {
+        ...validatedData.invoice,
+        createdByName: req.user?.fullName || req.user?.username || null
+      };
+      
       const newInvoice = await storage.createInvoice(
-        validatedData.invoice,
+        invoiceWithCreator,
         validatedData.items
       );
       
@@ -2313,8 +2318,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
       
+      const quotationWithCreator = {
+        ...validatedData.quotation,
+        createdByName: req.user?.fullName || req.user?.username || null
+      };
+      
       const newQuotation = await storage.createQuotation(
-        validatedData.quotation,
+        quotationWithCreator,
         validatedData.items
       );
       
@@ -2719,8 +2729,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
       
+      const poWithCreator = {
+        ...validatedData.purchaseOrder,
+        createdByName: req.user?.fullName || req.user?.username || null
+      };
+      
       const newPurchaseOrder = await storage.createPurchaseOrder(
-        validatedData.purchaseOrder,
+        poWithCreator,
         validatedData.items
       );
       
@@ -3303,7 +3318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           ...returnData,
           storeId,
-          status: validatedData.returnType === 'refund' ? 'completed' : 'pending'
+          status: validatedData.returnType === 'refund' ? 'completed' : 'pending',
+          createdByName: req.user?.fullName || req.user?.username || null
         },
         items
       );
