@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserManagement } from "@/components/user-management";
 import { StoreManagement } from "@/components/store-management";
+import { RoleManagement } from "@/components/role-management";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -1360,6 +1361,10 @@ export default function SettingsPage() {
               <Building className="h-4 w-4" />
               <span>Cabang</span>
             </TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2">
+              <Users className="h-4 w-4" />
+              <span>Role</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -2320,6 +2325,10 @@ export default function SettingsPage() {
 
         <TabsContent value="stores" className="space-y-6">
           <StoreManagement />
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-6">
+          <RoleManagement />
         </TabsContent>
 
       </Tabs>
