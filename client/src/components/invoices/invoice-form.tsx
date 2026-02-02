@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Check, Plus, Trash2, ArrowLeft, Printer, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle, AlertTriangle } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
