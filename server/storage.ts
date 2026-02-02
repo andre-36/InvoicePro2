@@ -821,28 +821,15 @@ export class DatabaseStorage implements IStorage {
 
   async getClientMonthlyPurchases(clientId: number): Promise<ClientMonthlyPurchase[]> {
     const results = await db.execute(sql`
-      WITH cleaned_invoices AS (
-        SELECT 
-          ${invoices.issueDate}::date as issue_date,
-          NULLIF(REGEXP_REPLACE(${invoices.totalAmount}, '[^0-9.]', '', 'g'), '') as clean_amount
-        FROM ${invoices}
-        WHERE ${invoices.clientId} = ${clientId}
-      )
       SELECT 
-        TO_CHAR(issue_date, 'Mon YYYY') as month,
-        TO_CHAR(issue_date, 'YYYY-MM') as "sortKey",
-        COALESCE(
-          SUM(
-            CASE 
-              WHEN clean_amount IS NOT NULL THEN clean_amount::numeric
-              ELSE 0
-            END
-          ), 0
-        )::text as "totalAmount",
+        TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY') as month,
+        TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM') as "sortKey",
+        COALESCE(SUM(${invoices.totalAmount}), 0)::text as "totalAmount",
         COUNT(*)::int as "invoiceCount"
-      FROM cleaned_invoices
-      GROUP BY TO_CHAR(issue_date, 'YYYY-MM'), TO_CHAR(issue_date, 'Mon YYYY')
-      ORDER BY TO_CHAR(issue_date, 'YYYY-MM')
+      FROM ${invoices}
+      WHERE ${invoices.clientId} = ${clientId}
+      GROUP BY TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM'), TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')
+      ORDER BY TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')
     `);
 
     const rows = results.rows as Array<{
