@@ -373,6 +373,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Tidak terautentikasi" });
+    }
+
+    try {
+      const { username, fullName } = req.body;
+      const userId = (req.user as any).id;
+
+      if (!username || username.trim().length < 3) {
+        return res.status(400).json({ message: "Username minimal 3 karakter" });
+      }
+
+      if (!fullName || fullName.trim().length < 2) {
+        return res.status(400).json({ message: "Nama minimal 2 karakter" });
+      }
+
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({ message: "Username sudah digunakan" });
+      }
+
+      const updatedUser = await storage.updateUser(userId, {
+        username: username.trim(),
+        fullName: fullName.trim(),
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Profil berhasil diperbarui",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          fullName: updatedUser.fullName,
+          email: updatedUser.email,
+          role: updatedUser.role,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Gagal memperbarui profil" });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertUserSchema, req, res);
