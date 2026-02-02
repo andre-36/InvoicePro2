@@ -48,6 +48,13 @@ type StoreOption = {
   name: string;
 };
 
+type RoleOption = {
+  id: number;
+  name: string;
+  description?: string | null;
+  permissions: string[];
+};
+
 const PERMISSION_GROUPS = {
   "Dashboard": [
     { id: "dashboard.view", label: "Lihat Dashboard" },
@@ -129,6 +136,7 @@ export function UserManagement() {
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRoleTemplate, setSelectedRoleTemplate] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -138,6 +146,10 @@ export function UserManagement() {
 
   const { data: stores } = useQuery<StoreOption[]>({
     queryKey: ['/api/stores'],
+  });
+
+  const { data: roles } = useQuery<RoleOption[]>({
+    queryKey: ['/api/roles'],
   });
 
   const form = useForm<UserFormData>({
@@ -201,6 +213,7 @@ export function UserManagement() {
 
   const handleAdd = () => {
     setEditingUser(null);
+    setSelectedRoleTemplate("");
     form.reset({
       username: "",
       password: "",
@@ -216,6 +229,7 @@ export function UserManagement() {
 
   const handleEdit = (user: StaffUser) => {
     setEditingUser(user);
+    setSelectedRoleTemplate("");
     form.reset({
       username: user.username,
       password: "",
@@ -518,6 +532,47 @@ export function UserManagement() {
                     <Shield className="h-4 w-4" />
                     <h4 className="font-medium">Hak Akses</h4>
                   </div>
+                  
+                  {roles && roles.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Terapkan dari Template Role</label>
+                      <div className="flex gap-2">
+                        <Select 
+                          value={selectedRoleTemplate}
+                          onValueChange={setSelectedRoleTemplate}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Pilih template role..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role.id} value={role.id.toString()}>
+                                {role.name} ({role.permissions?.length || 0} permission)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!selectedRoleTemplate}
+                          onClick={() => {
+                            const role = roles.find(r => r.id.toString() === selectedRoleTemplate);
+                            if (role) {
+                              form.setValue("permissions", role.permissions || []);
+                              toast({ title: "Template diterapkan", description: `${role.permissions?.length || 0} permission dari role "${role.name}" telah diterapkan` });
+                              setSelectedRoleTemplate("");
+                            }
+                          }}
+                        >
+                          Terapkan
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Atau atur permission secara manual di bawah
+                      </p>
+                    </div>
+                  )}
                   
                   <FormField
                     control={form.control}
