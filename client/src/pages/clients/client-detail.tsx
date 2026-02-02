@@ -428,7 +428,7 @@ export default function ClientDetailPage() {
                       <TableCell>{format(new Date(invoice.issueDate), 'MMM d, yyyy')}</TableCell>
                       <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM d, yyyy') : '-'}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                      <TableCell className="text-right">{invoice.totalAmount || '-'}</TableCell>
+                      <TableCell className="text-right">{invoice.totalAmount ? `Rp ${Number(invoice.totalAmount).toLocaleString('id-ID')}` : '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
