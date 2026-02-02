@@ -12,6 +12,7 @@ import * as csvWriter from "csv-writer";
 import {
   insertUserSchema,
   insertStoreSchema,
+  insertRoleSchema,
   insertClientSchema,
   insertSupplierSchema,
   insertCategorySchema,
@@ -857,6 +858,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting store:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Role routes
+  app.get("/api/roles", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const roles = await storage.getRoles();
+      res.json(roles);
+    } catch (error) {
+      console.error("Error getting roles:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/roles/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const role = await storage.getRole(parseInt(req.params.id));
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      res.json(role);
+    } catch (error) {
+      console.error("Error getting role:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/roles", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const validatedData = validateRequestBody(insertRoleSchema, req, res);
+      if (!validatedData) return;
+      
+      const newRole = await storage.createRole(validatedData);
+      res.status(201).json(newRole);
+    } catch (error) {
+      console.error("Error creating role:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/roles/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const roleId = parseInt(req.params.id);
+      const role = await storage.getRole(roleId);
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      if (role.isSystem) {
+        return res.status(400).json({ error: "Cannot modify system role" });
+      }
+      
+      const validatedData = validateRequestBody(insertRoleSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedRole = await storage.updateRole(roleId, validatedData);
+      res.json(updatedRole);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/roles/:id", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (currentUser.role !== 'owner') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      const roleId = parseInt(req.params.id);
+      const role = await storage.getRole(roleId);
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      if (role.isSystem) {
+        return res.status(400).json({ error: "Cannot delete system role" });
+      }
+      
+      await storage.deleteRole(roleId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting role:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

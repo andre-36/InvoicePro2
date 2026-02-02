@@ -6,9 +6,9 @@ import {
   transactions, stores, settings, categories, inflowCategories, outflowCategories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
-  returns, returnItems, creditNoteUsages, stockAdjustments,
+  returns, returnItems, creditNoteUsages, stockAdjustments, roles,
 
-  type User, type InsertUser, type Store, type InsertStore,
+  type User, type InsertUser, type Store, type InsertStore, type Role, type InsertRole,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
   type Product, type InsertProduct,
   type ProductBundleComponent, type InsertProductBundleComponent,
@@ -56,6 +56,13 @@ export interface IStorage {
   createStore(store: InsertStore): Promise<Store>;
   updateStore(id: number, store: Partial<InsertStore>): Promise<Store>;
   deleteStore(id: number): Promise<void>;
+
+  // Role methods
+  getRole(id: number): Promise<Role | undefined>;
+  getRoles(): Promise<Role[]>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: number, role: Partial<InsertRole>): Promise<Role>;
+  deleteRole(id: number): Promise<void>;
 
   // Client methods
   getClient(id: number): Promise<Client | undefined>;
@@ -745,6 +752,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStore(id: number): Promise<void> {
     await db.delete(stores).where(eq(stores.id, id));
+  }
+
+  // Role methods
+  async getRole(id: number): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
+    return role;
+  }
+
+  async getRoles(): Promise<Role[]> {
+    return db.select().from(roles).orderBy(roles.name);
+  }
+
+  async createRole(role: InsertRole): Promise<Role> {
+    const [newRole] = await db.insert(roles).values(role).returning();
+    return newRole;
+  }
+
+  async updateRole(id: number, roleData: Partial<InsertRole>): Promise<Role> {
+    const [updatedRole] = await db
+      .update(roles)
+      .set({ ...roleData, updatedAt: new Date() })
+      .where(eq(roles.id, id))
+      .returning();
+    return updatedRole;
+  }
+
+  async deleteRole(id: number): Promise<void> {
+    await db.delete(roles).where(eq(roles.id, id));
   }
 
   // Client methods
