@@ -301,6 +301,7 @@ export const invoices = pgTable("invoices", {
   notes: text("notes"),
   deliveryAddress: text("delivery_address"),
   deliveryAddressLink: text("delivery_address_link"),
+  createdByName: varchar("created_by_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
@@ -438,6 +439,7 @@ export const quotations = pgTable("quotations", {
   paperSize: paperSizeEnum("paper_size").default("a4"),
   notes: text("notes"),
   rejectionReason: text("rejection_reason"),
+  createdByName: varchar("created_by_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
@@ -553,6 +555,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
   notes: text("notes"),
   isPrepaid: boolean("is_prepaid").default(false).notNull(),
+  createdByName: varchar("created_by_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
@@ -788,6 +791,7 @@ export const returns = pgTable("returns", {
   totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
   usedAmount: numeric("used_amount", { precision: 15, scale: 2 }).default("0").notNull(),
   notes: text("notes"),
+  createdByName: varchar("created_by_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
