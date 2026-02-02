@@ -823,28 +823,29 @@ export class DatabaseStorage implements IStorage {
     const results = await db.execute(sql`
       SELECT 
         TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY') as month,
-        TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM') as "sortKey",
-        COALESCE(SUM(${invoices.totalAmount}), 0)::text as "totalAmount",
-        COUNT(*)::int as "invoiceCount"
+        TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM') as sort_key,
+        COALESCE(SUM(${invoices.totalAmount}), 0)::text as total_amount,
+        COUNT(*)::int as invoice_count
       FROM ${invoices}
       WHERE ${invoices.clientId} = ${clientId}
+        AND ${invoices.status} = 'paid'
       GROUP BY TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM'), TO_CHAR(${invoices.issueDate}::date, 'Mon YYYY')
-      ORDER BY TO_CHAR(${invoices.issueDate}::date, 'YYYY-MM')
+      ORDER BY sort_key
     `);
 
-    const rows = results.rows as Array<{
+    const rows = results as Array<{
       month: string;
-      sortKey: string;
-      totalAmount: string;
-      invoiceCount: number;
+      sort_key: string;
+      total_amount: string;
+      invoice_count: number;
     }>;
 
-    return rows
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    return (rows || [])
+      .sort((a, b) => (a.sort_key || '').localeCompare(b.sort_key || ''))
       .map(r => ({
         month: r.month,
-        totalAmount: parseFloat(r.totalAmount) || 0,
-        invoiceCount: Number(r.invoiceCount || 0),
+        totalAmount: parseFloat(r.total_amount) || 0,
+        invoiceCount: Number(r.invoice_count || 0),
       }));
   }
 
