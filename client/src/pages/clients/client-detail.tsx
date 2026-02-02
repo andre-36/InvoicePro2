@@ -345,6 +345,7 @@ export default function ClientDetailPage() {
                   />
                   <YAxis 
                     className="text-xs fill-gray-600 dark:fill-gray-400"
+                    tickFormatter={(value) => `Rp ${(value / 1000000).toFixed(1)}jt`}
                   />
                   <Tooltip 
                     contentStyle={{
@@ -353,6 +354,12 @@ export default function ClientDetailPage() {
                       borderRadius: '8px',
                     }}
                     labelStyle={{ color: '#111827', fontWeight: 600 }}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'Total Amount') {
+                        return [`Rp ${value.toLocaleString('id-ID')}`, 'Total'];
+                      }
+                      return [value, name];
+                    }}
                   />
                   <Line 
                     type="monotone" 
