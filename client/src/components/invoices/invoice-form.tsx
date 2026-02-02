@@ -1771,15 +1771,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <Button
               type="button"
-              variant="outline"
-              onClick={handleGeneratePDF}
-              disabled={mutation.isPending || saveDraftMutation.isPending}
-            >
-              <Printer className="mr-1.5 h-4 w-4" />
-              <span>Print</span>
-            </Button>
-            <Button
-              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 saveAndSend();
