@@ -93,6 +93,39 @@ function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
+// Seed default owner if no users exist
+async function seedDefaultOwner(): Promise<void> {
+  try {
+    const allUsers = await storage.getAllUsers();
+    if (allUsers.length === 0) {
+      console.log("No users found. Creating default owner account...");
+      const hashedPassword = hashPassword("admin123");
+      await storage.createUser({
+        username: "admin",
+        password: hashedPassword,
+        fullName: "Administrator",
+        email: "admin@example.com",
+        role: "owner",
+        storeId: null,
+        phone: null,
+        permissions: null,
+        companyName: null,
+        companyAddress: null,
+        companyPhone: null,
+        companyEmail: null,
+        companyLogo: null,
+        companyTaxId: null,
+        bankName: null,
+        bankAccountNumber: null,
+        bankAccountName: null,
+      });
+      console.log("Default owner created: username='admin', password='admin123'");
+    }
+  } catch (error) {
+    console.error("Error seeding default owner:", error);
+  }
+}
+
 // Helper function for validating request body
 function validateRequestBody<T extends z.ZodTypeAny>(
   schema: T,
@@ -115,6 +148,9 @@ function validateRequestBody<T extends z.ZodTypeAny>(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Seed default owner if no users exist
+  await seedDefaultOwner();
+  
   // Session configuration with PostgreSQL store
   app.use(
     session({
