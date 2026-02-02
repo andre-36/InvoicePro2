@@ -415,6 +415,16 @@ export default function SettingsPage() {
     queryKey: ['/api/account-transfers'],
   });
 
+  // Fetch global company settings (for login page branding)
+  const { data: globalCompanySettings } = useQuery<{ companyName: string; logoUrl: string | null }>({
+    queryKey: ['/api/company-settings'],
+  });
+
+  // Global company settings state
+  const [globalCompanyName, setGlobalCompanyName] = useState("");
+  const [globalLogoUrl, setGlobalLogoUrl] = useState("");
+  const [isSavingGlobalSettings, setIsSavingGlobalSettings] = useState(false);
+
   // Profile form setup
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -1009,6 +1019,47 @@ export default function SettingsPage() {
     }
   }, [userData, profileForm, companyForm]);
 
+  // Load global company settings
+  useEffect(() => {
+    if (globalCompanySettings) {
+      setGlobalCompanyName(globalCompanySettings.companyName || "Mitra Indo Aluminium");
+      setGlobalLogoUrl(globalCompanySettings.logoUrl || "");
+    }
+  }, [globalCompanySettings]);
+
+  // Save global company settings handler
+  const handleSaveGlobalSettings = async () => {
+    try {
+      setIsSavingGlobalSettings(true);
+      const res = await apiRequest('PUT', '/api/company-settings', {
+        companyName: globalCompanyName,
+        logoUrl: globalLogoUrl || null,
+      });
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: "Global company settings saved successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/company-settings'] });
+      } else {
+        const err = await res.json();
+        toast({
+          title: "Error",
+          description: err.error || "Failed to save settings",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save global settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingGlobalSettings(false);
+    }
+  };
+
   // Form submission handlers
   const onProfileSubmit = (data: ProfileFormValues) => {
     profileMutation.mutate(data);
@@ -1369,6 +1420,126 @@ export default function SettingsPage() {
         </div>
 
         <TabsContent value="company" className="space-y-6">
+          {/* Global Company Settings - Only visible to owner */}
+          {userData?.role === 'owner' && (
+            <Card className="border-primary/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  Application Branding
+                </CardTitle>
+                <CardDescription>
+                  Configure the company name and logo that appears on the login page
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="globalCompanyName">Application Name</Label>
+                  <Input
+                    id="globalCompanyName"
+                    value={globalCompanyName}
+                    onChange={(e) => setGlobalCompanyName(e.target.value)}
+                    placeholder="Mitra Indo Aluminium"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    This name will be displayed on the login page
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="globalLogoUrl">Login Page Logo URL</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="globalLogoUrl"
+                      value={globalLogoUrl}
+                      onChange={(e) => setGlobalLogoUrl(e.target.value)}
+                      placeholder="Enter logo URL or upload using button"
+                      className="flex-1"
+                    />
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={5242880}
+                      onGetUploadParameters={async (file) => {
+                        const responseObj = await apiRequest('POST', '/api/objects/upload', {});
+                        const response = await responseObj.json();
+                        if (!response.uploadURL) {
+                          throw new Error("No upload URL received from server");
+                        }
+                        return {
+                          method: 'PUT' as const,
+                          url: response.uploadURL,
+                        };
+                      }}
+                      onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                        if (result.failed && result.failed.length > 0) {
+                          toast({
+                            title: "Upload failed",
+                            description: result.failed[0]?.error?.message || "Unknown error",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (result.successful && result.successful.length > 0) {
+                          const uploadedFile = result.successful[0];
+                          if (uploadedFile?.response?.body) {
+                            const uploadResponse = uploadedFile.response.body as any;
+                            if (uploadResponse.publicUrl) {
+                              setGlobalLogoUrl(uploadResponse.publicUrl);
+                            }
+                          } else {
+                            const uploadURL = (uploadedFile?.response as any)?.uploadURL;
+                            if (uploadURL) {
+                              const urlParts = uploadURL.split('?');
+                              if (urlParts[0]) {
+                                setGlobalLogoUrl(urlParts[0]);
+                              }
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  {globalLogoUrl && (
+                    <div className="flex items-center gap-4 p-4 border rounded-lg mt-2">
+                      <img 
+                        src={globalLogoUrl} 
+                        alt="Login Logo" 
+                        className="h-16 w-16 object-contain border rounded"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Current Logo</p>
+                        <p className="text-xs text-muted-foreground break-all">{globalLogoUrl}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGlobalLogoUrl("")}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button 
+                  onClick={handleSaveGlobalSettings}
+                  disabled={isSavingGlobalSettings}
+                >
+                  {isSavingGlobalSettings ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Branding Settings
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
