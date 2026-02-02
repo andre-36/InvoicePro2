@@ -25,6 +25,7 @@ import {
   ChevronUp,
   ChevronDown,
   Store,
+  Briefcase,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -220,8 +221,8 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
           {/* Logo Section */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-border">
             <div className="flex items-center">
-              <FileText className="w-8 h-8 text-primary" />
-              <span className="ml-2 text-xl font-semibold text-foreground">InvoiceHub</span>
+              <Briefcase className="w-8 h-8 text-primary" />
+              <span className="ml-2 text-xl font-semibold text-foreground">CoreBiz</span>
             </div>
             <div className="flex items-center space-x-2">
               {/* Notifications */}
