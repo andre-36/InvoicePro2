@@ -1559,6 +1559,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                          invoice.paymentTerms || 'Custom'}
                       </span>
                     </div>
+                    {invoice.createdByName && (
+                      <div className="flex justify-between md:justify-end md:flex-col">
+                        <span className="text-sm font-medium text-gray-500 md:mb-1">Created By:</span>
+                        <span className="text-sm">{invoice.createdByName}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
