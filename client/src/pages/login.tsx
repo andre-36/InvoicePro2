@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,9 +21,37 @@ interface LoginPageProps {
   onLoginSuccess: (user: any) => void;
 }
 
+interface CompanySettings {
+  companyName: string;
+  logoUrl: string | null;
+}
+
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [companySettings, setCompanySettings] = useState<CompanySettings>({
+    companyName: "Mitra Indo Aluminium",
+    logoUrl: null
+  });
   const { toast } = useToast();
+
+  // Fetch company settings on mount
+  useEffect(() => {
+    const fetchCompanySettings = async () => {
+      try {
+        const res = await fetch('/api/company-settings');
+        if (res.ok) {
+          const data = await res.json();
+          setCompanySettings({
+            companyName: data.companyName || "Mitra Indo Aluminium",
+            logoUrl: data.logoUrl || null
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch company settings:", error);
+      }
+    };
+    fetchCompanySettings();
+  }, []);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -65,13 +93,27 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-rose-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4">
-            <Building2 className="h-8 w-8 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl font-bold">AluminumManager</CardTitle>
+          {companySettings.logoUrl ? (
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 overflow-hidden border">
+              <img 
+                src={companySettings.logoUrl} 
+                alt="Company Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary-foreground"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>';
+                }}
+              />
+            </div>
+          ) : (
+            <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4">
+              <Building2 className="h-8 w-8 text-primary-foreground" />
+            </div>
+          )}
+          <CardTitle className="text-2xl font-bold">{companySettings.companyName}</CardTitle>
           <CardDescription>
             Masuk ke akun Anda untuk melanjutkan
           </CardDescription>
