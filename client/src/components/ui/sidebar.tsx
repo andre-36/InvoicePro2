@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -229,8 +228,6 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
               <button className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-accent">
                 <Bell className="h-5 w-5" />
               </button>
-              {/* Theme Toggle */}
-              <ThemeToggle />
             </div>
           </div>
           
