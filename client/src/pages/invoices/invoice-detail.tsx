@@ -1284,6 +1284,13 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       <span className="print-doc-value">{formatDate(invoice.dueDate)}</span>
                     </div>
                   )}
+                  {/* Created By */}
+                  {invoice.createdByName && (
+                    <div className="print-doc-row">
+                      <span className="print-doc-label">Created By</span>
+                      <span className="print-doc-value">{invoice.createdByName}</span>
+                    </div>
+                  )}
                   {/* Page indicator */}
                   <div className="print-doc-row">
                     <span className="print-doc-label">Page</span>
