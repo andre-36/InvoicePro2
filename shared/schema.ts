@@ -64,6 +64,18 @@ export const stores = pgTable("stores", {
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
+// Custom Roles table for role-based access control
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  permissions: text("permissions").array().default([]).notNull(),
+  isSystem: boolean("is_system").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
 // Cash Accounts table (for multi-account cash management)
 export const cashAccounts = pgTable("cash_accounts", {
   id: serial("id").primaryKey(),
@@ -916,6 +928,7 @@ export const updateUserPaymentSchema = z.object({
   // For now, this is a placeholder schema
 });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true, updatedAt: true });
@@ -958,6 +971,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Store = typeof stores.$inferSelect;
 export type InsertStore = z.infer<typeof insertStoreSchema>;
+
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = z.infer<typeof insertRoleSchema>;
 
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type InsertCashAccount = z.infer<typeof insertCashAccountSchema>;
