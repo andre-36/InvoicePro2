@@ -2776,6 +2776,53 @@ export class DatabaseStorage implements IStorage {
 
           remainingToAllocate -= quantityFromBatch;
         }
+
+        // Allow negative stock: if there's still quantity to allocate after exhausting all batches
+        if (remainingToAllocate > 0) {
+          // Get any batch for this product (even with 0 or negative stock) to make it more negative
+          const anyBatch = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, invItem.productId),
+                eq(productBatches.storeId, invoice.storeId)
+              )
+            )
+            .orderBy(desc(productBatches.purchaseDate))
+            .limit(1);
+
+          if (anyBatch.length > 0) {
+            // Deduct from the most recent batch (allow negative)
+            const batch = anyBatch[0];
+            const currentRemaining = parseFloat(batch.remainingQuantity.toString());
+            const newRemaining = currentRemaining - remainingToAllocate;
+
+            await tx
+              .update(productBatches)
+              .set({
+                remainingQuantity: newRemaining.toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
+          } else {
+            // No batch exists at all, create a negative batch
+            const today = new Date().toISOString().split('T')[0];
+            await tx.insert(productBatches).values({
+              productId: invItem.productId,
+              storeId: invoice.storeId,
+              batchNumber: `NEG-${invItem.productId}-${today}`,
+              purchaseDate: today,
+              capitalCost: '0',
+              cost: '0',
+              baseCost: '0',
+              initialQuantity: '0',
+              remainingQuantity: (-remainingToAllocate).toString(),
+              reservedQuantity: '0',
+              notes: 'Negative stock from overselling'
+            });
+          }
+        }
       }
 
       // Update delivery note with cost and profit
