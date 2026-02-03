@@ -251,250 +251,224 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
               </Link>
             )}
             
-            {/* Sales Section */}
-            <div className="mt-6">
-              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sales</h3>
-              <div className="mt-2 space-y-1">
-                {hasPermission("invoices.view") && (
-                  <Link 
-                    href="/invoices"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/invoices") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <FileText className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/invoices") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Invoices</span>
-                  </Link>
-                )}
-                
-                {hasPermission("quotations.view") && (
-                  <Link 
-                    href="/quotations"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/quotations") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <FileEdit className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/quotations") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Quotations</span>
-                  </Link>
-                )}
-                
-                {hasPermission("delivery_notes.view") && (
-                  <Link 
-                    href="/delivery-notes"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/delivery-notes") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Truck className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Delivery Notes</span>
-                  </Link>
-                )}
-                
-                {hasPermission("returns.view") && (
-                  <Link 
-                    href="/returns"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/returns") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <RotateCcw className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/returns") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Returns</span>
-                  </Link>
-                )}
-              </div>
+            {/* Navigation Items (Clean List) */}
+            <div className="mt-4 space-y-1">
+              {hasPermission("invoices.view") && (
+                <Link 
+                  href="/invoices"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/invoices") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <FileText className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/invoices") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Invoices</span>
+                </Link>
+              )}
+              
+              {hasPermission("quotations.view") && (
+                <Link 
+                  href="/quotations"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/quotations") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <FileEdit className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/quotations") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Quotations</span>
+                </Link>
+              )}
+              
+              {hasPermission("delivery_notes.view") && (
+                <Link 
+                  href="/delivery-notes"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/delivery-notes") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Truck className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/delivery-notes") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Delivery Notes</span>
+                </Link>
+              )}
+              
+              {hasPermission("returns.view") && (
+                <Link 
+                  href="/returns"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/returns") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <RotateCcw className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/returns") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Returns</span>
+                </Link>
+              )}
+
+              {hasPermission("clients.view") && (
+                <Link 
+                  href="/clients"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/clients") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Users className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/clients") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Clients</span>
+                </Link>
+              )}
+              
+              {hasPermission("suppliers.view") && (
+                <Link 
+                  href="/suppliers"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/suppliers") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Building2 className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/suppliers") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Suppliers</span>
+                </Link>
+              )}
+              
+              {hasPermission("products.view") && (
+                <Link 
+                  href="/products"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/products") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Package2 className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Products</span>
+                </Link>
+              )}
+
+              {hasPermission("transactions.view") && (
+                <Link 
+                  href="/transactions"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/transactions") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <DollarSign className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/transactions") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Transactions</span>
+                </Link>
+              )}
+              
+              {hasPermission("reports.view") && (
+                <Link 
+                  href="/reports"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/reports") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <PieChart className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/reports") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Reports</span>
+                </Link>
+              )}
+
+              {hasPermission("purchase_orders.view") && (
+                <Link 
+                  href="/purchase-orders"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/purchase-orders") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Package className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Purchase Orders</span>
+                </Link>
+              )}
+              
+              {hasPermission("goods_receipts.view") && (
+                <Link 
+                  href="/goods-receipts"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/goods-receipts") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Package className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/goods-receipts") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Goods Receipt</span>
+                </Link>
+              )}
+
+              {hasPermission("settings.view") && (
+                <Link 
+                  href="/settings"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/settings") 
+                      ? "text-primary-foreground bg-primary" 
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <Settings className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Settings</span>
+                </Link>
+              )}
             </div>
-            
-            {/* Management Section */}
-            <div className="mt-6">
-              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Management</h3>
-              <div className="mt-2 space-y-1">
-                {hasPermission("clients.view") && (
-                  <Link 
-                    href="/clients"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/clients") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Users className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/clients") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Clients</span>
-                  </Link>
-                )}
-                
-                {hasPermission("suppliers.view") && (
-                  <Link 
-                    href="/suppliers"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/suppliers") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Building2 className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/suppliers") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Suppliers</span>
-                  </Link>
-                )}
-                
-                {hasPermission("products.view") && (
-                  <Link 
-                    href="/products"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/products") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Package2 className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/products") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Products</span>
-                  </Link>
-                )}
-              </div>
-            </div>
-            
-            {/* Financial Section */}
-            <div className="mt-6">
-              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Financial</h3>
-              <div className="mt-2 space-y-1">
-                {hasPermission("transactions.view") && (
-                  <Link 
-                    href="/transactions"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/transactions") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <DollarSign className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/transactions") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Transactions</span>
-                  </Link>
-                )}
-                
-                {hasPermission("reports.view") && (
-                  <Link 
-                    href="/reports"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/reports") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <PieChart className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/reports") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Reports</span>
-                  </Link>
-                )}
-              </div>
-            </div>
-            
-            {/* Purchasing Section */}
-            <div className="mt-6">
-              <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Purchasing</h3>
-              <div className="mt-2 space-y-1">
-                {hasPermission("purchase_orders.view") && (
-                  <Link 
-                    href="/purchase-orders"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/purchase-orders") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Package className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/purchase-orders") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Purchase Orders</span>
-                  </Link>
-                )}
-                
-                {hasPermission("goods_receipts.view") && (
-                  <Link 
-                    href="/goods-receipts"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/goods-receipts") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Package className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/goods-receipts") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>Goods Receipt</span>
-                  </Link>
-                )}
-              </div>
-            </div>
-            
-            {hasPermission("settings.view") && (
-              <div className="mt-8">
-                <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settings</h3>
-                <div className="mt-2 px-2 space-y-1">
-                  <Link 
-                    href="/settings"
-                    className={cn(
-                      "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
-                      isActive("/settings") 
-                        ? "text-primary-foreground bg-primary" 
-                        : "text-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Settings className={cn(
-                      "mr-3 h-5 w-5",
-                      isActive("/settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>General</span>
-                  </Link>
-                </div>
-              </div>
-            )}
           </nav>
           
           {/* Store Selector Section */}
@@ -598,47 +572,41 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-sm text-muted-foreground capitalize">
-                  {user.role === 'owner' ? 'Pemilik' : 'Staff'}
-                </p>
+                <h4 className="text-lg font-medium">{user.fullName}</h4>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editUsername">Username (untuk login)</Label>
-              <Input
-                id="editUsername"
-                value={editUsername}
-                onChange={(e) => setEditUsername(e.target.value)}
-                placeholder="Username"
+              <Label htmlFor="username">Username</Label>
+              <Input 
+                id="username" 
+                value={editUsername} 
+                onChange={(e) => setEditUsername(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editFullName">Nama (untuk panggilan)</Label>
-              <Input
-                id="editFullName"
-                value={editFullName}
-                onChange={(e) => setEditFullName(e.target.value)}
-                placeholder="Nama lengkap"
+              <Label htmlFor="fullName">Nama Lengkap</Label>
+              <Input 
+                id="fullName" 
+                value={editFullName} 
+                onChange={(e) => setEditFullName(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editEmail">Email</Label>
-              <Input
-                id="editEmail"
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
                 type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                placeholder="Email"
+                value={editEmail} 
+                onChange={(e) => setEditEmail(e.target.value)} 
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setProfileOpen(false)}>
-                Batal
-              </Button>
-              <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
-                {isSavingProfile ? "Menyimpan..." : "Simpan"}
-              </Button>
-            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>Batal</Button>
+            <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
+              {isSavingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -653,40 +621,36 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Password Saat Ini</Label>
-              <Input
-                id="currentPassword"
+              <Input 
+                id="currentPassword" 
                 type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Masukkan password saat ini"
+                value={currentPassword} 
+                onChange={(e) => setCurrentPassword(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="newPassword">Password Baru</Label>
-              <Input
-                id="newPassword"
+              <Input 
+                id="newPassword" 
                 type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Masukkan password baru"
+                value={newPassword} 
+                onChange={(e) => setNewPassword(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Konfirmasi Password Baru</Label>
-              <Input
-                id="confirmPassword"
+              <Input 
+                id="confirmPassword" 
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Ulangi password baru"
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)} 
               />
             </div>
-            <Button 
-              onClick={handleChangePassword} 
-              className="w-full"
-              disabled={isChangingPassword}
-            >
-              {isChangingPassword ? "Menyimpan..." : "Simpan Password"}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setPasswordOpen(false)}>Batal</Button>
+            <Button onClick={handleChangePassword} disabled={isChangingPassword}>
+              {isChangingPassword ? "Mengubah..." : "Ganti Password"}
             </Button>
           </div>
         </DialogContent>
