@@ -115,7 +115,7 @@ export function StockAdjustmentDialog({
         productId: product?.id,
         productBatchId: data.batchId ? parseInt(data.batchId) : null,
         type: data.type,
-        quantity: parseFloat(data.quantity),
+        quantity: data.quantity,
         reason: data.reason,
         date: today,
         notes: data.notes || null,
