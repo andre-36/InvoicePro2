@@ -4285,6 +4285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           Description: product.description || '',
           'Current Price': product.currentSellingPrice || '0',
           'Cost Price': product.costPrice || '',
+          'Lowest Price': product.lowestPrice || '',
           Unit: product.unit,
           'Current Stock': currentStock,
           'Initial Stock': '', // Empty for template - user fills this for new imports
@@ -4304,6 +4305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { id: 'Description', title: 'Description' },
             { id: 'Current Price', title: 'Current Price' },
             { id: 'Cost Price', title: 'Cost Price' },
+            { id: 'Lowest Price', title: 'Lowest Price' },
             { id: 'Unit', title: 'Unit' },
             { id: 'Current Stock', title: 'Current Stock' },
             { id: 'Initial Stock', title: 'Initial Stock' },
@@ -4697,47 +4699,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existingProduct = await storage.getProductBySku(sku);
           
           // Build update object only with fields that are present
+          // Helper function to get value from row with multiple possible column names
+          const getValue = (row: any, ...keys: string[]) => {
+            for (const key of keys) {
+              if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                return row[key];
+              }
+            }
+            return undefined;
+          };
+          
           const productData: any = {};
           
-          if (row.Name || row.name) {
-            productData.name = row.Name || row.name;
+          const nameValue = getValue(row, 'Name', 'name');
+          if (nameValue !== undefined) {
+            productData.name = nameValue;
           }
           
-          if (row.Description !== undefined || row.description !== undefined) {
-            productData.description = row.Description || row.description || '';
+          const descValue = getValue(row, 'Description', 'description');
+          if (descValue !== undefined) {
+            productData.description = descValue;
           }
           
-          if (row['Current Price'] !== undefined || row.currentSellingPrice !== undefined) {
-            productData.currentSellingPrice = row['Current Price'] || row.currentSellingPrice;
+          // Handle price fields - convert to string and handle 0 values properly
+          const currentPriceValue = row['Current Price'] ?? row.currentSellingPrice;
+          if (currentPriceValue !== undefined && currentPriceValue !== null && currentPriceValue !== '') {
+            productData.currentSellingPrice = String(currentPriceValue);
           }
           
-          if (row['Cost Price'] !== undefined || row.costPrice !== undefined) {
-            productData.costPrice = row['Cost Price'] || row.costPrice;
+          const costPriceValue = row['Cost Price'] ?? row.costPrice;
+          if (costPriceValue !== undefined && costPriceValue !== null && costPriceValue !== '') {
+            productData.costPrice = String(costPriceValue);
           }
           
-          if (row['Lowest Price'] !== undefined || row.lowestPrice !== undefined) {
-            productData.lowestPrice = row['Lowest Price'] || row.lowestPrice;
+          const lowestPriceValue = row['Lowest Price'] ?? row.lowestPrice;
+          if (lowestPriceValue !== undefined && lowestPriceValue !== null && lowestPriceValue !== '') {
+            productData.lowestPrice = String(lowestPriceValue);
           }
           
-          if (row.Unit || row.unit) {
-            productData.unit = row.Unit || row.unit;
+          const unitValue = getValue(row, 'Unit', 'unit');
+          if (unitValue !== undefined) {
+            productData.unit = unitValue;
           }
           
-          if (row['Min Stock'] !== undefined || row.minStock !== undefined) {
-            productData.minStock = parseInt(row['Min Stock'] || row.minStock || '0');
+          const minStockValue = row['Min Stock'] ?? row.minStock;
+          if (minStockValue !== undefined && minStockValue !== null && minStockValue !== '') {
+            productData.minStock = parseInt(String(minStockValue));
           }
           
-          if (row.Weight !== undefined || row.weight !== undefined) {
-            productData.weight = row.Weight || row.weight || null;
+          const weightValue = getValue(row, 'Weight', 'weight');
+          if (weightValue !== undefined) {
+            productData.weight = weightValue;
           }
           
-          if (row.Dimensions !== undefined || row.dimensions !== undefined) {
-            productData.dimensions = row.Dimensions || row.dimensions || null;
+          const dimensionsValue = getValue(row, 'Dimensions', 'dimensions');
+          if (dimensionsValue !== undefined) {
+            productData.dimensions = dimensionsValue;
           }
           
-          if (row['Is Active'] !== undefined || row.isActive !== undefined) {
-            const activeValue = row['Is Active'] || row.isActive;
-            productData.isActive = activeValue === 'Yes' || activeValue === 'yes' || activeValue === true || activeValue === 'TRUE';
+          const isActiveValue = row['Is Active'] ?? row.isActive;
+          if (isActiveValue !== undefined && isActiveValue !== null && isActiveValue !== '') {
+            productData.isActive = isActiveValue === 'Yes' || isActiveValue === 'yes' || isActiveValue === true || isActiveValue === 'TRUE' || isActiveValue === 1;
           }
 
           // Check for Initial Stock column

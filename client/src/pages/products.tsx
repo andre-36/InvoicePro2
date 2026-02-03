@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3, Layers, Scale, ArrowUpDown } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { StockAdjustmentDialog } from "@/components/products/stock-adjustment-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -308,17 +309,38 @@ export default function ProductsPage() {
         });
         importMutation.mutate(data);
       } else if (fileExtension === 'xlsx') {
-        // For XLSX files, we'll need to read them as binary
+        // Parse XLSX file using xlsx library
         const arrayBuffer = await importFile.arrayBuffer();
-        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         
-        // Since we can't use XLSX library on frontend, we'll send the raw data to backend
-        // For now, let's show an error message
-        toast({
-          title: "XLSX Import",
-          description: "XLSX import is not yet supported. Please use CSV format.",
-          variant: "destructive",
-        });
+        // Get the first sheet
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON with header row
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        
+        if (jsonData.length === 0) {
+          toast({
+            title: "Empty file",
+            description: "The XLSX file has no data rows.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate that required columns exist
+        const firstRow = jsonData[0] as Record<string, any>;
+        if (!firstRow['SKU'] && !firstRow['sku']) {
+          toast({
+            title: "Invalid format",
+            description: "The file must have a 'SKU' column.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        importMutation.mutate(jsonData as any[]);
       }
     } catch (error) {
       toast({
