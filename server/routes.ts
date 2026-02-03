@@ -513,12 +513,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.id);
       const currentUser = req.user as any;
       
-      // Only allow users to update their own profile or admins to update anyone
-      if (userId !== currentUser.id && currentUser.role !== 'admin') {
+      // Owner can update anyone, others can only update themselves
+      const isOwner = currentUser.role === 'owner';
+      if (userId !== currentUser.id && !isOwner) {
         return res.status(403).json({ error: "Permission denied" });
       }
       
-      // Use safe update schema to prevent privilege escalation
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // If owner updating other users, allow full update including role/permissions
+      if (isOwner && userId !== currentUser.id) {
+        const { fullName, email, role, storeId, permissions, isActive, password } = req.body;
+        
+        const updateData: any = {};
+        if (fullName !== undefined) updateData.fullName = fullName;
+        if (email !== undefined) updateData.email = email;
+        if (role !== undefined) updateData.role = role;
+        if (storeId !== undefined) updateData.storeId = storeId;
+        if (permissions !== undefined) updateData.permissions = permissions;
+        if (isActive !== undefined) updateData.isActive = isActive;
+        if (password) updateData.password = hashPassword(password);
+        
+        const updatedUser = await storage.updateUser(userId, updateData);
+        const { password: _, ...userData } = updatedUser;
+        return res.json(userData);
+      }
+      
+      // For regular users updating their own profile, use safe schema
       const validatedData = validateRequestBody(
         updateUserProfileSchema, 
         req, 
@@ -691,10 +715,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Staff/User Management routes (owner only)
-  app.get("/api/staff", requireOwner, async (req, res) => {
+  // GET /api/users - List all users (for user management)
+  app.get("/api/users", requireOwner, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
       // Return users without passwords
+      const usersWithoutPasswords = allUsers.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error getting users:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // POST /api/users - Create new user (for user management)
+  app.post("/api/users", requireOwner, async (req, res) => {
+    try {
+      const { username, password, fullName, email, role, storeId, permissions, isActive } = req.body;
+      
+      if (!username || !password || !fullName || !email) {
+        return res.status(400).json({ error: "Username, password, full name, and email are required" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const hashedPassword = hashPassword(password);
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        fullName,
+        email,
+        role: role || 'staff',
+        storeId: storeId || null,
+        permissions: permissions || [],
+        isActive: isActive !== false,
+      });
+
+      const { password: _, ...userData } = newUser;
+      res.status(201).json(userData);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // DELETE /api/users/:id - Delete user
+  app.delete("/api/users/:id", requireOwner, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const currentUser = req.user as any;
+      
+      // Prevent deleting yourself
+      if (userId === currentUser.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+      
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Legacy staff routes (keep for backwards compatibility)
+  app.get("/api/staff", requireOwner, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
       const usersWithoutPasswords = allUsers.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
@@ -711,7 +807,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Username, password, full name, and email are required" });
       }
 
-      // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ error: "Username already exists" });
