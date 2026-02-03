@@ -97,8 +97,8 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
               data={chartData}
               margin={{
                 top: 10,
-                right: 30,
-                left: 20,
+                right: 10,
+                left: 0,
                 bottom: 0,
               }}
             >
@@ -118,7 +118,7 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
                 }}
                 tickLine={false}
                 axisLine={false}
-                width={120}
+                width={70}
               />
               <Tooltip 
                 formatter={(value) => [formatCurrency(typeof value === 'number' ? value : 0), '']}
