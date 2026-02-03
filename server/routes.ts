@@ -590,7 +590,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       if (!validatedData) return;
       
-      const updatedUser = await storage.updateUser(currentUser.id, validatedData);
+      // Non-owner users cannot change their own fullName
+      const updateData = { ...validatedData };
+      if (currentUser.role !== 'owner') {
+        delete updateData.fullName;
+      }
+      
+      const updatedUser = await storage.updateUser(currentUser.id, updateData);
       
       // Exclude password
       const { password, ...userData } = updatedUser;
@@ -2776,7 +2782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-adjustments", requireAuth, async (req, res) => {
+  app.post("/api/stock-adjustments", requireAuth, requirePermission('products.stock_adjust'), async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertStockAdjustmentSchema, req, res);
       if (!validatedData) return;

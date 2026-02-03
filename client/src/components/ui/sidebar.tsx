@@ -581,16 +581,20 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
               <Input 
                 id="username" 
                 value={editUsername} 
-                onChange={(e) => setEditUsername(e.target.value)} 
+                onChange={(e) => setEditUsername(e.target.value)}
+                disabled={!isOwner}
               />
+              {!isOwner && <p className="text-xs text-muted-foreground">Username hanya bisa diubah oleh owner</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="fullName">Nama Lengkap</Label>
               <Input 
                 id="fullName" 
                 value={editFullName} 
-                onChange={(e) => setEditFullName(e.target.value)} 
+                onChange={(e) => setEditFullName(e.target.value)}
+                disabled={!isOwner}
               />
+              {!isOwner && <p className="text-xs text-muted-foreground">Nama hanya bisa diubah oleh owner</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
