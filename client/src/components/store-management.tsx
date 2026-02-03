@@ -34,6 +34,11 @@ type Store = {
   name: string;
   address?: string | null;
   phone?: string | null;
+  email?: string | null;
+  npwp?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
 };
 
 export function StoreManagement() {
@@ -43,13 +48,18 @@ export function StoreManagement() {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [npwp, setNpwp] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
 
   const { data: stores, isLoading } = useQuery<Store[]>({
     queryKey: ['/api/stores'],
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; address?: string; phone?: string }) => {
+    mutationFn: async (data: { name: string; address?: string; phone?: string; email?: string; npwp?: string; bankName?: string; bankAccountNumber?: string; bankAccountName?: string }) => {
       return apiRequest("POST", "/api/stores", data);
     },
     onSuccess: () => {
@@ -67,7 +77,7 @@ export function StoreManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string; address?: string; phone?: string } }) => {
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; address?: string; phone?: string; email?: string; npwp?: string; bankName?: string; bankAccountNumber?: string; bankAccountName?: string } }) => {
       return apiRequest("PATCH", `/api/stores/${id}`, data);
     },
     onSuccess: () => {
@@ -106,6 +116,11 @@ export function StoreManagement() {
     setName("");
     setAddress("");
     setPhone("");
+    setEmail("");
+    setNpwp("");
+    setBankName("");
+    setBankAccountNumber("");
+    setBankAccountName("");
     setDialogOpen(true);
   };
 
@@ -114,6 +129,11 @@ export function StoreManagement() {
     setName(store.name);
     setAddress(store.address || "");
     setPhone(store.phone || "");
+    setEmail(store.email || "");
+    setNpwp(store.npwp || "");
+    setBankName(store.bankName || "");
+    setBankAccountNumber(store.bankAccountNumber || "");
+    setBankAccountName(store.bankAccountName || "");
     setDialogOpen(true);
   };
 
@@ -123,6 +143,11 @@ export function StoreManagement() {
     setName("");
     setAddress("");
     setPhone("");
+    setEmail("");
+    setNpwp("");
+    setBankName("");
+    setBankAccountNumber("");
+    setBankAccountName("");
   };
 
   const handleSubmit = () => {
@@ -134,7 +159,12 @@ export function StoreManagement() {
     const data = { 
       name: name.trim(), 
       address: address.trim() || undefined, 
-      phone: phone.trim() || undefined 
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
+      npwp: npwp.trim() || undefined,
+      bankName: bankName.trim() || undefined,
+      bankAccountNumber: bankAccountNumber.trim() || undefined,
+      bankAccountName: bankAccountName.trim() || undefined
     };
 
     if (editingStore) {
@@ -217,41 +247,100 @@ export function StoreManagement() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingStore ? "Edit Cabang" : "Tambah Cabang"}</DialogTitle>
             <DialogDescription>
-              {editingStore ? "Perbarui informasi cabang" : "Tambahkan cabang baru"}
+              {editingStore ? "Perbarui informasi cabang" : "Tambahkan cabang baru dengan setting lengkap"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="storeName">Nama Cabang *</Label>
-              <Input
-                id="storeName"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Contoh: Cabang Pusat"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="storeName">Nama Cabang *</Label>
+                <Input
+                  id="storeName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Contoh: Cabang Pusat"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="storePhone">Telepon</Label>
+                <Input
+                  id="storePhone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Nomor telepon cabang"
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="storeAddress">Alamat</Label>
               <Input
                 id="storeAddress"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Alamat cabang"
+                placeholder="Alamat lengkap cabang"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="storePhone">Telepon</Label>
-              <Input
-                id="storePhone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Nomor telepon cabang"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="storeEmail">Email</Label>
+                <Input
+                  id="storeEmail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@cabang.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="storeNpwp">NPWP</Label>
+                <Input
+                  id="storeNpwp"
+                  value={npwp}
+                  onChange={(e) => setNpwp(e.target.value)}
+                  placeholder="Nomor NPWP cabang"
+                />
+              </div>
             </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h4 className="font-medium mb-3">Informasi Bank</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="storeBankName">Nama Bank</Label>
+                  <Input
+                    id="storeBankName"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="Contoh: BCA, Mandiri"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="storeBankAccountNumber">Nomor Rekening</Label>
+                  <Input
+                    id="storeBankAccountNumber"
+                    value={bankAccountNumber}
+                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                    placeholder="Nomor rekening bank"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="storeBankAccountName">Atas Nama</Label>
+                <Input
+                  id="storeBankAccountName"
+                  value={bankAccountName}
+                  onChange={(e) => setBankAccountName(e.target.value)}
+                  placeholder="Nama pemilik rekening"
+                />
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={closeDialog}>
                 Batal

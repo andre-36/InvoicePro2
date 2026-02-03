@@ -18,7 +18,7 @@ export const goodsReceiptStatusEnum = pgEnum('goods_receipt_status', ['draft', '
 export const returnStatusEnum = pgEnum('return_status', ['none', 'pending', 'returned']);
 export const deliveryTypeEnum = pgEnum('delivery_type', ['self_pickup', 'delivery', 'combination']);
 
-// Role enum for users
+// Role enum for users (kept for backwards compatibility, but role column is now varchar)
 export const userRoleEnum = pgEnum('user_role', ['owner', 'staff']);
 
 // Users table
@@ -28,7 +28,7 @@ export const users = pgTable("users", {
   password: varchar("password", { length: 100 }).notNull(),
   fullName: varchar("full_name", { length: 100 }).notNull(),
   email: varchar("email", { length: 100 }).notNull(),
-  role: userRoleEnum("role").default("staff").notNull(),
+  role: varchar("role", { length: 50 }).default("staff").notNull(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'set null' }),
   permissions: text("permissions").array().default([]).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
@@ -57,6 +57,11 @@ export const stores = pgTable("stores", {
   address: text("address"),
   phone: varchar("phone", { length: 50 }),
   email: varchar("email", { length: 100 }),
+  npwp: varchar("npwp", { length: 50 }),
+  bankName: varchar("bank_name", { length: 100 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 50 }),
+  bankAccountName: varchar("bank_account_name", { length: 100 }),
+  logoUrl: text("logo_url"),
   isActive: boolean("is_active").default(true).notNull(),
   invoicePaymentCategoryId: integer("invoice_payment_category_id"),
   goodsReceiptPaymentCategoryId: integer("goods_receipt_payment_category_id"),

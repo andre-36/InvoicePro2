@@ -24,7 +24,7 @@ const userFormSchema = z.object({
   password: z.string().min(6, "Password minimal 6 karakter").optional().or(z.literal("")),
   fullName: z.string().min(1, "Nama lengkap wajib diisi"),
   email: z.string().email("Email tidak valid"),
-  role: z.enum(["owner", "staff"]),
+  role: z.string().min(1, "Role wajib dipilih"),
   storeId: z.number().nullable(),
   permissions: z.array(z.string()),
   isActive: z.boolean(),
@@ -37,7 +37,7 @@ type StaffUser = {
   username: string;
   fullName: string;
   email: string;
-  role: 'owner' | 'staff';
+  role: string;
   storeId: number | null;
   permissions: string[];
   isActive: boolean;
@@ -321,7 +321,7 @@ export function UserManagement() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   <Badge variant={user.role === 'owner' ? 'default' : 'secondary'}>
-                    {user.role === 'owner' ? 'Owner' : 'Staff'}
+                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -455,26 +455,38 @@ export function UserManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          const selectedRole = roles?.find(r => r.name.toLowerCase() === value.toLowerCase());
+                          if (selectedRole && selectedRole.permissions) {
+                            form.setValue("permissions", selectedRole.permissions);
+                          }
+                        }} 
+                        value={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Pilih role" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="owner">Owner</SelectItem>
-                          <SelectItem value="staff">Staff</SelectItem>
+                          {roles?.map((role) => (
+                            <SelectItem key={role.id} value={role.name.toLowerCase()}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormDescription>
-                        Owner memiliki akses penuh ke semua cabang
+                        {field.value === "owner" ? "Owner memiliki akses penuh ke semua cabang" : "Hak akses sesuai role, dapat dikustomisasi per user"}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {form.watch("role") === "staff" && (
+                {form.watch("role") !== "owner" && (
                   <FormField
                     control={form.control}
                     name="storeId"
@@ -526,7 +538,7 @@ export function UserManagement() {
                 )}
               />
 
-              {form.watch("role") === "staff" && (
+              {form.watch("role") !== "owner" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Shield className="h-4 w-4" />

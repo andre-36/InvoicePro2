@@ -108,15 +108,8 @@ async function seedDefaultOwner(): Promise<void> {
         role: "owner",
         storeId: null,
         phone: null,
-        companyName: null,
-        companyAddress: null,
-        companyPhone: null,
-        companyEmail: null,
-        companyLogo: null,
-        companyTaxId: null,
-        bankName: null,
-        bankAccountNumber: null,
-        bankAccountName: null,
+        permissions: [],
+        isActive: true,
       });
       console.log("Default owner created: username='admin', password='admin123'");
     }
@@ -866,6 +859,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/stores/:id", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.id);
+      const validatedData = validateRequestBody(insertStoreSchema.partial(), req, res);
+      if (!validatedData) return;
+      
+      const updatedStore = await storage.updateStore(storeId, validatedData);
+      res.json(updatedStore);
+    } catch (error) {
+      console.error("Error updating store:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.patch("/api/stores/:id", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.id);
       const validatedData = validateRequestBody(insertStoreSchema.partial(), req, res);
