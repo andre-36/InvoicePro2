@@ -1480,23 +1480,39 @@ export default function SettingsPage() {
                         }
                         if (result.successful && result.successful.length > 0) {
                           const uploadedFile = result.successful[0];
-                          if (uploadedFile?.response?.body) {
-                            const uploadResponse = uploadedFile.response.body as any;
-                            if (uploadResponse.publicUrl) {
-                              setGlobalLogoUrl(uploadResponse.publicUrl);
-                            }
-                          } else {
-                            const uploadURL = (uploadedFile?.response as any)?.uploadURL;
-                            if (uploadURL) {
+                          const uploadURL = (uploadedFile as any)?.uploadURL;
+                          
+                          if (uploadURL) {
+                            try {
+                              // Call /api/logo to set ACL and get public path
+                              const responseObj = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                              const responseData = await responseObj.json();
+                              
+                              const logoUrl = responseData.logoPath || responseData.logoURL || uploadURL;
+                              setGlobalLogoUrl(logoUrl);
+                              
+                              toast({
+                                title: "Logo uploaded",
+                                description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
+                              });
+                            } catch (error) {
+                              console.error("Error setting logo ACL:", error);
+                              // Fallback: use the upload URL without query params
                               const urlParts = uploadURL.split('?');
                               if (urlParts[0]) {
                                 setGlobalLogoUrl(urlParts[0]);
+                                toast({
+                                  title: "Logo uploaded",
+                                  description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
+                                });
                               }
                             }
                           }
                         }
                       }}
-                    />
+                    >
+                      <Upload className="h-4 w-4" />
+                    </ObjectUploader>
                   </div>
                   {globalLogoUrl && (
                     <div className="flex items-center gap-4 p-4 border rounded-lg mt-2">
