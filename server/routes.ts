@@ -733,8 +733,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password, fullName, email, role, storeId, permissions, isActive } = req.body;
       
-      if (!username || !password || !fullName || !email) {
-        return res.status(400).json({ error: "Username, password, full name, and email are required" });
+      if (!username || !password || !fullName) {
+        return res.status(400).json({ error: "Username, password, and full name are required" });
       }
 
       // Check if username already exists
@@ -748,7 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username,
         password: hashedPassword,
         fullName,
-        email,
+        email: email || null,
         role: role || 'staff',
         storeId: storeId || null,
         permissions: permissions || [],
@@ -803,8 +803,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password, fullName, email, storeId, permissions, isActive } = req.body;
       
-      if (!username || !password || !fullName || !email) {
-        return res.status(400).json({ error: "Username, password, full name, and email are required" });
+      if (!username || !password || !fullName) {
+        return res.status(400).json({ error: "Username, password, and full name are required" });
       }
 
       const existingUser = await storage.getUserByUsername(username);
@@ -817,7 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username,
         password: hashedPassword,
         fullName,
-        email,
+        email: email || null,
         role: 'staff',
         storeId: storeId || null,
         permissions: permissions || [],

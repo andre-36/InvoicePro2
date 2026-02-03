@@ -23,7 +23,7 @@ const userFormSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
   password: z.string().min(6, "Password minimal 6 karakter").optional().or(z.literal("")),
   fullName: z.string().min(1, "Nama lengkap wajib diisi"),
-  email: z.string().email("Email tidak valid"),
+  email: z.string().email("Email tidak valid").optional().or(z.literal("")),
   role: z.string().min(1, "Role wajib dipilih"),
   storeId: z.number().nullable(),
   permissions: z.array(z.string()),
@@ -70,7 +70,6 @@ const PERMISSION_GROUPS = {
     { id: "invoices.view", label: "Lihat Invoice" },
     { id: "invoices.create", label: "Buat Invoice" },
     { id: "invoices.edit", label: "Edit Invoice" },
-    { id: "invoices.delete", label: "Hapus Invoice" },
     { id: "invoices.print", label: "Print Invoice" },
   ],
   "Quotation": [

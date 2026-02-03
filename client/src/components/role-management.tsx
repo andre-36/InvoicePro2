@@ -82,7 +82,6 @@ const PERMISSION_GROUPS = {
     { id: "invoices.view", label: "Lihat Invoice" },
     { id: "invoices.create", label: "Buat Invoice" },
     { id: "invoices.edit", label: "Edit Invoice" },
-    { id: "invoices.delete", label: "Hapus Invoice" },
     { id: "invoices.print", label: "Print Invoice" },
   ],
   "Quotation": [
