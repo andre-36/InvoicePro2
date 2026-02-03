@@ -16,7 +16,7 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { DateRange as DayPickerDateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
-import type { CashAccount } from "@shared/schema";
+import type { CashAccount, InflowCategory, OutflowCategory } from "@shared/schema";
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
@@ -223,25 +223,62 @@ export default function ReportsPage() {
     queryKey: ['/api/stores/1/cash-accounts'],
   });
 
-  // Process transaction data for charts
+  // Fetch inflow categories from settings
+  const { data: inflowCategories } = useQuery<InflowCategory[]>({
+    queryKey: ['/api/stores/1/inflow-categories'],
+  });
+
+  // Fetch outflow categories from settings
+  const { data: outflowCategories } = useQuery<OutflowCategory[]>({
+    queryKey: ['/api/stores/1/outflow-categories'],
+  });
+
+  // Process transaction data for charts - now using categories from settings
   const processTransactionsByCategory = (type: 'income' | 'expense') => {
     if (!transactions) return [];
     
     const filteredTransactions = transactions.filter(t => t.type === type);
     
-    const categories = filteredTransactions.reduce((acc, transaction) => {
-      const category = transaction.category || 'Uncategorized';
-      if (!acc[category]) {
-        acc[category] = 0;
-      }
-      acc[category] += parseFloat(transaction.amount);
-      return acc;
-    }, {} as Record<string, number>);
+    // Get category names from settings (use normalized lowercase for matching)
+    const settingsCategories = type === 'income' 
+      ? (inflowCategories || []).filter(c => c.isActive).map(c => c.name)
+      : (outflowCategories || []).filter(c => c.isActive).map(c => c.name);
     
-    return Object.entries(categories).map(([name, value]) => ({
-      name,
-      value: parseFloat(value.toFixed(2))
-    }));
+    // Create mapping for case-insensitive category matching
+    const categoryNameMap: Record<string, string> = {};
+    settingsCategories.forEach(name => {
+      categoryNameMap[name.toLowerCase().trim()] = name;
+    });
+    
+    // Initialize all categories from settings with 0 value
+    const categoryTotals: Record<string, number> = {};
+    settingsCategories.forEach(name => {
+      categoryTotals[name] = 0;
+    });
+    // Add "Lain-lain" for uncategorized transactions
+    categoryTotals['Lain-lain'] = 0;
+    
+    // Sum up transaction amounts per category (with normalization)
+    filteredTransactions.forEach(transaction => {
+      const rawCategory = transaction.category?.trim() || '';
+      const normalizedKey = rawCategory.toLowerCase();
+      
+      // Try to match with settings category (case-insensitive)
+      const matchedCategory = categoryNameMap[normalizedKey] || 
+        (rawCategory && categoryTotals[rawCategory] !== undefined ? rawCategory : 'Lain-lain');
+      
+      categoryTotals[matchedCategory] += parseFloat(transaction.amount);
+    });
+    
+    // Convert to array - show ALL categories from settings (including 0 value)
+    // Filter out only "Lain-lain" if it has 0 value
+    return Object.entries(categoryTotals)
+      .filter(([name, value]) => name !== 'Lain-lain' || value > 0)
+      .map(([name, value]) => ({
+        name,
+        value: parseFloat(value.toFixed(2))
+      }))
+      .sort((a, b) => b.value - a.value); // Sort by value descending
   };
   
   const incomeByCategory = processTransactionsByCategory('income');
