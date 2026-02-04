@@ -281,6 +281,30 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     }
   });
 
+  // Update invoice delivery type mutation
+  const updateDeliveryTypeMutation = useMutation({
+    mutationFn: async (deliveryType: string) => {
+      return apiRequest('PUT', `/api/invoices/${id}/delivery-type`, { deliveryType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      toast({
+        title: "Tipe pengiriman diperbarui",
+        description: "Tipe pengiriman invoice berhasil diubah.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal mengubah tipe pengiriman",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Generate PDF
   const handleDownloadPDF = async () => {
     if (!invoice) return;
@@ -1548,12 +1572,24 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     </div>
                     <div className="flex justify-between md:justify-end md:flex-col">
                       <span className="text-sm font-medium text-gray-500 md:mb-1">Delivery Type:</span>
-                      <span className="text-sm">
-                        {invoice.deliveryType === 'self_pickup' ? 'Self Pickup' : 
-                         invoice.deliveryType === 'delivery' ? 'Delivery' : 
-                         invoice.deliveryType === 'combination' ? 'Combination' : 
-                         invoice.deliveryType || 'Delivery'}
-                      </span>
+                      <select
+                        className="text-sm px-2 py-1 border rounded-md bg-white cursor-pointer hover:border-primary"
+                        value={invoice.deliveryType || 'delivery'}
+                        onChange={(e) => {
+                          if (window.confirm(
+                            invoice.status === 'paid' 
+                              ? 'Mengubah tipe pengiriman akan mempengaruhi stok. Lanjutkan?' 
+                              : 'Ubah tipe pengiriman?'
+                          )) {
+                            updateDeliveryTypeMutation.mutate(e.target.value);
+                          }
+                        }}
+                        disabled={invoice.isVoided || updateDeliveryTypeMutation.isPending}
+                      >
+                        <option value="delivery">Delivery</option>
+                        <option value="self_pickup">Self Pickup</option>
+                        <option value="combination">Combination</option>
+                      </select>
                     </div>
                     <div className="flex justify-between md:justify-end md:flex-col">
                       <span className="text-sm font-medium text-gray-500 md:mb-1">Payment Terms:</span>
