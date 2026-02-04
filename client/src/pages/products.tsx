@@ -1,8 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Package, Download, Upload, FileSpreadsheet, BarChart3, Layers, Scale, ArrowUpDown } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { StockAdjustmentDialog } from "@/components/products/stock-adjustment-dialog";
+
+type UserData = {
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role?: 'owner' | 'staff';
+  permissions?: string[];
+};
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -156,6 +165,18 @@ export default function ProductsPage() {
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
   });
+
+  const { data: currentUser } = useQuery<UserData>({
+    queryKey: ['/api/auth/user'],
+  });
+
+  const hasPermission = useMemo(() => {
+    return (permission: string): boolean => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'owner') return true;
+      return currentUser.permissions?.includes(permission) ?? false;
+    };
+  }, [currentUser]);
   
   // Create/update product mutation
   const productMutation = useMutation({
@@ -783,13 +804,15 @@ export default function ProductsPage() {
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setStockAdjustmentProduct(product);
-                              setIsStockAdjustmentOpen(true);
-                            }}>
-                              <ArrowUpDown className="mr-2 h-4 w-4" />
-                              <span>Stock Adjustment</span>
-                            </DropdownMenuItem>
+                            {hasPermission('products.stock_adjust') && (
+                              <DropdownMenuItem onClick={() => {
+                                setStockAdjustmentProduct(product);
+                                setIsStockAdjustmentOpen(true);
+                              }}>
+                                <ArrowUpDown className="mr-2 h-4 w-4" />
+                                <span>Stock Adjustment</span>
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
