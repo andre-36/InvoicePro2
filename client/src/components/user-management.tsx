@@ -426,9 +426,9 @@ export function UserManagement() {
                       <div className="relative">
                         <FormControl>
                           <Input 
+                            {...field} 
                             type={showPassword ? "text" : "password"} 
                             placeholder={editingUser ? "••••••" : "Password"} 
-                            {...field} 
                           />
                         </FormControl>
                         <Button
