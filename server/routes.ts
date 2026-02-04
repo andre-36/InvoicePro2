@@ -2259,8 +2259,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceId = parseInt(req.params.invoiceId);
       const paymentId = parseInt(req.params.paymentId);
       
-      // Get the payment details before deleting (to find matching transaction)
+      // Get the payment details before deleting (to find matching transaction and credit note)
       const payment = await storage.getInvoicePayment(paymentId);
+      
+      // If payment was from a credit note, restore the credit note balance
+      if (payment && payment.creditNoteId) {
+        const creditNote = await storage.getReturn(payment.creditNoteId);
+        if (creditNote) {
+          const currentUsed = parseFloat(creditNote.usedAmount || '0');
+          const paymentAmount = parseFloat(payment.amount);
+          const newUsedAmount = Math.max(0, currentUsed - paymentAmount);
+          
+          await storage.updateReturn(payment.creditNoteId, { 
+            usedAmount: newUsedAmount.toFixed(2) 
+          });
+          console.log(`Restored credit note ${payment.creditNoteId} balance: usedAmount ${currentUsed} -> ${newUsedAmount}`);
+        }
+      }
       
       // Delete the payment
       await storage.deleteInvoicePayment(paymentId);
