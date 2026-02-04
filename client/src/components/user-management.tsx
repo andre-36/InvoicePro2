@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Users, Shield, Store, Eye, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Shield, Store, Eye, EyeOff, KeyRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -136,6 +136,9 @@ export function UserManagement() {
   const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRoleTemplate, setSelectedRoleTemplate] = useState<string>("");
+  const [resetPasswordUser, setResetPasswordUser] = useState<StaffUser | null>(null);
+  const [newResetPassword, setNewResetPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -204,6 +207,22 @@ export function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({ title: "Berhasil", description: "User berhasil dihapus" });
       setDeletingUser(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: number; newPassword: string }) => {
+      return apiRequest('PUT', `/api/staff/${id}/reset-password`, { newPassword });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: "Berhasil", description: "Password berhasil direset" });
+      setResetPasswordUser(null);
+      setNewResetPassword("");
+      setShowResetPassword(false);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -340,9 +359,19 @@ export function UserManagement() {
                       <Edit className="h-4 w-4" />
                     </Button>
                     {user.role !== 'owner' && (
-                      <Button variant="ghost" size="sm" onClick={() => setDeletingUser(user)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setResetPasswordUser(user)}
+                          title="Reset Password"
+                        >
+                          <KeyRound className="h-4 w-4 text-amber-600" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setDeletingUser(user)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </TableCell>
@@ -676,6 +705,65 @@ export function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetPasswordUser} onOpenChange={(open) => {
+        if (!open) {
+          setResetPasswordUser(null);
+          setNewResetPassword("");
+          setShowResetPassword(false);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Masukkan password baru untuk user <strong>{resetPasswordUser?.fullName}</strong> ({resetPasswordUser?.username})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password Baru</label>
+              <div className="relative">
+                <Input 
+                  type={showResetPassword ? "text" : "password"}
+                  value={newResetPassword}
+                  onChange={(e) => setNewResetPassword(e.target.value)}
+                  placeholder="Masukkan password baru"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowResetPassword(!showResetPassword)}
+                >
+                  {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setResetPasswordUser(null);
+              setNewResetPassword("");
+              setShowResetPassword(false);
+            }}>
+              Batal
+            </Button>
+            <Button 
+              onClick={() => {
+                if (resetPasswordUser && newResetPassword) {
+                  resetPasswordMutation.mutate({ id: resetPasswordUser.id, newPassword: newResetPassword });
+                }
+              }}
+              disabled={!newResetPassword || resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? "Menyimpan..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
