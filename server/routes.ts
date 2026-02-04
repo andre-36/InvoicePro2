@@ -2004,6 +2004,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change invoice delivery type endpoint
+  app.put("/api/invoices/:id/delivery-type", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const schema = z.object({
+        deliveryType: z.enum(['self_pickup', 'delivery', 'combination'])
+      });
+      
+      const validatedData = validateRequestBody(schema, req, res);
+      if (!validatedData) return;
+      
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      const oldDeliveryType = invoice.deliveryType;
+      const newDeliveryType = validatedData.deliveryType;
+      
+      // If no change, just return current invoice
+      if (oldDeliveryType === newDeliveryType) {
+        return res.json(invoice);
+      }
+      
+      // Check if invoice is paid - if so, handle stock accordingly
+      if (invoice.status === 'paid') {
+        // Get existing delivery notes
+        const deliveryNotes = await storage.getDeliveryNotesByInvoice(invoiceId);
+        const deliveredNotes = deliveryNotes.filter(dn => dn.status === 'delivered');
+        
+        // Changing FROM self_pickup TO delivery
+        if (oldDeliveryType === 'self_pickup' && (newDeliveryType === 'delivery' || newDeliveryType === 'combination')) {
+          // Return the stock that was deducted for self_pickup
+          // Stock will be deducted again when delivery notes are marked as delivered
+          await storage.returnStockFromSelfPickup(invoiceId);
+        }
+        
+        // Changing FROM delivery TO self_pickup
+        if ((oldDeliveryType === 'delivery' || oldDeliveryType === 'combination') && newDeliveryType === 'self_pickup') {
+          // If there are delivered delivery notes, prevent the change
+          if (deliveredNotes.length > 0) {
+            return res.status(400).json({ 
+              error: "Cannot change to self_pickup", 
+              message: "Invoice sudah memiliki delivery note yang sudah dikirim. Hapus delivery note terlebih dahulu." 
+            });
+          }
+          
+          // Delete pending delivery notes if any
+          for (const dn of deliveryNotes) {
+            await storage.deleteDeliveryNote(dn.id);
+          }
+          
+          // Release any reserved stock first
+          await storage.releaseStockReservationForInvoice(invoiceId);
+          
+          // Then deduct stock immediately for self_pickup
+          // Need to temporarily update delivery type first
+          await storage.updateInvoice(invoiceId, { deliveryType: newDeliveryType });
+          await storage.deductStockForSelfPickup(invoiceId);
+          
+          return res.json(await storage.getInvoice(invoiceId));
+        }
+      }
+      
+      // Just update the delivery type
+      const updatedInvoice = await storage.updateInvoice(invoiceId, { deliveryType: newDeliveryType });
+      res.json(updatedInvoice);
+    } catch (error: any) {
+      console.error("Error updating invoice delivery type:", error);
+      res.status(500).json({ error: error.message || "Server error" });
+    }
+  });
+
   // Void invoice endpoint (replaces delete - invoices should never be deleted, only voided)
   app.post("/api/invoices/:id/void", requireAuth, async (req, res) => {
     try {
