@@ -400,6 +400,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({
         title: "Status updated",
         description: "The purchase order status has been updated successfully.",

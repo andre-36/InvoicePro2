@@ -266,6 +266,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       toast({
         title: "Status updated",
         description: "The invoice status has been updated successfully.",
@@ -367,7 +368,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       return apiRequest('PATCH', `/api/invoices/${id}/payments/${editingPayment.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
       setPaymentDialogOpen(false);
       setEditingPayment(null);
       setPaymentForm({
@@ -427,6 +430,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
       setDeliveryDialogOpen(false);
       resetDeliveryForm();
       toast({
@@ -451,6 +455,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
       toast({
         title: "Success",
         description: "Delivery note deleted successfully.",
@@ -473,6 +478,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
       setEditDeliveryDialogOpen(false);
       setEditingDeliveryNote(null);
       toast({
@@ -497,6 +503,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
     },
     onError: (error) => {
       toast({
