@@ -169,6 +169,10 @@ export interface IStorage {
   // Stock reservation methods (for paid invoices awaiting delivery)
   reserveStockForInvoice(invoiceId: number): Promise<void>;
   releaseStockReservationForInvoice(invoiceId: number): Promise<void>;
+  
+  // Self pickup stock deduction (when self_pickup invoice is paid)
+  deductStockForSelfPickup(invoiceId: number): Promise<void>;
+  returnStockFromSelfPickup(invoiceId: number): Promise<void>;
 
   // Purchase order payment methods (for prepaid POs)
   getPurchaseOrderPayment(paymentId: number): Promise<PurchaseOrderPayment | undefined>;
@@ -2188,6 +2192,145 @@ export class DatabaseStorage implements IStorage {
           remainingToRelease -= releaseFromBatch;
         }
       }
+    });
+  }
+
+  // Self pickup stock deduction (when self_pickup invoice is paid)
+  async deductStockForSelfPickup(invoiceId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Get the invoice
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${invoiceId} not found`);
+      }
+
+      if (invoice.deliveryType !== 'self_pickup') {
+        throw new Error(`Invoice is not a self_pickup invoice`);
+      }
+
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      // For each item, deduct stock using FIFO
+      for (const item of items) {
+        const quantityToDeduct = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+        
+        // Calculate revenue
+        const unitPrice = parseFloat(item.unitPrice.toString());
+        const itemQty = parseFloat(item.quantity.toString());
+        totalRevenue += itemQty * unitPrice;
+
+        // Get available batches for this product (FIFO)
+        const availableBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, item.productId),
+              eq(productBatches.storeId, invoice.storeId),
+              gt(productBatches.remainingQuantity, 0)
+            )
+          )
+          .orderBy(productBatches.purchaseDate);
+
+        let remainingToDeduct = quantityToDeduct;
+
+        for (const batch of availableBatches) {
+          if (remainingToDeduct <= 0) break;
+
+          const remaining = parseFloat(batch.remainingQuantity.toString());
+          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+          const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+
+          // Deduct from remaining quantity
+          const deductFromBatch = Math.min(remainingToDeduct, remaining);
+          
+          // Calculate cost for profit tracking
+          totalCost += deductFromBatch * baseCost;
+
+          // First release reserved if any, then deduct from remaining
+          const newReserved = Math.max(0, reserved - deductFromBatch);
+          const newRemaining = remaining - deductFromBatch;
+
+          await tx
+            .update(productBatches)
+            .set({
+              remainingQuantity: newRemaining.toString(),
+              reservedQuantity: newReserved.toString(),
+              updatedAt: new Date()
+            })
+            .where(eq(productBatches.id, batch.id));
+
+          remainingToDeduct -= deductFromBatch;
+        }
+
+        // Update unit cost in invoice item for COGS tracking
+        if (quantityToDeduct > 0) {
+          const avgCost = totalCost / quantityToDeduct;
+          await tx
+            .update(invoiceItems)
+            .set({ unitCost: avgCost.toString() })
+            .where(eq(invoiceItems.id, item.id));
+        }
+      }
+
+      // Update invoice profit data
+      const profit = totalRevenue - totalCost;
+      await tx
+        .update(invoices)
+        .set({
+          totalCost: totalCost.toString(),
+          profit: profit.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId));
+    });
+  }
+
+  async returnStockFromSelfPickup(invoiceId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      // Get the invoice
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${invoiceId} not found`);
+      }
+
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+
+      // For each item, return stock by creating adjustment batches (similar to returns)
+      for (const item of items) {
+        const quantityToReturn = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+        
+        // Get the unit cost from invoice item
+        const unitCost = parseFloat(item.unitCost?.toString() || '0');
+
+        // Create a new batch for the returned stock
+        await tx.insert(productBatches).values({
+          productId: item.productId,
+          storeId: invoice.storeId,
+          quantity: quantityToReturn.toString(),
+          remainingQuantity: quantityToReturn.toString(),
+          reservedQuantity: '0',
+          cost: unitCost.toString(),
+          baseCost: unitCost.toString(),
+          purchaseDate: new Date(),
+          batchReference: `PICKUP-RETURN-INV-${invoice.invoiceNumber}`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+
+      // Reset invoice profit data
+      await tx
+        .update(invoices)
+        .set({
+          totalCost: '0',
+          profit: '0',
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId));
     });
   }
 

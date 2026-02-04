@@ -2079,11 +2079,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
         const invoiceTotal = parseFloat(invoice.totalAmount);
         
-        // If fully paid, update invoice status to "paid" and reserve stock
+        // If fully paid, update invoice status to "paid" and handle stock
         if (totalPayments >= invoiceTotal && invoice.status !== 'paid') {
           await storage.updateInvoice(invoiceId, { status: 'paid' });
-          // Reserve stock for this invoice (prevents overselling)
-          await storage.reserveStockForInvoice(invoiceId);
+          
+          // For self_pickup invoices, deduct stock immediately (no delivery note needed)
+          // For delivery invoices, only reserve stock (will be deducted when delivery note is delivered)
+          if (invoice.deliveryType === 'self_pickup') {
+            await storage.deductStockForSelfPickup(invoiceId);
+          } else {
+            // Reserve stock for this invoice (prevents overselling)
+            await storage.reserveStockForInvoice(invoiceId);
+          }
         }
         
         // If payment is using a credit note, deduct from credit note balance
