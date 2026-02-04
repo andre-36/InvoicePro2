@@ -428,7 +428,7 @@ export function UserManagement() {
                           <Input 
                             {...field} 
                             type={showPassword ? "text" : "password"} 
-                            placeholder={editingUser ? "••••••" : "Password"} 
+                            placeholder={editingUser ? (showPassword ? "Kosongkan jika tidak diubah" : "••••••") : "Password"} 
                           />
                         </FormControl>
                         <Button
