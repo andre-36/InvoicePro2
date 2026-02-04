@@ -2437,6 +2437,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const invoiceId = parseInt(req.params.invoiceId);
       
+      // Check if invoice is self_pickup - delivery notes are not needed for self_pickup
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      if (invoice.deliveryType === 'self_pickup') {
+        return res.status(400).json({ 
+          error: "Cannot create delivery note", 
+          message: "Invoice ini menggunakan metode Self Pickup. Delivery note tidak diperlukan untuk Self Pickup." 
+        });
+      }
+      
       // Use a flexible schema that accepts string dates
       const schema = z.object({
         deliveryNote: z.object({
