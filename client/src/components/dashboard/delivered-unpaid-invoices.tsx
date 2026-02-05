@@ -121,7 +121,7 @@ export function DeliveredUnpaidInvoices() {
                       </div>
                       <p className="text-xs text-gray-600 truncate">{clientName}</p>
                       <p className="text-xs text-gray-400">
-                        {format(parseISO(invoice.invoiceDate), 'dd/MM/yyyy')}
+                        {invoice.issueDate && format(parseISO(invoice.issueDate), 'dd/MM/yyyy')}
                       </p>
                     </div>
                     <div className="text-right ml-3">
