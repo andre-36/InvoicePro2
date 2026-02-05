@@ -610,7 +610,19 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
 
   const totalPaid = (receiptPayments || []).reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const totalAmount = parseFloat(form.watch("totalAmount") || "0");
-  const remainingBalance = totalAmount - totalPaid;
+  
+  // Calculate prepaid amounts from PO payments for items from prepaid POs
+  const prepaidAmount = items.reduce((sum, item) => {
+    if (!item.purchaseOrderId) return sum;
+    const status = getPrepaidStatus(item.purchaseOrderId);
+    if (status.isPrepaid && status.isFullyPaid) {
+      return sum + parseFloat(item.totalAmount || "0");
+    }
+    return sum;
+  }, 0);
+  
+  const totalPaidIncludingPrepaid = totalPaid + prepaidAmount;
+  const remainingBalance = totalAmount - totalPaidIncludingPrepaid;
 
   const getPOName = (poId: number | null | undefined) => {
     if (!poId) return null;
@@ -1096,15 +1108,21 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                 </CardHeader>
                 <CardContent>
                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="grid grid-cols-4 gap-4 text-center">
                       <div>
                         <p className="text-sm text-gray-600">Total Amount</p>
                         <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Amount Paid</p>
+                        <p className="text-sm text-gray-600">Payments</p>
                         <p className="text-xl font-bold text-green-600">{formatCurrency(totalPaid)}</p>
                       </div>
+                      {prepaidAmount > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-600">Prepaid via PO</p>
+                          <p className="text-xl font-bold text-blue-600">{formatCurrency(prepaidAmount)}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm text-gray-600">Balance</p>
                         <p className={cn("text-xl font-bold", remainingBalance > 0 ? "text-red-600" : "text-green-600")}>
@@ -1112,6 +1130,13 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                         </p>
                       </div>
                     </div>
+                    {prepaidAmount > 0 && (
+                      <div className="mt-3 text-center">
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                          Items from prepaid PO(s) - no additional payment required
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
                   {receiptPayments && receiptPayments.length > 0 ? (
