@@ -158,7 +158,14 @@ function PurchaseOrderItemRow({
                         className={`mr-2 h-4 w-4 ${item.productId === product.id ? "opacity-100" : "opacity-0"}`}
                       />
                       <div className="flex flex-col">
-                        <span>{product.name}</span>
+                        <div className="flex items-center gap-1">
+                          <span>{product.name}</span>
+                          {product.productType === 'bundle' && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                              BUNDLE
+                            </span>
+                          )}
+                        </div>
                         <span className="text-xs text-gray-500">Cost: {formatCurrency(product.costPrice || '0')}</span>
                       </div>
                     </CommandItem>
@@ -890,7 +897,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
