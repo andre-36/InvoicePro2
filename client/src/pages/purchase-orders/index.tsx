@@ -71,6 +71,7 @@ export default function PurchaseOrdersPage() {
   const [itemSupplierFilter, setItemSupplierFilter] = useState<string>("all");
   const [itemProductFilter, setItemProductFilter] = useState<string>("all");
   const [itemPOFilter, setItemPOFilter] = useState<string>("all");
+  const [itemSearchQuery, setItemSearchQuery] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -164,13 +165,17 @@ export default function PurchaseOrdersPage() {
     ? [...new Set(pendingItems.map(item => item.purchaseOrderNumber))].sort()
     : [];
 
-  // Filter pending items based on all filters
+  // Filter pending items based on all filters including search
   const filteredPendingItems = pendingItems
     ? pendingItems.filter(item => {
         const matchesSupplier = itemSupplierFilter === 'all' || item.supplierName === itemSupplierFilter;
         const matchesProduct = itemProductFilter === 'all' || item.productName === itemProductFilter;
         const matchesPO = itemPOFilter === 'all' || item.purchaseOrderNumber === itemPOFilter;
-        return matchesSupplier && matchesProduct && matchesPO;
+        const matchesSearch = !itemSearchQuery || 
+          item.productName.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+          item.supplierName.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+          item.purchaseOrderNumber.toLowerCase().includes(itemSearchQuery.toLowerCase());
+        return matchesSupplier && matchesProduct && matchesPO && matchesSearch;
       })
     : [];
 
@@ -383,8 +388,19 @@ export default function PurchaseOrdersPage() {
         <TabsContent value="by-item">
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex flex-col md:flex-row gap-4 justify-between">
-                <CardTitle className="text-lg">Pending Items</CardTitle>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 justify-between">
+                  <CardTitle className="text-lg">Pending Items</CardTitle>
+                  <div className="relative w-full md:w-80">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Cari produk, supplier, atau PO#..."
+                      className="pl-8"
+                      value={itemSearchQuery}
+                      onChange={(e) => setItemSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={itemSupplierFilter}
@@ -447,9 +463,9 @@ export default function PurchaseOrdersPage() {
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-1">No pending items</h3>
                   <p className="text-sm text-gray-500 mb-4 max-w-md">
-                    {itemSupplierFilter !== 'all' || itemProductFilter !== 'all' || itemPOFilter !== 'all'
-                      ? "Try adjusting your filters to find what you're looking for."
-                      : "All purchase order items have been received."}
+                    {itemSupplierFilter !== 'all' || itemProductFilter !== 'all' || itemPOFilter !== 'all' || itemSearchQuery
+                      ? "Coba sesuaikan filter atau pencarian Anda."
+                      : "Semua item purchase order sudah diterima."}
                   </p>
                 </div>
               ) : (
