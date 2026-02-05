@@ -257,6 +257,7 @@ export interface IStorage {
   deleteTransaction(id: number): Promise<void>;
   deleteTransactionByInvoicePaymentId(invoicePaymentId: number): Promise<void>;
   deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void>;
+  deleteTransactionByPurchaseOrderPaymentId(purchaseOrderPaymentId: number): Promise<void>;
 
   // Stock adjustment methods
   getStockAdjustment(id: number): Promise<StockAdjustment | undefined>;
@@ -4318,6 +4319,10 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransactionByGoodsReceiptPaymentId(goodsReceiptPaymentId: number): Promise<void> {
     await db.delete(transactions).where(eq(transactions.goodsReceiptPaymentId, goodsReceiptPaymentId));
+  }
+
+  async deleteTransactionByPurchaseOrderPaymentId(purchaseOrderPaymentId: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.purchaseOrderPaymentId, purchaseOrderPaymentId));
   }
 
   // Stock adjustment methods

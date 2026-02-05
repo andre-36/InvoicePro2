@@ -495,6 +495,7 @@ export const transactions = pgTable("transactions", {
   invoicePaymentId: integer("invoice_payment_id"),
   goodsReceiptId: integer("goods_receipt_id"),
   goodsReceiptPaymentId: integer("goods_receipt_payment_id"),
+  purchaseOrderPaymentId: integer("purchase_order_payment_id"),
   returnId: integer("return_id"),
   referenceNumber: varchar("reference_number", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -507,7 +508,8 @@ export const transactions = pgTable("transactions", {
     dateIdx: index("transactions_date_idx").on(table.date),
     invoiceIdIdx: index("transactions_invoice_id_idx").on(table.invoiceId),
     invoicePaymentIdIdx: index("transactions_invoice_payment_id_idx").on(table.invoicePaymentId),
-    goodsReceiptPaymentIdIdx: index("transactions_goods_receipt_payment_id_idx").on(table.goodsReceiptPaymentId)
+    goodsReceiptPaymentIdIdx: index("transactions_goods_receipt_payment_id_idx").on(table.goodsReceiptPaymentId),
+    purchaseOrderPaymentIdIdx: index("transactions_purchase_order_payment_id_idx").on(table.purchaseOrderPaymentId)
   };
 });
 
@@ -580,13 +582,15 @@ export const purchaseOrderPayments = pgTable("purchase_order_payments", {
   paymentDate: date("payment_date").notNull(),
   paymentType: varchar("payment_type", { length: 50 }).notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  cashAccountId: integer("cash_account_id").references(() => cashAccounts.id, { onDelete: 'set null' }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 }, (table) => {
   return {
     purchaseOrderIdIdx: index("purchase_order_payments_purchase_order_id_idx").on(table.purchaseOrderId),
-    paymentDateIdx: index("purchase_order_payments_payment_date_idx").on(table.paymentDate)
+    paymentDateIdx: index("purchase_order_payments_payment_date_idx").on(table.paymentDate),
+    cashAccountIdIdx: index("purchase_order_payments_cash_account_id_idx").on(table.cashAccountId)
   };
 });
 

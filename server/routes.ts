@@ -3153,12 +3153,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertPurchaseOrderPaymentSchema, req, res);
       if (!validatedData) return;
 
+      // Get PO details for transaction description
+      const purchaseOrder = await storage.getPurchaseOrder(purchaseOrderId);
+      if (!purchaseOrder) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+
       const paymentData = {
         ...validatedData,
         purchaseOrderId: purchaseOrderId
       };
       
       const newPayment = await storage.createPurchaseOrderPayment(paymentData);
+      
+      // Create corresponding expense transaction
+      await storage.createTransaction({
+        storeId: purchaseOrder.storeId,
+        type: 'expense',
+        amount: validatedData.amount,
+        description: `Pembayaran PO Prepaid: ${purchaseOrder.purchaseOrderNumber} - ${purchaseOrder.supplierName}`,
+        date: validatedData.paymentDate,
+        categoryId: null,
+        outflowCategoryId: null,
+        notes: validatedData.notes || null,
+        cashAccountId: validatedData.cashAccountId || null,
+        purchaseOrderPaymentId: newPayment.id
+      });
+      
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating purchase order payment:", error);
@@ -3184,7 +3205,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/purchase-orders/:purchaseOrderId/payments/:paymentId", requireAuth, async (req, res) => {
     try {
       const paymentId = parseInt(req.params.paymentId);
+      
+      // Delete the corresponding transaction first
+      await storage.deleteTransactionByPurchaseOrderPaymentId(paymentId);
+      
+      // Then delete the payment
       await storage.deletePurchaseOrderPayment(paymentId);
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting purchase order payment:", error);
