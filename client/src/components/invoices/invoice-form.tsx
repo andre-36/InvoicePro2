@@ -40,7 +40,6 @@ const extendedInvoiceSchema = insertInvoiceSchema.extend({
   total: z.string().optional(),
   useFakturPajak: z.boolean().optional(),
   taxRate: z.string().optional(),
-  deliveryType: z.enum(['self_pickup', 'delivery', 'combination']).optional(),
   deliveryAddress: z.string().optional(),
   deliveryAddressLink: z.string().optional(),
 });
@@ -134,7 +133,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       paymentTerms: invoiceValues?.paymentTerms,
       notes: invoiceValues?.notes || '',
       useFakturPajak: invoiceValues?.useFakturPajak || false,
-      deliveryType: invoiceValues?.deliveryType || 'delivery',
       deliveryAddress: invoiceValues?.deliveryAddress || '',
       deliveryAddressLink: invoiceValues?.deliveryAddressLink || '',
       items: itemsArray.map(item => ({
@@ -300,7 +298,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         notes: "",
         useFakturPajak: false,
         taxRate: "11",
-        deliveryType: "delivery" as "self_pickup" | "delivery" | "combination",
         deliveryAddress: "",
         deliveryAddressLink: ""
       },
@@ -509,7 +506,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         total: (invoiceRecord.totalAmount ?? invoiceRecord.total ?? 0).toString(),
         useFakturPajak: invoiceRecord.useFakturPajak || false,
         taxRate: invoiceRecord.taxRate?.toString() || currentUser?.defaultTaxRate || "11",
-        deliveryType: invoiceRecord.deliveryType || "delivery",
         deliveryAddress: invoiceRecord.deliveryAddress || "",
         deliveryAddressLink: invoiceRecord.deliveryAddressLink || "",
       };
@@ -1211,58 +1207,24 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                   />
                 </div>
 
-                {/* Delivery Type Selection */}
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="invoice.deliveryType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipe Pengambilan</FormLabel>
-                        <Select
-                          value={field.value || "delivery"}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih tipe pengambilan" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="self_pickup">Self Pickup (Ambil Sendiri)</SelectItem>
-                            <SelectItem value="delivery">Delivery (Pengiriman)</SelectItem>
-                            <SelectItem value="combination">Combination (Sebagian Ambil, Sebagian Kirim)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {field.value === 'self_pickup' 
-                            ? 'Customer mengambil barang sendiri, tidak perlu surat jalan' 
-                            : 'Perlu membuat surat jalan (delivery note)'}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Delivery Address Section - for alternate delivery location */}
+                {/* Delivery Address Section - auto-filled from client, editable */}
                 <div className="mt-4 space-y-4">
                   <FormField
                     control={form.control}
                     name="invoice.deliveryAddress"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Alamat Pengiriman (Opsional)</FormLabel>
+                        <FormLabel>Alamat Pengiriman</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Masukkan alamat pengiriman jika berbeda dengan alamat client..."
+                            placeholder="Alamat pengiriman akan terisi otomatis dari data client..."
                             className="resize-none"
                             rows={2}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Isi jika barang dikirim ke alamat berbeda (contoh: lokasi proyek)
+                          Otomatis dari data client. Ubah jika pengiriman ke alamat berbeda. Pilih ulang client untuk reset.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1274,7 +1236,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                     name="invoice.deliveryAddressLink"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Link Google Maps (Opsional)</FormLabel>
+                        <FormLabel>Link Google Maps</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="https://maps.google.com/..."
@@ -1282,7 +1244,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           />
                         </FormControl>
                         <FormDescription>
-                          Link lokasi pengiriman di Google Maps
+                          Otomatis dari data client. Ubah jika lokasi pengiriman berbeda.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1334,6 +1296,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                                       value={`${client.clientNumber || ''} ${client.name}`}
                                       onSelect={() => {
                                         field.onChange(client.id);
+                                        form.setValue('invoice.deliveryAddress', client.address || '');
+                                        form.setValue('invoice.deliveryAddressLink', client.addressLink || '');
                                         setClientComboboxOpen(false);
                                       }}
                                       data-testid={`client-option-${client.id}`}

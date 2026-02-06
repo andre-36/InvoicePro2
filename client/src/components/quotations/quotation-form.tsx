@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -199,7 +199,9 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         discount: "0",
         totalAmount: "0",
         notes: "",
-        useFakturPajak: false
+        useFakturPajak: false,
+        deliveryAddress: "",
+        deliveryAddressLink: ""
       },
       items: items
     }
@@ -483,6 +485,8 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                                     value={`${client.clientNumber || ''} ${client.name}`}
                                     onSelect={() => {
                                       field.onChange(client.id);
+                                      form.setValue('quotation.deliveryAddress', client.address || '');
+                                      form.setValue('quotation.deliveryAddressLink', client.addressLink || '');
                                       setClientComboboxOpen(false);
                                     }}
                                     data-testid={`client-option-${client.id}`}
@@ -564,6 +568,52 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quotation.deliveryAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alamat Pengiriman</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Alamat pengiriman akan terisi otomatis dari data client..."
+                          className="resize-none"
+                          rows={2}
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Otomatis dari data client. Ubah jika pengiriman ke alamat berbeda. Pilih ulang client untuk reset.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quotation.deliveryAddressLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Link Google Maps</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://maps.google.com/..."
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Otomatis dari data client. Ubah jika lokasi pengiriman berbeda.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 

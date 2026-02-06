@@ -2713,27 +2713,12 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Invoice with ID ${deliveryNoteData.invoiceId} not found`);
       }
 
-      // Get all existing delivery numbers for this invoice
-      const existingDNs = await tx
-        .select({ deliveryNumber: deliveryNotes.deliveryNumber })
-        .from(deliveryNotes)
-        .where(eq(deliveryNotes.invoiceId, deliveryNoteData.invoiceId));
-      
-      // Parse sequences and find max in JavaScript
-      let maxSeq = 0;
-      for (const dn of existingDNs) {
-        const match = dn.deliveryNumber.match(/-(\d+)$/);
-        if (match) {
-          const seq = parseInt(match[1], 10);
-          if (seq > maxSeq) maxSeq = seq;
-        }
-      }
-      const sequence = maxSeq + 1;
-      
-      // Generate DN number: DN-{invoice_number_without_prefix}-{sequence}
-      // e.g., INV-2601-0003 -> DN-2601-0003-1
-      const invoiceNumberPart = invoice.invoice_number.replace(/^INV-/, '');
-      const deliveryNumber = `DN-${invoiceNumberPart}-${sequence}`;
+      // Generate DN number: DN-YYMM-XXXX (independent format)
+      const dnDate = deliveryNoteData.deliveryDate ? new Date(deliveryNoteData.deliveryDate) : new Date();
+      const dnYear = dnDate.getFullYear().toString().slice(-2);
+      const dnMonth = (dnDate.getMonth() + 1).toString().padStart(2, '0');
+      const dnYearMonth = dnYear + dnMonth;
+      const deliveryNumber = await generateNextNumber("DN", dnYearMonth, deliveryNotes, deliveryNotes.deliveryNumber, tx);
 
       const [newDeliveryNote] = await tx
         .insert(deliveryNotes)
@@ -3804,6 +3789,8 @@ export class DatabaseStorage implements IStorage {
           totalAmount: quotation.totalAmount,
           paperSize: quotation.paperSize,
           notes: quotation.notes,
+          deliveryAddress: quotation.deliveryAddress,
+          deliveryAddressLink: quotation.deliveryAddressLink,
         })
         .returning();
 

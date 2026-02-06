@@ -445,6 +445,8 @@ export const quotations = pgTable("quotations", {
   termsAndConditions: text("terms_and_conditions"),
   paperSize: paperSizeEnum("paper_size").default("a4"),
   notes: text("notes"),
+  deliveryAddress: text("delivery_address"),
+  deliveryAddressLink: text("delivery_address_link"),
   rejectionReason: text("rejection_reason"),
   createdByName: varchar("created_by_name", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),

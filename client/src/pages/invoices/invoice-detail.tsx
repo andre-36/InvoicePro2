@@ -770,15 +770,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               <div class="print-bill-to-label">Kepada</div>
               <div class="print-bill-to-name">${client?.name || 'N/A'}</div>
               <div class="print-bill-to-details">
-                ${client?.address ? `<div>${client.address}</div>` : ''}
+                ${invoice?.deliveryAddress 
+                  ? `<div>${invoice.deliveryAddress}</div>` 
+                  : (client?.address ? `<div>${client.address}</div>` : '')}
                 ${client?.phone ? `<div>Phone: ${client.phone}</div>` : ''}
               </div>
-              ${invoice?.deliveryAddress ? `
-                <div class="print-bill-to-details" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc;">
-                  <div style="font-weight: bold; font-size: 9px;">Alamat Pengiriman:</div>
-                  <div>${invoice.deliveryAddress}</div>
-                </div>
-              ` : ''}
+              <div style="margin-top: 3px; font-size: 9px; font-weight: bold;">
+                ${deliveryNote.deliveryType === 'self_pickup' ? '📦 DIAMBIL SENDIRI' : '🚚 PENGIRIMAN'}
+              </div>
             </div>
           </div>
           
@@ -1510,16 +1509,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       <Card>
         <Tabs defaultValue="details" className="w-full">
           <div className="border-b px-6 pt-6">
-            <TabsList className={`grid w-full ${invoice?.deliveryType === 'self_pickup' ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details">Invoice Details</TabsTrigger>
               <TabsTrigger value="payments">
                 Payments {invoicePayments.length > 0 && `(${invoicePayments.length})`}
               </TabsTrigger>
-              {invoice?.deliveryType !== 'self_pickup' && (
-                <TabsTrigger value="delivery">
-                  Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
-                </TabsTrigger>
-              )}
+              <TabsTrigger value="delivery">
+                Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -1569,27 +1566,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     <div className="flex justify-between md:justify-end md:flex-col">
                       <span className="text-sm font-medium text-gray-500 md:mb-1">Due Date:</span>
                       <span className="text-sm">{formatDate(invoice.dueDate)}</span>
-                    </div>
-                    <div className="flex justify-between md:justify-end md:flex-col">
-                      <span className="text-sm font-medium text-gray-500 md:mb-1">Delivery Type:</span>
-                      <select
-                        className="text-sm px-2 py-1 border rounded-md bg-white cursor-pointer hover:border-primary"
-                        value={invoice.deliveryType || 'delivery'}
-                        onChange={(e) => {
-                          if (window.confirm(
-                            invoice.status === 'paid' 
-                              ? 'Mengubah tipe pengiriman akan mempengaruhi stok. Lanjutkan?' 
-                              : 'Ubah tipe pengiriman?'
-                          )) {
-                            updateDeliveryTypeMutation.mutate(e.target.value);
-                          }
-                        }}
-                        disabled={invoice.isVoided || updateDeliveryTypeMutation.isPending}
-                      >
-                        <option value="delivery">Delivery</option>
-                        <option value="self_pickup">Self Pickup</option>
-                        <option value="combination">Combination</option>
-                      </select>
                     </div>
                     <div className="flex justify-between md:justify-end md:flex-col">
                       <span className="text-sm font-medium text-gray-500 md:mb-1">Payment Terms:</span>
@@ -1945,7 +1921,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </Dialog>
           </TabsContent>
 
-          {invoice?.deliveryType !== 'self_pickup' && (
           <TabsContent value="delivery" className="m-0 p-6">
             <div className="space-y-6">
               {/* Delivery Summary */}
@@ -2319,7 +2294,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               </DialogContent>
             </Dialog>
           </TabsContent>
-          )}
         </Tabs>
       </Card>
       </div>

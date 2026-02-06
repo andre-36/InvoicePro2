@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckCircle, XCircle, Clock, Truck, MapPin, FileText, Printer } from "lucide-react";
+import { Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckCircle, XCircle, Clock, Truck, MapPin, FileText, Printer, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -270,6 +270,7 @@ export default function DeliveryNotesPage() {
                   </TableHead>
                   <TableHead>No. Surat Jalan</TableHead>
                   <TableHead>Client</TableHead>
+                  <TableHead>Tipe</TableHead>
                   <TableHead>Alamat Pengiriman</TableHead>
                   <TableHead>Invoice</TableHead>
                   <TableHead>Tanggal</TableHead>
@@ -294,6 +295,15 @@ export default function DeliveryNotesPage() {
                     </TableCell>
                     <TableCell>
                       {note.invoice?.client?.name || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={note.deliveryType === 'self_pickup' ? 'outline' : 'secondary'} className="text-xs">
+                        {note.deliveryType === 'self_pickup' ? (
+                          <><Package className="h-3 w-3 mr-1" />Diambil</>
+                        ) : (
+                          <><Truck className="h-3 w-3 mr-1" />Dikirim</>
+                        )}
+                      </Badge>
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate" title={getDeliveryAddress(note)}>
                       <div className="flex items-center gap-1">
