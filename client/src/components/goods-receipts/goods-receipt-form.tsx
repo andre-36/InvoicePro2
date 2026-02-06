@@ -715,14 +715,21 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <fieldset disabled={isViewOnly} className="disabled:opacity-100">
           <Tabs defaultValue="details" className="space-y-6">
             <TabsList>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="items">Items</TabsTrigger>
+              {isViewOnly && (
+                <TabsTrigger value="payments">
+                  Payments {receiptPayments && receiptPayments.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{receiptPayments.length}</Badge>
+                  )}
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="details">
+              <fieldset disabled={isViewOnly} className="disabled:opacity-100">
               <Card>
                 <CardHeader>
                   <CardTitle>Receipt Information</CardTitle>
@@ -859,6 +866,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                   </div>
                 </CardContent>
               </Card>
+              </fieldset>
             </TabsContent>
 
             <TabsContent value="items">
@@ -991,26 +999,19 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                               />
                             </TableCell>
                             <TableCell className="p-1">
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                value={item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0
-                                  ? (parseFloat(item.unitCost) / (1 + parseFloat(item.taxRate || "0") / 100)).toFixed(2)
-                                  : item.unitCost} 
-                                onChange={(e) => {
-                                  if (item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0) {
-                                    const baseCost = parseFloat(e.target.value) || 0;
-                                    const inclCost = baseCost * (1 + parseFloat(item.taxRate || "0") / 100);
-                                    updateItem(index, 'unitCost', inclCost.toFixed(2));
-                                  } else {
-                                    updateItem(index, 'unitCost', e.target.value);
-                                  }
-                                }} 
-                                className={`h-8 text-right ${item.purchaseOrderId ? 'bg-muted' : ''}`}
-                                readOnly={!!item.purchaseOrderId}
-                              />
-                              {item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0 && (
-                                <p className="text-[10px] text-muted-foreground text-right mt-0.5">incl. tax: {formatCurrency(item.unitCost)}</p>
+                              {item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0 ? (
+                                <div className="h-8 flex items-center justify-end px-3 text-sm font-medium bg-muted rounded-md">
+                                  {formatCurrency((parseFloat(item.unitCost) / (1 + parseFloat(item.taxRate || "0") / 100)).toFixed(2))}
+                                </div>
+                              ) : (
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={item.unitCost} 
+                                  onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
+                                  className={`h-8 text-right ${item.purchaseOrderId ? 'bg-muted' : ''}`}
+                                  readOnly={!!item.purchaseOrderId}
+                                />
                               )}
                             </TableCell>
                             <TableCell className="p-1">
@@ -1169,87 +1170,86 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
               </Card>
             </TabsContent>
 
-          </Tabs>
-          </fieldset>
-
-          {isViewOnly && (
-            <div className="mt-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Payments</CardTitle>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { resetPaymentForm(); setEditingPayment(null); setPaymentDialogOpen(true); }} disabled={remainingBalance <= 0}>
-                    <Plus className="h-4 w-4 mr-2" /> Add Payment
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <div className="grid grid-cols-4 gap-4 text-center">
-                      <div>
-                        <p className="text-sm text-gray-600">Total Amount</p>
-                        <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Payments</p>
-                        <p className="text-xl font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+            {isViewOnly && (
+              <TabsContent value="payments">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Payments</CardTitle>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { resetPaymentForm(); setEditingPayment(null); setPaymentDialogOpen(true); }} disabled={remainingBalance <= 0}>
+                      <Plus className="h-4 w-4 mr-2" /> Add Payment
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                          <p className="text-sm text-gray-600">Total Amount</p>
+                          <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Payments</p>
+                          <p className="text-xl font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                        </div>
+                        {prepaidAmount > 0 && (
+                          <div>
+                            <p className="text-sm text-gray-600">Prepaid via PO</p>
+                            <p className="text-xl font-bold text-blue-600">{formatCurrency(prepaidAmount)}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm text-gray-600">Balance</p>
+                          <p className={cn("text-xl font-bold", remainingBalance > 0 ? "text-red-600" : "text-green-600")}>
+                            {formatCurrency(remainingBalance)}
+                          </p>
+                        </div>
                       </div>
                       {prepaidAmount > 0 && (
-                        <div>
-                          <p className="text-sm text-gray-600">Prepaid via PO</p>
-                          <p className="text-xl font-bold text-blue-600">{formatCurrency(prepaidAmount)}</p>
+                        <div className="mt-3 text-center">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                            Items from prepaid PO(s) - no additional payment required
+                          </Badge>
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm text-gray-600">Balance</p>
-                        <p className={cn("text-xl font-bold", remainingBalance > 0 ? "text-red-600" : "text-green-600")}>
-                          {formatCurrency(remainingBalance)}
-                        </p>
-                      </div>
                     </div>
-                    {prepaidAmount > 0 && (
-                      <div className="mt-3 text-center">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                          Items from prepaid PO(s) - no additional payment required
-                        </Badge>
+
+                    {receiptPayments && receiptPayments.length > 0 ? (
+                      <div className="space-y-3">
+                        {receiptPayments.map((payment) => (
+                          <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="p-2 bg-green-100 rounded-full">
+                                <DollarSign className="h-5 w-5 text-green-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                                <p className="text-sm text-gray-500">{payment.paymentType} - {format(new Date(payment.paymentDate), 'dd MMM yyyy')}</p>
+                                {payment.reference && <p className="text-xs text-gray-400">Ref: {payment.reference}</p>}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => openEditPayment(payment)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => deletePaymentMutation.mutate(payment.id)}>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p>No payments recorded yet</p>
+                        <p className="text-sm">Add a payment to track supplier payments</p>
                       </div>
                     )}
-                  </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
-                  {receiptPayments && receiptPayments.length > 0 ? (
-                    <div className="space-y-3">
-                      {receiptPayments.map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className="p-2 bg-green-100 rounded-full">
-                              <DollarSign className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                              <p className="text-sm text-gray-500">{payment.paymentType} - {format(new Date(payment.paymentDate), 'dd MMM yyyy')}</p>
-                              {payment.reference && <p className="text-xs text-gray-400">Ref: {payment.reference}</p>}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openEditPayment(payment)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => deletePaymentMutation.mutate(payment.id)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p>No payments recorded yet</p>
-                      <p className="text-sm">Add a payment to track supplier payments</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          </Tabs>
           <CardFooter className="flex justify-between pt-6">
             <Button type="button" variant="outline" onClick={() => navigate('/goods-receipts')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> {isViewOnly ? 'Back' : 'Cancel'}
