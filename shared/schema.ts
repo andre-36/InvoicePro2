@@ -692,6 +692,7 @@ export const goodsReceiptPayments = pgTable("goods_receipt_payments", {
   goodsReceiptId: integer("goods_receipt_id").references(() => goodsReceipts.id, { onDelete: 'cascade' }).notNull(),
   paymentDate: date("payment_date").notNull(),
   paymentType: varchar("payment_type", { length: 50 }).notNull(),
+  cashAccountId: integer("cash_account_id").references(() => cashAccounts.id, { onDelete: 'set null' }),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   reference: varchar("reference", { length: 100 }),
   notes: text("notes"),
@@ -700,7 +701,8 @@ export const goodsReceiptPayments = pgTable("goods_receipt_payments", {
 }, (table) => {
   return {
     goodsReceiptIdIdx: index("goods_receipt_payments_goods_receipt_id_idx").on(table.goodsReceiptId),
-    paymentDateIdx: index("goods_receipt_payments_payment_date_idx").on(table.paymentDate)
+    paymentDateIdx: index("goods_receipt_payments_payment_date_idx").on(table.paymentDate),
+    cashAccountIdIdx: index("goods_receipt_payments_cash_account_id_idx").on(table.cashAccountId)
   };
 });
 

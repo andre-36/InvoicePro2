@@ -3513,14 +3513,18 @@ export class DatabaseStorage implements IStorage {
 
       // Create expense transaction for this payment
       const paymentDateObj = new Date(payment.paymentDate || new Date());
-      await tx.insert(transactions).values({
+      const txData: any = {
         storeId: receipt.storeId,
         type: 'expense',
         amount: payment.amount.toString(),
         description: `Pembayaran GR ${receipt.receiptNumber}`,
         date: paymentDateObj.toISOString().split('T')[0],
-        goodsReceiptId: payment.goodsReceiptId
-      });
+        goodsReceiptId: payment.goodsReceiptId,
+      };
+      if (payment.cashAccountId) {
+        txData.accountId = payment.cashAccountId;
+      }
+      await tx.insert(transactions).values(txData);
 
       return newPayment;
     });

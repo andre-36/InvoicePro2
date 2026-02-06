@@ -8,7 +8,7 @@ import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, ChevronsUpDown, Che
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertGoodsReceiptSchema } from "@shared/schema";
-import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier } from "@shared/schema";
+import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier, CashAccount } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -146,7 +146,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
   const [editingPayment, setEditingPayment] = useState<GoodsReceiptPayment | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     paymentDate: format(new Date(), 'yyyy-MM-dd'),
-    paymentType: 'Cash',
+    paymentType: '',
+    cashAccountId: null as number | null,
     amount: '',
     reference: '',
     notes: ''
@@ -191,8 +192,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
     queryKey: ['/api/purchase-orders'],
   });
 
-  const { data: paymentTypes } = useQuery<{ id: number; name: string }[]>({
-    queryKey: ['/api/stores/1/payment-types'],
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ['/api/stores/1/cash-accounts'],
   });
 
   const hasExistingId = !!goodsReceiptId;
@@ -605,7 +606,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
   const resetPaymentForm = () => {
     setPaymentForm({
       paymentDate: format(new Date(), 'yyyy-MM-dd'),
-      paymentType: 'Cash',
+      paymentType: '',
+      cashAccountId: null,
       amount: '',
       reference: '',
       notes: ''
@@ -625,6 +627,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
     setPaymentForm({
       paymentDate: payment.paymentDate,
       paymentType: payment.paymentType,
+      cashAccountId: payment.cashAccountId || null,
       amount: String(payment.amount),
       reference: payment.reference || '',
       notes: payment.notes || ''
@@ -1282,14 +1285,18 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
               <Input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} className="mt-1" />
             </div>
             <div>
-              <label className="text-sm font-medium">Payment Type *</label>
-              <Select value={paymentForm.paymentType} onValueChange={(v) => setPaymentForm({ ...paymentForm, paymentType: v })}>
+              <label className="text-sm font-medium">Cash Account *</label>
+              <Select value={paymentForm.cashAccountId ? String(paymentForm.cashAccountId) : ''} onValueChange={(v) => {
+                const accountId = parseInt(v);
+                const account = cashAccounts?.find(a => a.id === accountId);
+                setPaymentForm({ ...paymentForm, cashAccountId: accountId, paymentType: account?.name || '' });
+              }}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select payment type" />
+                  <SelectValue placeholder="Select cash account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {paymentTypes?.map((pt) => (
-                    <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                  {cashAccounts?.map((account) => (
+                    <SelectItem key={account.id} value={String(account.id)}>{account.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

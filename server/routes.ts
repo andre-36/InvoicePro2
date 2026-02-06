@@ -3478,6 +3478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({
         paymentDate: z.string(),
         paymentType: z.string(),
+        cashAccountId: z.number().nullable().optional(),
         amount: z.union([z.string(), z.number()]),
         reference: z.string().optional(),
         notes: z.string().optional()
@@ -3521,6 +3522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             referenceNumber: `GR #${goodsReceipt.receiptNumber}`,
             goodsReceiptId: goodsReceiptId,
             goodsReceiptPaymentId: newPayment.id,
+            accountId: validatedData.cashAccountId || undefined,
           };
           
           console.log("Creating goods receipt payment transaction:", transactionData);
@@ -3541,6 +3543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({
         paymentDate: z.string().optional(),
         paymentType: z.string().optional(),
+        cashAccountId: z.number().nullable().optional(),
         amount: z.union([z.string(), z.number()]).optional(),
         reference: z.string().optional(),
         notes: z.string().optional()
