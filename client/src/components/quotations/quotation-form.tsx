@@ -7,6 +7,8 @@ import { useLocation } from "wouter";
 import { X, Save, Check, Plus, Trash2, ChevronsUpDown, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
 import { insertQuotationSchema } from "@shared/schema";
 import { QuotationItemRow } from "@/components/quotations/quotation-item-row";
 import { Button } from "@/components/ui/button";
@@ -249,7 +251,16 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     },
   });
 
-  // Client-side number generation is no longer needed since server generates numbers automatically
+  const { showDialog: showNavGuardDialog, confirmNavigation, cancelNavigation } = useUnsavedChangesGuard({
+    isDirty: () => {
+      const quotationValues = form.getValues('quotation');
+      const hasClient = quotationValues.clientId && quotationValues.clientId !== 0;
+      const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+      const hasMeaningfulData = hasClient || hasNonEmptyItems;
+      return hasUnsavedChanges() && hasMeaningfulData;
+    },
+    isSubmitting: mutation.isPending,
+  });
 
   // Load existing quotation data for editing
   useEffect(() => {
@@ -733,6 +744,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
           </Card>
         </form>
       </Form>
+      <UnsavedChangesDialog open={showNavGuardDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { useLocation } from "wouter";
 import { X, Save, Plus, Trash2, ArrowLeft, Package, ChevronsUpDown, Check, Edit, DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
 import { insertPurchaseOrderSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -586,6 +588,17 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
         variant: "destructive",
       });
     }
+  });
+
+  const { showDialog: showNavGuardDialog, confirmNavigation, cancelNavigation } = useUnsavedChangesGuard({
+    isDirty: () => {
+      const poValues = form.getValues('purchaseOrder');
+      const hasSupplier = poValues.supplierName && poValues.supplierName.trim() !== '';
+      const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+      const hasMeaningfulData = hasSupplier || hasNonEmptyItems;
+      return hasUnsavedChanges() && hasMeaningfulData;
+    },
+    isSubmitting: mutation.isPending,
   });
 
   // Add new item
@@ -1524,6 +1537,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
           </div>
         </form>
       </Form>
+      <UnsavedChangesDialog open={showNavGuardDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </div>
   );
 }

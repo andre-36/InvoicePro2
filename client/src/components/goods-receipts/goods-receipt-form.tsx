@@ -7,6 +7,8 @@ import { useLocation } from "wouter";
 import { X, Save, Plus, Trash2, ArrowLeft, DollarSign, Edit, ChevronsUpDown, Check, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
 import { insertGoodsReceiptSchema } from "@shared/schema";
 import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier, CashAccount } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -539,6 +541,16 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
     onError: (error) => {
       toast({ title: "Error", description: `Failed to update goods receipt: ${error.message}`, variant: "destructive" });
     }
+  });
+
+  const { showDialog: showNavGuardDialog, confirmNavigation, cancelNavigation } = useUnsavedChangesGuard({
+    isDirty: () => {
+      if (isViewOnly) return false;
+      const hasSupplier = !!form.getValues('supplierName');
+      const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+      return hasSupplier || hasNonEmptyItems;
+    },
+    isSubmitting: createMutation.isPending || updateMutation.isPending,
   });
 
   const invalidateTransactions = () => {
@@ -1327,6 +1339,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UnsavedChangesDialog open={showNavGuardDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </div>
   );
 }

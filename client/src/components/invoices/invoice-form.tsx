@@ -7,6 +7,8 @@ import { useLocation } from "wouter";
 import { X, Save, Check, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
 import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
 import type { InvoicePayment, Return } from "@shared/schema";
 import { InvoiceItemRow } from "@/components/invoices/invoice-item-row";
@@ -484,6 +486,17 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
         variant: "destructive",
       });
     }
+  });
+
+  const { showDialog: showNavGuardDialog, confirmNavigation, cancelNavigation } = useUnsavedChangesGuard({
+    isDirty: () => {
+      const invoiceData = form.getValues('invoice');
+      const hasClient = invoiceData.clientId && invoiceData.clientId !== 0;
+      const hasNonEmptyItems = items.some(item => item.description && item.description.trim() !== '');
+      const hasMeaningfulData = hasClient || hasNonEmptyItems;
+      return hasUnsavedChanges() && hasMeaningfulData;
+    },
+    isSubmitting: mutation.isPending || saveDraftMutation.isPending,
   });
 
   // Set up the form when data is loaded  
@@ -1788,6 +1801,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
           </AlertDialog>
         </form>
       </Form>
+      <UnsavedChangesDialog open={showNavGuardDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </div>
   );
 }
