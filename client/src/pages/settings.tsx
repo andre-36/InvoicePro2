@@ -1890,25 +1890,6 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-
-                    <FormField
-                      control={companyForm.control}
-                      name="defaultNotes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>General Fallback Notes</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="General fallback notes" 
-                              className="min-h-[100px]" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>Used if document-specific notes are empty</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end border-t p-6">
