@@ -2001,7 +2001,7 @@ export class DatabaseStorage implements IStorage {
             for (const batch of batches) {
               if (remainingToRestore <= 0) break;
 
-              const totalQty = parseFloat(batch.totalQuantity.toString());
+              const totalQty = parseFloat(batch.initialQuantity.toString());
               const remainingQty = parseFloat(batch.remainingQuantity.toString());
               const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
               
@@ -2311,15 +2311,11 @@ export class DatabaseStorage implements IStorage {
         await tx.insert(productBatches).values({
           productId: item.productId,
           storeId: invoice.storeId,
-          quantity: quantityToReturn.toString(),
+          batchNumber: `PICKUP-RETURN-INV-${invoice.invoiceNumber}`,
+          initialQuantity: quantityToReturn.toString(),
           remainingQuantity: quantityToReturn.toString(),
-          reservedQuantity: '0',
-          cost: unitCost.toString(),
-          baseCost: unitCost.toString(),
-          purchaseDate: new Date(),
-          batchReference: `PICKUP-RETURN-INV-${invoice.invoiceNumber}`,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          capitalCost: unitCost.toString(),
+          purchaseDate: new Date().toISOString().split('T')[0],
         });
       }
 
@@ -3036,7 +3032,7 @@ export class DatabaseStorage implements IStorage {
         for (const batch of batches) {
           if (remainingToRestore <= 0) break;
 
-          const totalQty = parseFloat(batch.totalQuantity.toString());
+          const totalQty = parseFloat(batch.initialQuantity.toString());
           const remainingQty = parseFloat(batch.remainingQuantity.toString());
           
           // How much can we restore to this batch? Up to its total quantity
@@ -3247,14 +3243,13 @@ export class DatabaseStorage implements IStorage {
               .limit(1);
 
             if (existingBatch) {
-              // Update existing batch with base quantity
-              const newQuantity = parseFloat(existingBatch.totalQuantity) + baseQuantity;
+              const newQuantity = parseFloat(existingBatch.initialQuantity) + baseQuantity;
               const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + baseQuantity;
 
               await tx
                 .update(productBatches)
                 .set({
-                  totalQuantity: newQuantity.toString(),
+                  initialQuantity: newQuantity.toString(),
                   remainingQuantity: newRemainingQuantity.toString(),
                   updatedAt: new Date()
                 })
@@ -3268,11 +3263,11 @@ export class DatabaseStorage implements IStorage {
                   productId: item.productId,
                   storeId: goodsReceiptData.storeId,
                   batchNumber: batchReference,
-                  purchaseDate: new Date(goodsReceiptData.receiptDate || new Date()),
-                  expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
-                  totalQuantity: baseQuantity.toString(),
+                  purchaseDate: typeof goodsReceiptData.receiptDate === 'string' ? goodsReceiptData.receiptDate : new Date().toISOString().split('T')[0],
+                  expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  initialQuantity: baseQuantity.toString(),
                   remainingQuantity: baseQuantity.toString(),
-                  costPrice: String(batchCost),
+                  capitalCost: String(batchCost),
                   notes: batchDescription
                 });
             }
@@ -3365,16 +3360,15 @@ export class DatabaseStorage implements IStorage {
         
         // Reduce the batch quantity
         const newRemaining = Math.max(0, parseFloat(batch.remainingQuantity) - baseQuantity);
-        const newTotal = Math.max(0, parseFloat(batch.totalQuantity) - baseQuantity);
+        const newTotal = Math.max(0, parseFloat(batch.initialQuantity) - baseQuantity);
 
         if (newTotal <= 0) {
-          // Delete the batch if no quantity remains
           await tx.delete(productBatches).where(eq(productBatches.id, batch.id));
         } else {
           await tx
             .update(productBatches)
             .set({
-              totalQuantity: newTotal.toString(),
+              initialQuantity: newTotal.toString(),
               remainingQuantity: newRemaining.toString(),
               updatedAt: new Date()
             })
@@ -4080,29 +4074,29 @@ export class DatabaseStorage implements IStorage {
             .limit(1);
 
           if (existingBatch) {
-            // Update existing batch
-            const newQuantity = parseFloat(existingBatch.totalQuantity) + item.quantityReceived;
+            const newQuantity = parseFloat(existingBatch.initialQuantity) + item.quantityReceived;
             const newRemainingQuantity = parseFloat(existingBatch.remainingQuantity) + item.quantityReceived;
 
             await tx
               .update(productBatches)
               .set({
-                totalQuantity: newQuantity.toString(),
+                initialQuantity: newQuantity.toString(),
                 remainingQuantity: newRemainingQuantity.toString(),
                 updatedAt: new Date()
               })
               .where(eq(productBatches.id, existingBatch.id));
           } else {
-            // Create new batch
             await tx
               .insert(productBatches)
               .values({
                 productId: poItem.productId,
+                storeId: purchaseOrder.storeId,
                 batchNumber: batchReference,
-                expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
-                totalQuantity: item.quantityReceived.toString(),
+                purchaseDate: new Date().toISOString().split('T')[0],
+                expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                initialQuantity: item.quantityReceived.toString(),
                 remainingQuantity: item.quantityReceived.toString(),
-                costPrice: poItem.unitCost,
+                capitalCost: poItem.unitCost,
                 notes: batchDescription
               });
           }

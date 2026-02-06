@@ -3309,15 +3309,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
       
-      // Ensure date fields are strings (drizzle-zod may coerce to Date objects)
+      // Convert all Date objects to strings (drizzle-zod coerces date columns to Date objects)
       const grData = { ...validatedData.goodsReceipt } as any;
-      if (grData.receiptDate instanceof Date) {
-        grData.receiptDate = grData.receiptDate.toISOString().split('T')[0];
+      for (const key of Object.keys(grData)) {
+        if (grData[key] instanceof Date) {
+          grData[key] = grData[key].toISOString().split('T')[0];
+        }
       }
-      if (grData.dueDate instanceof Date) {
-        grData.dueDate = grData.dueDate.toISOString().split('T')[0];
-      }
-      
       const newGoodsReceipt = await storage.createGoodsReceipt(
         grData,
         validatedData.items
