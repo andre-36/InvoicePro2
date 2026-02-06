@@ -3207,10 +3207,17 @@ export class DatabaseStorage implements IStorage {
     return withTransaction(async (tx) => {
       const receiptNumber = await this.getNextGoodsReceiptNumber(goodsReceiptData.receiptDate ? new Date(goodsReceiptData.receiptDate) : undefined);
 
-      const [newReceipt] = await tx.insert(goodsReceipts).values({
+      const receiptValues: any = {
         ...goodsReceiptData,
-        receiptNumber
-      }).returning();
+        receiptNumber,
+        receiptDate: goodsReceiptData.receiptDate instanceof Date 
+          ? goodsReceiptData.receiptDate.toISOString().split('T')[0] 
+          : goodsReceiptData.receiptDate,
+        dueDate: goodsReceiptData.dueDate instanceof Date 
+          ? goodsReceiptData.dueDate.toISOString().split('T')[0] 
+          : goodsReceiptData.dueDate,
+      };
+      const [newReceipt] = await tx.insert(goodsReceipts).values(receiptValues).returning();
 
       if (items && items.length > 0) {
         const hasReturns = items.some(item => parseFloat(String(item.returnQuantity || 0)) > 0);
