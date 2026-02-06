@@ -3226,8 +3226,13 @@ export class DatabaseStorage implements IStorage {
 
           // Update product stock by creating/updating product batch
           // Use baseQuantity if available (for multi-unit products), otherwise use quantity
+          // Subtract returnQuantity from stock added (returns reduce incoming stock)
           const itemAny = item as any;
-          const baseQuantity = parseFloat(String(itemAny.baseQuantity || item.quantity || 0));
+          const fullBaseQuantity = parseFloat(String(itemAny.baseQuantity || item.quantity || 0));
+          const returnQty = parseFloat(String(item.returnQuantity || 0));
+          const conversionFactor = itemAny.baseQuantity ? fullBaseQuantity / (parseFloat(String(item.quantity || 1)) || 1) : 1;
+          const baseReturnQty = returnQty * conversionFactor;
+          const baseQuantity = fullBaseQuantity - baseReturnQty;
           if (baseQuantity > 0) {
             const batchReference = `GR-${receiptNumber}-${item.productId}`;
             const batchDescription = `Received from GR ${receiptNumber}`;
@@ -3411,13 +3416,62 @@ export class DatabaseStorage implements IStorage {
 
   async updateGoodsReceiptItem(id: number, itemData: Partial<InsertGoodsReceiptItem>): Promise<GoodsReceiptItem> {
     return withTransaction(async (tx) => {
+      const [existingItem] = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.id, id));
+      if (!existingItem) {
+        throw new Error(`Goods Receipt Item with ID ${id} not found`);
+      }
+      
+      const oldReturnedQty = parseFloat(String(existingItem.returnedQuantity || 0));
+      const newReturnedQty = itemData.returnedQuantity !== undefined ? parseFloat(String(itemData.returnedQuantity)) : oldReturnedQty;
+      const returnedDiff = newReturnedQty - oldReturnedQty;
+      
+      const autoStatus = (() => {
+        const returnQty = parseFloat(String(itemData.returnQuantity || existingItem.returnQuantity || 0));
+        if (returnQty <= 0) return 'none' as const;
+        return newReturnedQty >= returnQty ? 'returned' as const : 'pending' as const;
+      })();
+      
       const [updatedItem] = await tx.update(goodsReceiptItems)
-        .set({ ...itemData, updatedAt: new Date() })
+        .set({ ...itemData, returnStatus: autoStatus, updatedAt: new Date() })
         .where(eq(goodsReceiptItems.id, id))
         .returning();
 
-      if (!updatedItem) {
-        throw new Error(`Goods Receipt Item with ID ${id} not found`);
+      if (returnedDiff !== 0) {
+        const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, existingItem.goodsReceiptId));
+        if (receipt) {
+          const itemAny = existingItem as any;
+          const fullBaseQty = parseFloat(String(itemAny.baseQuantity || existingItem.quantity || 0));
+          const itemQty = parseFloat(String(existingItem.quantity || 1)) || 1;
+          const conversionFactor = itemAny.baseQuantity ? fullBaseQty / itemQty : 1;
+          const baseReturnedDiff = returnedDiff * conversionFactor;
+          
+          const batchReference = `GR-${receipt.receiptNumber}-${existingItem.productId}`;
+          const [existingBatch] = await tx.select().from(productBatches)
+            .where(eq(productBatches.batchNumber, batchReference)).limit(1);
+          
+          if (existingBatch) {
+            const newRemaining = Math.max(0, parseFloat(existingBatch.remainingQuantity) + baseReturnedDiff);
+            const newInitial = Math.max(0, parseFloat(existingBatch.initialQuantity) + baseReturnedDiff);
+            await tx.update(productBatches).set({
+              remainingQuantity: newRemaining.toString(),
+              initialQuantity: newInitial.toString(),
+              updatedAt: new Date()
+            }).where(eq(productBatches.id, existingBatch.id));
+          } else if (returnedDiff > 0) {
+            const batchCost = itemAny.baseCost || existingItem.unitCost || '0';
+            await tx.insert(productBatches).values({
+              productId: existingItem.productId,
+              storeId: receipt.storeId,
+              batchNumber: `${batchReference}-RET`,
+              purchaseDate: new Date().toISOString().split('T')[0],
+              expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              initialQuantity: baseReturnedDiff.toString(),
+              remainingQuantity: baseReturnedDiff.toString(),
+              capitalCost: String(batchCost),
+              notes: `Returned stock from GR ${receipt.receiptNumber}`
+            });
+          }
+        }
       }
 
       const receiptItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, updatedItem.goodsReceiptId));

@@ -55,6 +55,7 @@ const goodsReceiptItemSchema = z.object({
   returnReason: z.string().optional(),
   returnStatus: z.enum(['none', 'pending', 'returned']).optional(),
   returnedQuantity: z.string().optional(),
+  isTaxInclusive: z.boolean().optional(),
 });
 
 type GoodsReceiptItem = z.infer<typeof goodsReceiptItemSchema>;
@@ -272,26 +273,30 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       });
 
       if (existingReceipt.items && existingReceipt.items.length > 0) {
-        setItems(existingReceipt.items.map((item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          purchaseOrderId: item.purchaseOrderId,
-          description: item.description,
-          quantity: String(item.quantity),
-          unitCost: String(item.unitCost),
-          taxRate: String(item.taxRate || 0),
-          taxAmount: String(item.taxAmount || 0),
-          discount: String(item.discount || 0),
-          subtotal: String(item.subtotal),
-          totalAmount: String(item.totalAmount),
-          returnQuantity: String(item.returnQuantity || 0),
-          returnReason: item.returnReason || "",
-          returnStatus: item.returnStatus || 'none',
-          returnedQuantity: String(item.returnedQuantity || 0),
-        })));
+        setItems(existingReceipt.items.map((item: any) => {
+          const linkedPO = purchaseOrders?.find((po: any) => po.id === item.purchaseOrderId);
+          return {
+            id: item.id,
+            productId: item.productId,
+            purchaseOrderId: item.purchaseOrderId,
+            description: item.description,
+            quantity: String(item.quantity),
+            unitCost: String(item.unitCost),
+            taxRate: String(item.taxRate || 0),
+            taxAmount: String(item.taxAmount || 0),
+            discount: String(item.discount || 0),
+            subtotal: String(item.subtotal),
+            totalAmount: String(item.totalAmount),
+            returnQuantity: String(item.returnQuantity || 0),
+            returnReason: item.returnReason || "",
+            returnStatus: item.returnStatus || 'none',
+            returnedQuantity: String(item.returnedQuantity || 0),
+            isTaxInclusive: linkedPO?.useFakturPajak || false,
+          };
+        }));
       }
     }
-  }, [existingReceipt, form]);
+  }, [existingReceipt, form, purchaseOrders]);
 
   const calculateItemTotals = (item: GoodsReceiptItem): GoodsReceiptItem => {
     const qty = parseFloat(item.quantity) || 0;
@@ -299,8 +304,19 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
     const taxRate = parseFloat(item.taxRate || "0") || 0;
     const discount = parseFloat(item.discount || "0") || 0;
     
-    const subtotal = qty * cost;
-    const taxAmount = subtotal * (taxRate / 100);
+    let subtotal: number;
+    let taxAmount: number;
+    
+    if (item.isTaxInclusive && taxRate > 0) {
+      const totalBeforeDiscount = qty * cost;
+      const baseCostPerUnit = cost / (1 + taxRate / 100);
+      subtotal = qty * baseCostPerUnit;
+      taxAmount = totalBeforeDiscount - subtotal;
+    } else {
+      subtotal = qty * cost;
+      taxAmount = subtotal * (taxRate / 100);
+    }
+    
     const total = subtotal + taxAmount - discount;
 
     return {
@@ -449,7 +465,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
         baseCost: poBaseCost,
         baseQuantity: baseQuantity.toFixed(2),
         conversionFactor: conversionFactor.toString(),
-        taxRate: po.useFakturPajak ? "11" : "0" // 11% PPN if using Faktur Pajak
+        taxRate: po.useFakturPajak ? "11" : "0",
+        isTaxInclusive: !!po.useFakturPajak,
       };
     } else {
       updatedItems[index] = {
@@ -459,7 +476,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
         baseCost: null,
         baseQuantity: null,
         conversionFactor: "1",
-        taxRate: "0"
+        taxRate: "0",
+        isTaxInclusive: false,
       };
     }
     updatedItems[index] = calculateItemTotals(updatedItems[index]);
@@ -1006,27 +1024,32 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                         <TableBody>
                           {items.filter(item => parseFloat(item.returnQuantity || "0") > 0).map((item, idx) => {
                             const originalIndex = items.findIndex(i => i === item);
+                            const returnQty = parseFloat(item.returnQuantity || "0");
+                            const returnedQty = parseFloat(item.returnedQuantity || "0");
+                            const autoStatus = returnedQty >= returnQty ? "Returned" : "Return Pending";
                             return (
                               <TableRow key={idx}>
                                 <TableCell>{item.description}</TableCell>
                                 <TableCell className="text-right">{item.returnQuantity}</TableCell>
                                 <TableCell>
-                                  <Select value={item.returnStatus || 'pending'} onValueChange={(v) => updateItem(originalIndex, 'returnStatus', v as any)}>
-                                    <SelectTrigger className="h-8">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="pending">Pending</SelectItem>
-                                      <SelectItem value="returned">Returned</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <span className={`text-xs px-2 py-1 rounded ${returnedQty >= returnQty ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                    {autoStatus}
+                                  </span>
                                 </TableCell>
                                 <TableCell>
                                   <Input 
                                     type="number" 
-                                    step="0.01" 
+                                    step="1" 
+                                    min="0"
+                                    max={item.returnQuantity}
                                     value={item.returnedQuantity} 
-                                    onChange={(e) => updateItem(originalIndex, 'returnedQuantity', e.target.value)} 
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      updateItem(originalIndex, 'returnedQuantity', val);
+                                      const returned = parseFloat(val || "0");
+                                      const rqty = parseFloat(item.returnQuantity || "0");
+                                      updateItem(originalIndex, 'returnStatus', returned >= rqty ? 'returned' : 'pending');
+                                    }} 
                                     className="h-8 text-right w-16" 
                                   />
                                 </TableCell>
@@ -1049,7 +1072,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                             <span className="text-gray-500">Return:</span>
                             <Input 
                               type="number" 
-                              step="0.01" 
+                              step="1" 
+                              min="0"
                               value={item.returnQuantity} 
                               onChange={(e) => {
                                 updateItem(index, 'returnQuantity', e.target.value);
