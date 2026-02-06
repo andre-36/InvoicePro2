@@ -112,13 +112,15 @@ interface GoodsReceiptData {
 interface GoodsReceiptFormProps {
   goodsReceiptId?: number;
   onSuccess?: () => void;
+  mode?: 'create' | 'edit' | 'view';
 }
 
-export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsReceiptFormProps) {
+export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goodsReceiptId ? 'edit' : 'create' }: GoodsReceiptFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const isEditing = !!goodsReceiptId;
+  const isEditing = mode === 'edit';
+  const isViewOnly = mode === 'view';
   
   const [items, setItems] = useState<GoodsReceiptItem[]>([{
     productId: 0,
@@ -296,7 +298,29 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
         }));
       }
     }
-  }, [existingReceipt, form, purchaseOrders]);
+  }, [existingReceipt, form]);
+
+  useEffect(() => {
+    if (purchaseOrders && purchaseOrders.length > 0 && items.length > 0) {
+      let changed = false;
+      const updatedItems = items.map(item => {
+        if (item.purchaseOrderId) {
+          const linkedPO = purchaseOrders.find((po: any) => po.id === item.purchaseOrderId);
+          const shouldBeTaxInclusive = !!linkedPO?.useFakturPajak;
+          if (item.isTaxInclusive !== shouldBeTaxInclusive) {
+            changed = true;
+            const updated = { ...item, isTaxInclusive: shouldBeTaxInclusive };
+            return calculateItemTotals(updated);
+          }
+        }
+        return item;
+      });
+      if (changed) {
+        setItems(updatedItems);
+        updateFormTotals(updatedItems);
+      }
+    }
+  }, [purchaseOrders]);
 
   const calculateItemTotals = (item: GoodsReceiptItem): GoodsReceiptItem => {
     const qty = parseFloat(item.quantity) || 0;
@@ -671,12 +695,18 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEditing ? `Edit Goods Receipt` : 'New Goods Receipt'}
+            {isViewOnly 
+              ? `Goods Receipt` 
+              : isEditing 
+                ? `Edit Goods Receipt` 
+                : 'New Goods Receipt'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {isEditing 
-              ? `Editing receipt ${existingReceipt?.goodsReceipt?.receiptNumber}` 
-              : `Receipt Number: ${nextReceiptNumberData?.receiptNumber || '...'}`}
+            {isViewOnly
+              ? existingReceipt?.goodsReceipt?.receiptNumber || ''
+              : isEditing 
+                ? `Editing receipt ${existingReceipt?.goodsReceipt?.receiptNumber}` 
+                : `Receipt Number: ${nextReceiptNumberData?.receiptNumber || '...'}`}
           </p>
         </div>
       </div>
@@ -1045,10 +1075,16 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
                                     value={item.returnedQuantity} 
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      updateItem(originalIndex, 'returnedQuantity', val);
                                       const returned = parseFloat(val || "0");
                                       const rqty = parseFloat(item.returnQuantity || "0");
-                                      updateItem(originalIndex, 'returnStatus', returned >= rqty ? 'returned' : 'pending');
+                                      const newStatus = returned >= rqty ? 'returned' : 'pending';
+                                      const updatedItems = [...items];
+                                      updatedItems[originalIndex] = { 
+                                        ...updatedItems[originalIndex], 
+                                        returnedQuantity: val, 
+                                        returnStatus: newStatus as any 
+                                      };
+                                      setItems(updatedItems);
                                     }} 
                                     className="h-8 text-right w-16" 
                                   />
