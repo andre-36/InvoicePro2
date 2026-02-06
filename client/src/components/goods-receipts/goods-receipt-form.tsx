@@ -720,11 +720,6 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
             <TabsList>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="items">Items</TabsTrigger>
-              <TabsTrigger value="payments" disabled={!hasExistingId}>
-                Payments {receiptPayments && receiptPayments.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">{receiptPayments.length}</Badge>
-                )}
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
@@ -999,11 +994,24 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                               <Input 
                                 type="number" 
                                 step="0.01" 
-                                value={item.unitCost} 
-                                onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
+                                value={item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0
+                                  ? (parseFloat(item.unitCost) / (1 + parseFloat(item.taxRate || "0") / 100)).toFixed(2)
+                                  : item.unitCost} 
+                                onChange={(e) => {
+                                  if (item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0) {
+                                    const baseCost = parseFloat(e.target.value) || 0;
+                                    const inclCost = baseCost * (1 + parseFloat(item.taxRate || "0") / 100);
+                                    updateItem(index, 'unitCost', inclCost.toFixed(2));
+                                  } else {
+                                    updateItem(index, 'unitCost', e.target.value);
+                                  }
+                                }} 
                                 className={`h-8 text-right ${item.purchaseOrderId ? 'bg-muted' : ''}`}
                                 readOnly={!!item.purchaseOrderId}
                               />
+                              {item.isTaxInclusive && parseFloat(item.taxRate || "0") > 0 && (
+                                <p className="text-[10px] text-muted-foreground text-right mt-0.5">incl. tax: {formatCurrency(item.unitCost)}</p>
+                              )}
                             </TableCell>
                             <TableCell className="p-1">
                               <Input 
@@ -1161,7 +1169,11 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
               </Card>
             </TabsContent>
 
-            <TabsContent value="payments">
+          </Tabs>
+          </fieldset>
+
+          {isViewOnly && (
+            <div className="mt-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Payments</CardTitle>
@@ -1236,10 +1248,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-
-          </Tabs>
-          </fieldset>
+            </div>
+          )}
           <CardFooter className="flex justify-between pt-6">
             <Button type="button" variant="outline" onClick={() => navigate('/goods-receipts')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> {isViewOnly ? 'Back' : 'Cancel'}
