@@ -1264,12 +1264,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       {client.phone && <div>Phone: {client.phone}</div>}
                     </div>
                   )}
-                  {invoice.deliveryAddress && (
-                    <div className="print-bill-to-details" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ccc' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '10px' }}>Alamat Pengiriman:</div>
-                      <div>{invoice.deliveryAddress}</div>
-                    </div>
-                  )}
                 </div>
               </div>
               
@@ -1327,6 +1321,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     <span className="print-doc-label">Page</span>
                     <span className="print-doc-value">{pageIndex + 1}/{totalPages}</span>
                   </div>
+                  {invoice.deliveryAddress && invoice.deliveryAddress !== client?.address && (
+                    <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #ccc', fontSize: '8pt', lineHeight: '1.3' }}>
+                      <span style={{ fontWeight: 'bold' }}>Alamat Pengiriman:</span>
+                      <div>{invoice.deliveryAddress}</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
