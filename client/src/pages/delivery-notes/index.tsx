@@ -299,9 +299,9 @@ export default function DeliveryNotesPage() {
                     <TableCell>
                       <Badge variant={note.deliveryType === 'self_pickup' ? 'outline' : 'secondary'} className="text-xs">
                         {note.deliveryType === 'self_pickup' ? (
-                          <><Package className="h-3 w-3 mr-1" />Diambil</>
+                          <><Package className="h-3 w-3 mr-1" />Self Pickup</>
                         ) : (
-                          <><Truck className="h-3 w-3 mr-1" />Dikirim</>
+                          <><Truck className="h-3 w-3 mr-1" />Delivery</>
                         )}
                       </Badge>
                     </TableCell>

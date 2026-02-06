@@ -775,9 +775,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   : (client?.address ? `<div>${client.address}</div>` : '')}
                 ${client?.phone ? `<div>Phone: ${client.phone}</div>` : ''}
               </div>
-              <div style="margin-top: 3px; font-size: 9px; font-weight: bold;">
-                ${deliveryNote.deliveryType === 'self_pickup' ? '📦 DIAMBIL SENDIRI' : '🚚 PENGIRIMAN'}
-              </div>
             </div>
           </div>
           
@@ -808,6 +805,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               <div class="print-doc-row">
                 <span class="print-doc-label">Page</span>
                 <span>${pageIdx + 1}/${totalPages}</span>
+              </div>
+              <div class="print-doc-row" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #ccc;">
+                <span class="print-doc-label">Tipe</span>
+                <span style="font-weight: bold;">${deliveryNote.deliveryType === 'self_pickup' ? 'Self Pickup' : 'Delivery'}</span>
               </div>
             </div>
           </div>
@@ -1997,7 +1998,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                             <TableCell>{formatDate(dn.deliveryDate)}</TableCell>
                             <TableCell>
                               <Badge variant={dn.deliveryType === 'self_pickup' ? 'outline' : 'secondary'}>
-                                {dn.deliveryType === 'self_pickup' ? 'Diambil' : 'Dikirim'}
+                                {dn.deliveryType === 'self_pickup' ? 'Self Pickup' : 'Delivery'}
                               </Badge>
                             </TableCell>
                             <TableCell>{dn.driverName || '-'}</TableCell>
@@ -2091,8 +2092,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       value={deliveryForm.deliveryType}
                       onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryType: e.target.value as 'delivered' | 'self_pickup' })}
                     >
-                      <option value="delivered">Dikirim</option>
-                      <option value="self_pickup">Diambil Sendiri</option>
+                      <option value="delivered">Delivery</option>
+                      <option value="self_pickup">Self Pickup</option>
                     </select>
                   </div>
 
@@ -2220,8 +2221,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       value={editDeliveryForm.deliveryType}
                       onChange={(e) => setEditDeliveryForm({ ...editDeliveryForm, deliveryType: e.target.value as 'delivered' | 'self_pickup' })}
                     >
-                      <option value="delivered">Dikirim</option>
-                      <option value="self_pickup">Diambil Sendiri</option>
+                      <option value="delivered">Delivery</option>
+                      <option value="self_pickup">Self Pickup</option>
                     </select>
                   </div>
 
