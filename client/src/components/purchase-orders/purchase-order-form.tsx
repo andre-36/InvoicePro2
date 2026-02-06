@@ -1151,7 +1151,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                 <table className="min-w-full">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '30px' }}>#</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '45%' }}>Product</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style={{ width: '120px' }}>Qty</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style={{ width: '80px' }}>Unit</th>

@@ -527,17 +527,23 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
       return;
     }
 
+    if (!paymentForm.cashAccountId) {
+      toast({
+        title: "Error",
+        description: "Cash Account is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const data: any = {
       purchaseOrderId: id,
       paymentDate: paymentForm.paymentDate,
-      paymentType: paymentForm.paymentType,
+      paymentType: 'PO Prepaid',
       amount: paymentForm.amount,
       notes: paymentForm.notes || null,
+      cashAccountId: parseInt(paymentForm.cashAccountId),
     };
-
-    if (paymentForm.cashAccountId) {
-      data.cashAccountId = parseInt(paymentForm.cashAccountId);
-    }
 
     createPaymentMutation.mutate(data);
   };
@@ -937,9 +943,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Date
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
-                        </th>
                         <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Amount
                         </th>
@@ -960,7 +963,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.paymentType}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
                             {formatCurrency(parseFloat(payment.amount))}
                           </td>
@@ -1003,16 +1005,6 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Type</label>
-                      <Input
-                        type="text"
-                        value={paymentForm.paymentType}
-                        onChange={(e) => setPaymentForm({ ...paymentForm, paymentType: e.target.value })}
-                        placeholder="e.g., Cash, Bank Transfer"
-                        data-testid="input-payment-type"
-                      />
-                    </div>
-                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                       <div className="flex gap-2">
                         <Input
@@ -1034,13 +1026,13 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Cash Account</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cash Account *</label>
                       <Select
                         value={paymentForm.cashAccountId}
                         onValueChange={(value) => setPaymentForm({ ...paymentForm, cashAccountId: value })}
                       >
                         <SelectTrigger data-testid="select-cash-account">
-                          <SelectValue placeholder="Select cash account (optional)" />
+                          <SelectValue placeholder="Select cash account" />
                         </SelectTrigger>
                         <SelectContent>
                           {cashAccounts?.filter(ca => ca.isActive).map((account) => (

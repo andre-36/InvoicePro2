@@ -610,19 +610,6 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
 
   const totalPaid = (receiptPayments || []).reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const totalAmount = parseFloat(form.watch("totalAmount") || "0");
-  
-  // Calculate prepaid amounts from PO payments for items from prepaid POs
-  const prepaidAmount = items.reduce((sum, item) => {
-    if (!item.purchaseOrderId) return sum;
-    const status = getPrepaidStatus(item.purchaseOrderId);
-    if (status.isPrepaid && status.isFullyPaid) {
-      return sum + parseFloat(item.totalAmount || "0");
-    }
-    return sum;
-  }, 0);
-  
-  const totalPaidIncludingPrepaid = totalPaid + prepaidAmount;
-  const remainingBalance = totalAmount - totalPaidIncludingPrepaid;
 
   const getPOName = (poId: number | null | undefined) => {
     if (!poId) return null;
@@ -644,6 +631,19 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
       isFullyPaid: status?.isFullyPaid || false
     };
   };
+
+  // Calculate prepaid amounts from PO payments for items from prepaid POs
+  const prepaidAmount = items.reduce((sum, item) => {
+    if (!item.purchaseOrderId) return sum;
+    const status = getPrepaidStatus(item.purchaseOrderId);
+    if (status.isPrepaid && status.isFullyPaid) {
+      return sum + parseFloat(item.totalAmount || "0");
+    }
+    return sum;
+  }, 0);
+  
+  const totalPaidIncludingPrepaid = totalPaid + prepaidAmount;
+  const remainingBalance = totalAmount - totalPaidIncludingPrepaid;
 
   return (
     <div className="space-y-6">
