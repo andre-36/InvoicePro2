@@ -65,6 +65,8 @@ export const stores = pgTable("stores", {
   isActive: boolean("is_active").default(true).notNull(),
   invoicePaymentCategoryId: integer("invoice_payment_category_id"),
   goodsReceiptPaymentCategoryId: integer("goods_receipt_payment_category_id"),
+  defaultPaymentTypeId: integer("default_payment_type_id"),
+  defaultPaymentTermId: integer("default_payment_term_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });

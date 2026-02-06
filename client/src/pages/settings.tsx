@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText, Wallet, ArrowLeftRight, Users } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText, Wallet, ArrowLeftRight, Users, Star } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -189,6 +189,8 @@ type Store = {
   name: string;
   invoicePaymentCategoryId: number | null;
   goodsReceiptPaymentCategoryId: number | null;
+  defaultPaymentTypeId: number | null;
+  defaultPaymentTermId: number | null;
 };
 
 type UserData = {
@@ -379,6 +381,11 @@ export default function SettingsPage() {
   // Fetch user data
   const { data: userData, isLoading } = useQuery<UserData>({
     queryKey: ['/api/user'],
+  });
+
+  // Fetch store data for defaults
+  const { data: storeData } = useQuery<Store>({
+    queryKey: ['/api/stores/1'],
   });
 
   // Fetch payment types and terms
@@ -730,6 +737,33 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete payment term", variant: "destructive" });
+    }
+  });
+
+  // Set default payment type/term mutations
+  const setDefaultPaymentTypeMutation = useMutation({
+    mutationFn: async (paymentTypeId: number | null) => {
+      return apiRequest('PUT', '/api/stores/1', { defaultPaymentTypeId: paymentTypeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      toast({ title: "Success", description: "Default payment type updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update default payment type", variant: "destructive" });
+    }
+  });
+
+  const setDefaultPaymentTermMutation = useMutation({
+    mutationFn: async (paymentTermId: number | null) => {
+      return apiRequest('PUT', '/api/stores/1', { defaultPaymentTermId: paymentTermId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      toast({ title: "Success", description: "Default payment term updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update default payment term", variant: "destructive" });
     }
   });
 
@@ -1919,13 +1953,16 @@ export default function SettingsPage() {
                         <div
                           key={type.id}
                           onClick={() => setSelectedTypeId(type.id)}
-                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                          className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between ${
                             selectedTypeId === type.id
                               ? 'bg-primary text-primary-foreground'
                               : 'hover:bg-muted'
                           }`}
                         >
-                          {type.name}
+                          <span>{type.name}</span>
+                          {storeData?.defaultPaymentTypeId === type.id && (
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1937,6 +1974,21 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedTypeId) {
+                        const isAlreadyDefault = storeData?.defaultPaymentTypeId === selectedTypeId;
+                        setDefaultPaymentTypeMutation.mutate(isAlreadyDefault ? null : selectedTypeId);
+                      }
+                    }}
+                    disabled={!selectedTypeId}
+                    className="gap-2"
+                  >
+                    <Star className={`h-4 w-4 ${storeData?.defaultPaymentTypeId === selectedTypeId ? 'fill-yellow-400 text-yellow-400' : 'text-yellow-600'}`} />
+                    {storeData?.defaultPaymentTypeId === selectedTypeId ? 'Unset Default' : 'Set as Default'}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1984,13 +2036,16 @@ export default function SettingsPage() {
                         <div
                           key={term.id}
                           onClick={() => setSelectedTermId(term.id)}
-                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                          className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between ${
                             selectedTermId === term.id
                               ? 'bg-primary text-primary-foreground'
                               : 'hover:bg-muted'
                           }`}
                         >
-                          {term.name}
+                          <span>{term.name}</span>
+                          {storeData?.defaultPaymentTermId === term.id && (
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2002,6 +2057,21 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedTermId) {
+                        const isAlreadyDefault = storeData?.defaultPaymentTermId === selectedTermId;
+                        setDefaultPaymentTermMutation.mutate(isAlreadyDefault ? null : selectedTermId);
+                      }
+                    }}
+                    disabled={!selectedTermId}
+                    className="gap-2"
+                  >
+                    <Star className={`h-4 w-4 ${storeData?.defaultPaymentTermId === selectedTermId ? 'fill-yellow-400 text-yellow-400' : 'text-yellow-600'}`} />
+                    {storeData?.defaultPaymentTermId === selectedTermId ? 'Unset Default' : 'Set as Default'}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

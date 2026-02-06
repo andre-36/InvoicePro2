@@ -198,6 +198,11 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Check if there are active (non-cancelled) delivery notes
   const hasActiveDeliveryNotes = invoiceId && deliveryNotes.some(dn => dn.status !== 'cancelled');
   
+  // Fetch store data for defaults
+  const { data: storeData } = useQuery<any>({
+    queryKey: ['/api/stores/1'],
+  });
+
   // Fetch current user for default notes and tax rate
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
@@ -340,6 +345,19 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     
     return date;
   };
+
+  // Set default payment term from store settings for new invoices
+  useEffect(() => {
+    if (!invoiceId && storeData?.defaultPaymentTermId && paymentTermsData.length > 0) {
+      const defaultTerm = paymentTermsData.find(t => t.id === storeData.defaultPaymentTermId);
+      if (defaultTerm) {
+        const currentTerms = form.getValues('invoice.paymentTerms');
+        if (currentTerms === 'net_30' || !currentTerms) {
+          form.setValue('invoice.paymentTerms', defaultTerm.code);
+        }
+      }
+    }
+  }, [storeData, paymentTermsData, invoiceId]);
 
   // Watch for changes to issueDate and paymentTerms to auto-update dueDate
   const watchIssueDate = form.watch('invoice.issueDate');
