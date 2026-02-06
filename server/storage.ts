@@ -4277,7 +4277,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(eq(transactions.storeId, storeId))
-      .orderBy(desc(transactions.date));
+      .orderBy(desc(transactions.createdAt), desc(transactions.id));
   }
 
   async getTransactionsByType(storeId: number, type: string): Promise<Transaction[]> {
@@ -4290,7 +4290,7 @@ export class DatabaseStorage implements IStorage {
           eq(transactions.type, type as any)
         )
       )
-      .orderBy(desc(transactions.date));
+      .orderBy(desc(transactions.createdAt), desc(transactions.id));
   }
 
   async createTransaction(transactionData: InsertTransaction): Promise<Transaction> {

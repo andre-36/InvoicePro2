@@ -3321,6 +3321,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.items
       );
       
+      // Check if items are fully covered by prepaid PO payments — if so, mark as paid
+      const items = validatedData.items;
+      const uniquePOIds = [...new Set(items.filter(i => i.purchaseOrderId).map(i => i.purchaseOrderId!))];
+      
+      if (uniquePOIds.length > 0) {
+        let prepaidTotal = 0;
+        for (const poId of uniquePOIds) {
+          const po = await storage.getPurchaseOrder(poId);
+          if (po && po.isPrepaid) {
+            const poPaidAmount = await storage.getPurchaseOrderPaidAmount(poId);
+            const poTotal = parseFloat(po.totalAmount);
+            if (poPaidAmount >= poTotal) {
+              // PO is fully paid — sum up GR items from this PO
+              for (const item of items) {
+                if (item.purchaseOrderId === poId) {
+                  prepaidTotal += parseFloat(String(item.totalAmount || 0));
+                }
+              }
+            }
+          }
+        }
+        
+        const grTotal = parseFloat(String(newGoodsReceipt.totalAmount));
+        const grPaid = parseFloat(String(newGoodsReceipt.amountPaid || 0));
+        if (prepaidTotal + grPaid >= grTotal) {
+          await storage.updateGoodsReceipt(newGoodsReceipt.id, { status: 'paid' as any });
+          const updated = await storage.getGoodsReceipt(newGoodsReceipt.id);
+          if (updated) {
+            return res.status(201).json(updated);
+          }
+        }
+      }
+      
       res.status(201).json(newGoodsReceipt);
     } catch (error) {
       console.error("Error creating goods receipt:", error);

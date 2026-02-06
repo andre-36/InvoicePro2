@@ -361,7 +361,10 @@ export default function TransactionsPage() {
                   {transactions.map((transaction) => (
                     <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
                       <TableCell className="font-medium">
-                        {format(new Date(transaction.date), 'MMM dd, yyyy')}
+                        <div>{format(new Date(transaction.date), 'MMM dd, yyyy')}</div>
+                        {transaction.createdAt && (
+                          <div className="text-xs text-gray-500">{format(new Date(transaction.createdAt), 'HH:mm')}</div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge 

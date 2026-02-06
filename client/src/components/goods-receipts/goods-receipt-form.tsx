@@ -1102,7 +1102,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess }: GoodsRec
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Payments</CardTitle>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { resetPaymentForm(); setEditingPayment(null); setPaymentDialogOpen(true); }}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { resetPaymentForm(); setEditingPayment(null); setPaymentDialogOpen(true); }} disabled={remainingBalance <= 0}>
                     <Plus className="h-4 w-4 mr-2" /> Add Payment
                   </Button>
                 </CardHeader>
