@@ -195,19 +195,21 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
     queryKey: ['/api/stores/1/payment-types'],
   });
 
+  const hasExistingId = !!goodsReceiptId;
+
   const { data: existingReceipt } = useQuery<GoodsReceiptData>({
     queryKey: ['/api/goods-receipts', goodsReceiptId],
-    enabled: isEditing,
+    enabled: hasExistingId,
   });
 
   const { data: nextReceiptNumberData } = useQuery<{ receiptNumber: string }>({
     queryKey: ['/api/goods-receipts/next-number'],
-    enabled: !isEditing,
+    enabled: !hasExistingId,
   });
 
   const { data: receiptPayments, refetch: refetchPayments } = useQuery<GoodsReceiptPayment[]>({
     queryKey: ['/api/goods-receipts', goodsReceiptId, 'payments'],
-    enabled: isEditing,
+    enabled: hasExistingId,
   });
 
   // Fetch payment status for all prepaid POs (for dropdown and selected items)
@@ -713,11 +715,12 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
+          <fieldset disabled={isViewOnly} className="disabled:opacity-100">
           <Tabs defaultValue="details" className="space-y-6">
             <TabsList>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="items">Items</TabsTrigger>
-              <TabsTrigger value="payments" disabled={!isEditing}>
+              <TabsTrigger value="payments" disabled={!hasExistingId}>
                 Payments {receiptPayments && receiptPayments.length > 0 && (
                   <Badge variant="secondary" className="ml-2">{receiptPayments.length}</Badge>
                 )}
@@ -831,7 +834,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                       />
 
                       {/* Payment Status - Calculated automatically */}
-                      {isEditing && (
+                      {hasExistingId && (
                         <div>
                           <FormLabel>Status Pembayaran</FormLabel>
                           <div className="mt-2">
@@ -1235,16 +1238,25 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
               </Card>
             </TabsContent>
 
-            <CardFooter className="flex justify-between pt-6">
-              <Button type="button" variant="outline" onClick={() => navigate('/goods-receipts')}>
-                <X className="mr-2 h-4 w-4" /> Cancel
-              </Button>
+          </Tabs>
+          </fieldset>
+          <CardFooter className="flex justify-between pt-6">
+            <Button type="button" variant="outline" onClick={() => navigate('/goods-receipts')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> {isViewOnly ? 'Back' : 'Cancel'}
+            </Button>
+            {!isViewOnly && (
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                 <Save className="mr-2 h-4 w-4" />
                 {isEditing ? 'Update' : 'Create'} Goods Receipt
               </Button>
-            </CardFooter>
-          </Tabs>
+            )}
+            {isViewOnly && (
+              <Button type="button" onClick={() => navigate(`/goods-receipts/${goodsReceiptId}/edit`)}>
+                <Save className="mr-2 h-4 w-4" />
+                Edit Goods Receipt
+              </Button>
+            )}
+          </CardFooter>
         </form>
       </Form>
 
