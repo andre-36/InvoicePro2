@@ -245,20 +245,13 @@ export default function DeliveryPlanningPage() {
       return;
     }
 
-    if (selectedCategoryIds.size === 0) {
-      toast({
-        title: "Error",
-        description: "Pilih minimal satu kategori untuk ditampilkan",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
       const promises = Array.from(selectedIds).map(id => 
         fetch(`/api/delivery-notes/${id}`, { credentials: 'include' }).then(res => res.json())
       );
       const selectedNotesDetails: DeliveryNoteWithItems[] = await Promise.all(promises);
+
+      const hasActiveCategoryFilter = selectedCategoryIds.size > 0;
 
       const clientMap = new Map<string, ClientDelivery>();
 
@@ -303,7 +296,7 @@ export default function DeliveryPlanningPage() {
         ...client,
         deliveryNotes: client.deliveryNotes.map(dn => ({
           ...dn,
-          items: dn.items.filter(item => selectedCategoryIds.has(item.categoryId))
+          items: hasActiveCategoryFilter ? dn.items.filter(item => selectedCategoryIds.has(item.categoryId)) : dn.items
         })).filter(dn => dn.items.length > 0)
       })).filter(client => client.deliveryNotes.length > 0);
 
@@ -316,211 +309,186 @@ export default function DeliveryPlanningPage() {
         return;
       }
 
-      const today = new Date().toLocaleDateString('id-ID', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const categoryItemsByClient = new Map<string, Map<string, { clientName: string; deliveryAddress: string; items: GroupedItem[] }>>();
+      clientDeliveries.forEach(client => {
+        const destKey = `${client.clientName}||${client.deliveryAddress}`;
+        client.deliveryNotes.forEach(dn => {
+          dn.items.forEach(item => {
+            if (!categoryItemsByClient.has(item.categoryName)) {
+              categoryItemsByClient.set(item.categoryName, new Map());
+            }
+            const catClients = categoryItemsByClient.get(item.categoryName)!;
+            if (!catClients.has(destKey)) {
+              catClients.set(destKey, { clientName: client.clientName, deliveryAddress: client.deliveryAddress, items: [] });
+            }
+            catClients.get(destKey)!.items.push(item);
+          });
+        });
       });
 
-      const selectedCategoryNames = Array.from(selectedCategoryIds)
-        .map(id => categoryMap.get(id))
-        .filter(Boolean)
-        .join(', ');
+      const sortedCategoryNames = Array.from(categoryItemsByClient.keys()).sort((a, b) => a.localeCompare(b));
 
       const printContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Daftar Pengiriman - ${today}</title>
+          <title>Daftar Pengiriman</title>
           <style>
-            @page { size: A4; margin: 15mm; }
-            * { box-sizing: border-box; }
+            @page { size: A4; margin: 12mm 15mm; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
             body { 
               font-family: Arial, sans-serif; 
-              font-size: 11px; 
-              line-height: 1.4;
-              margin: 0;
-              padding: 0;
+              font-size: 10px; 
+              line-height: 1.35;
             }
-            .header { 
-              text-align: center; 
-              margin-bottom: 15px;
-              border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-            }
-            .header h1 { margin: 0 0 5px 0; font-size: 18px; }
-            .header p { margin: 0; color: #666; }
-            .filter-badge {
-              display: inline-block;
-              background: #e0e0e0;
-              padding: 2px 8px;
-              border-radius: 4px;
-              font-size: 10px;
-              margin-top: 5px;
-            }
-            .client-section { 
-              margin-bottom: 15px; 
-              page-break-inside: avoid;
-              border: 1px solid #ccc;
-              border-radius: 4px;
-              padding: 10px;
-            }
-            .client-header { 
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
+            h1 { font-size: 16px; text-align: center; margin-bottom: 10px; }
+            .section-title {
+              font-weight: bold;
+              font-size: 11px;
+              background: #000;
+              color: #fff;
+              padding: 3px 8px;
               margin-bottom: 8px;
-              padding-bottom: 8px;
-              border-bottom: 1px solid #eee;
             }
-            .client-name { 
-              font-weight: bold; 
-              font-size: 13px; 
+            .destination-list {
+              margin-bottom: 12px;
             }
-            .client-address { 
-              color: #333;
-              font-size: 10px;
-              margin-top: 3px;
+            .dest-item {
+              display: flex;
+              gap: 6px;
+              margin-bottom: 4px;
+              padding: 3px 0;
+              border-bottom: 1px dotted #ccc;
             }
-            .category-group { 
-              margin-left: 10px;
-              margin-bottom: 6px;
+            .dest-num {
+              font-weight: bold;
+              min-width: 18px;
             }
-            .category-name { 
-              font-weight: bold; 
-              font-size: 10px;
-              color: #333;
-              background: #f0f0f0;
+            .dest-name { font-weight: bold; }
+            .dest-addr { color: #444; font-size: 9px; }
+            .dest-dn { color: #888; font-size: 8px; }
+            .two-col {
+              column-count: 2;
+              column-gap: 20px;
+            }
+            .cat-block {
+              break-inside: avoid;
+              margin-bottom: 10px;
+            }
+            .cat-title {
+              font-weight: bold;
+              font-size: 11px;
+              background: #e8e8e8;
               padding: 2px 6px;
-              display: inline-block;
-              margin-bottom: 3px;
+              margin-bottom: 4px;
+              border-left: 3px solid #000;
             }
-            .item-list { 
-              margin: 0;
-              padding-left: 15px;
+            .cat-client {
+              margin-bottom: 6px;
+              padding-left: 4px;
+              break-inside: avoid;
             }
-            .item-list li {
+            .cat-client-name {
+              font-weight: bold;
+              font-size: 10px;
               margin-bottom: 2px;
             }
-            .qty { 
-              font-weight: bold; 
-              color: #000;
+            .cat-items {
+              list-style: none;
+              padding-left: 8px;
+            }
+            .cat-items li {
+              margin-bottom: 1px;
+              display: flex;
+              align-items: center;
+              gap: 4px;
             }
             .checkbox {
               display: inline-block;
-              width: 12px;
-              height: 12px;
+              width: 10px;
+              height: 10px;
               border: 1px solid #333;
-              margin-right: 5px;
-              vertical-align: middle;
+              flex-shrink: 0;
+            }
+            .qty {
+              font-weight: bold;
+              min-width: 30px;
             }
             .summary {
-              margin-top: 20px;
-              padding-top: 10px;
+              margin-top: 12px;
+              padding-top: 8px;
               border-top: 2px solid #000;
             }
-            .summary-title {
-              font-weight: bold;
-              font-size: 12px;
-              margin-bottom: 8px;
-            }
-            .category-summary {
+            .summary-grid {
               display: flex;
               flex-wrap: wrap;
-              gap: 15px;
+              gap: 10px;
             }
-            .category-total {
-              background: #f5f5f5;
-              padding: 8px 12px;
-              border-radius: 4px;
+            .summary-item {
+              background: #f0f0f0;
+              padding: 4px 10px;
+              border-radius: 3px;
             }
-            .category-total-name {
-              font-size: 10px;
-              color: #666;
-            }
-            .category-total-count {
-              font-size: 14px;
-              font-weight: bold;
-            }
+            .summary-cat { font-size: 9px; color: #666; }
+            .summary-count { font-size: 13px; font-weight: bold; }
             @media print {
               .no-print { display: none; }
             }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>DAFTAR PENGIRIMAN</h1>
-            <p>${today}</p>
-            <p style="margin-top: 5px;">${clientDeliveries.length} Tujuan | ${selectedIds.size} Surat Jalan</p>
-            <div class="filter-badge">Kategori: ${selectedCategoryNames}</div>
+          <h1>DAFTAR PENGIRIMAN</h1>
+
+          <div class="destination-list">
+            <div class="section-title">DAFTAR TUJUAN PENGIRIMAN</div>
+            ${clientDeliveries.map((client, idx) => `
+              <div class="dest-item">
+                <span class="dest-num">${idx + 1}.</span>
+                <div>
+                  <span class="dest-name">${client.clientName}</span>
+                  <span class="dest-dn">(${client.deliveryNotes.map(dn => dn.deliveryNumber).join(', ')})</span>
+                  <div class="dest-addr">${client.deliveryAddress}</div>
+                </div>
+              </div>
+            `).join('')}
           </div>
 
-          ${clientDeliveries.map((client, idx) => {
-            const groupedByCategory = new Map<string, GroupedItem[]>();
-            client.deliveryNotes.forEach(dn => {
-              dn.items.forEach(item => {
-                if (!groupedByCategory.has(item.categoryName)) {
-                  groupedByCategory.set(item.categoryName, []);
-                }
-                groupedByCategory.get(item.categoryName)!.push(item);
-              });
-            });
-
-            const priorityCategories = ['Glass', 'Aluminium Composite Panel', 'ACP'];
-            const sortedCategories = Array.from(groupedByCategory.entries()).sort((a, b) => {
-              const aIdx = priorityCategories.findIndex(p => a[0].toLowerCase().includes(p.toLowerCase()));
-              const bIdx = priorityCategories.findIndex(p => b[0].toLowerCase().includes(p.toLowerCase()));
-              if (aIdx !== -1 && bIdx === -1) return -1;
-              if (aIdx === -1 && bIdx !== -1) return 1;
-              return a[0].localeCompare(b[0]);
-            });
-
-            return `
-              <div class="client-section">
-                <div class="client-header">
-                  <div>
-                    <div class="client-name"><span class="checkbox"></span> ${idx + 1}. ${client.clientName}</div>
-                    <div class="client-address">${client.deliveryAddress}</div>
-                  </div>
-                  <div style="text-align: right; font-size: 9px; color: #666;">
-                    ${client.deliveryNotes.map(dn => dn.deliveryNumber).join(', ')}
-                  </div>
+          <div class="section-title">DETAIL PER KATEGORI</div>
+          <div class="two-col">
+            ${sortedCategoryNames.map(catName => {
+              const clients = categoryItemsByClient.get(catName)!;
+              return `
+                <div class="cat-block">
+                  <div class="cat-title">${catName}</div>
+                  ${Array.from(clients.values()).map(c => `
+                    <div class="cat-client">
+                      <div class="cat-client-name">${c.clientName}</div>
+                      <ul class="cat-items">
+                        ${c.items.map(item => `
+                          <li><span class="checkbox"></span> <span class="qty">${item.quantity}</span> ${item.description}</li>
+                        `).join('')}
+                      </ul>
+                    </div>
+                  `).join('')}
                 </div>
-                ${sortedCategories.map(([catName, items]) => `
-                  <div class="category-group">
-                    <div class="category-name">${catName}</div>
-                    <ul class="item-list">
-                      ${items.map(item => `
-                        <li><span class="checkbox"></span><span class="qty">${item.quantity}</span> - ${item.description}</li>
-                      `).join('')}
-                    </ul>
-                  </div>
-                `).join('')}
-              </div>
-            `;
-          }).join('')}
+              `;
+            }).join('')}
+          </div>
 
           <div class="summary">
-            <div class="summary-title">RINGKASAN PER KATEGORI</div>
-            <div class="category-summary">
-              ${(() => {
-                const categoryTotals = new Map<string, number>();
-                clientDeliveries.forEach(client => {
-                  client.deliveryNotes.forEach(dn => {
-                    dn.items.forEach(item => {
-                      const current = categoryTotals.get(item.categoryName) || 0;
-                      categoryTotals.set(item.categoryName, current + parseFloat(item.quantity));
-                    });
-                  });
-                });
-                return Array.from(categoryTotals.entries()).map(([cat, total]) => `
-                  <div class="category-total">
-                    <div class="category-total-name">${cat}</div>
-                    <div class="category-total-count">${total} pcs</div>
+            <div class="section-title" style="margin-bottom: 6px;">RINGKASAN</div>
+            <div class="summary-grid">
+              ${sortedCategoryNames.map(catName => {
+                const clients = categoryItemsByClient.get(catName)!;
+                let total = 0;
+                clients.forEach(c => c.items.forEach(item => { total += parseFloat(item.quantity); }));
+                return `
+                  <div class="summary-item">
+                    <div class="summary-cat">${catName}</div>
+                    <div class="summary-count">${total} pcs</div>
                   </div>
-                `).join('');
-              })()}
+                `;
+              }).join('')}
             </div>
           </div>
         </body>
@@ -649,7 +617,7 @@ export default function DeliveryPlanningPage() {
               </Button>
               <Button 
                 onClick={handlePrint} 
-                disabled={selectedIds.size === 0 || selectedCategoryIds.size === 0}
+                disabled={selectedIds.size === 0}
               >
                 <Printer className="h-4 w-4 mr-2" />
                 Print Daftar Pengiriman ({selectedIds.size})
