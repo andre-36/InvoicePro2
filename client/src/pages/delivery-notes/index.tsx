@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckCircle, XCircle, Clock, Truck, MapPin, FileText, Printer, Package } from "lucide-react";
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
@@ -35,12 +36,14 @@ type DeliveryNoteWithDetails = DeliveryNote & {
 };
 
 type DeliveryStatus = 'all' | 'pending' | 'delivered' | 'cancelled';
+type DeliveryTypeTab = 'all' | 'delivery' | 'self_pickup';
 type SortDirection = 'asc' | 'desc';
 
 export default function DeliveryNotesPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus>("all");
+  const [typeTab, setTypeTab] = useState<DeliveryTypeTab>("all");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
@@ -124,7 +127,7 @@ export default function DeliveryNotesPage() {
   };
 
   const toggleSelectAll = () => {
-    if (!filteredNotes) return;
+    if (filteredNotes.length === 0) return;
     if (selectedIds.size === filteredNotes.length) {
       setSelectedIds(new Set());
     } else {
@@ -132,7 +135,14 @@ export default function DeliveryNotesPage() {
     }
   };
 
-  const filteredNotes = deliveryNotes?.filter(note => {
+  const typeFilteredNotes = useMemo(() => {
+    if (!deliveryNotes) return [];
+    if (typeTab === 'all') return deliveryNotes;
+    if (typeTab === 'delivery') return deliveryNotes.filter(note => note.deliveryType === 'delivery' || note.deliveryType === 'combination');
+    return deliveryNotes.filter(note => note.deliveryType === 'self_pickup');
+  }, [deliveryNotes, typeTab]);
+
+  const filteredNotes = typeFilteredNotes.filter(note => {
     const matchesSearch = 
       note.deliveryNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       note.invoice?.client?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -143,6 +153,9 @@ export default function DeliveryNotesPage() {
     const dateB = new Date(b.deliveryDate).getTime();
     return sortDirection === 'desc' ? dateB - dateA : dateA - dateB;
   });
+
+  const deliveryCount = deliveryNotes?.filter(n => n.deliveryType === 'delivery' || n.deliveryType === 'combination').length || 0;
+  const selfPickupCount = deliveryNotes?.filter(n => n.deliveryType === 'self_pickup').length || 0;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -164,7 +177,8 @@ export default function DeliveryNotesPage() {
     return note.invoice?.client?.address || '-';
   };
 
-  const pendingCount = deliveryNotes?.filter(n => n.status === 'pending').length || 0;
+  const pendingCount = typeFilteredNotes.filter(n => n.status === 'pending').length || 0;
+  const deliveredCount = typeFilteredNotes.filter(n => n.status === 'delivered').length || 0;
 
   return (
     <div className="p-6">
@@ -187,6 +201,25 @@ export default function DeliveryNotesPage() {
         </div>
       </div>
 
+      <Tabs value={typeTab} onValueChange={(v) => { setTypeTab(v as DeliveryTypeTab); setSelectedIds(new Set()); }} className="mb-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            Semua
+            <Badge variant="secondary" className="ml-1 text-xs">{deliveryNotes?.length || 0}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="delivery" className="flex items-center gap-2">
+            <Truck className="h-3.5 w-3.5" />
+            Delivery
+            <Badge variant="secondary" className="ml-1 text-xs">{deliveryCount}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="self_pickup" className="flex items-center gap-2">
+            <Package className="h-3.5 w-3.5" />
+            Self Pickup
+            <Badge variant="secondary" className="ml-1 text-xs">{selfPickupCount}</Badge>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
@@ -201,9 +234,7 @@ export default function DeliveryNotesPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {deliveryNotes?.filter(n => n.status === 'delivered').length || 0}
-            </div>
+            <div className="text-2xl font-bold text-green-600">{deliveredCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -211,7 +242,7 @@ export default function DeliveryNotesPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{deliveryNotes?.length || 0}</div>
+            <div className="text-2xl font-bold">{typeFilteredNotes.length}</div>
           </CardContent>
         </Card>
       </div>
