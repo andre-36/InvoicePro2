@@ -290,9 +290,9 @@ export default function DeliveryPlanningPage() {
         });
       });
 
-      let clientDeliveries = Array.from(clientMap.values());
+      const allClientDeliveries = Array.from(clientMap.values());
 
-      clientDeliveries = clientDeliveries.map(client => ({
+      const filteredClientDeliveries = allClientDeliveries.map(client => ({
         ...client,
         deliveryNotes: client.deliveryNotes.map(dn => ({
           ...dn,
@@ -300,17 +300,8 @@ export default function DeliveryPlanningPage() {
         })).filter(dn => dn.items.length > 0)
       })).filter(client => client.deliveryNotes.length > 0);
 
-      if (clientDeliveries.length === 0) {
-        toast({
-          title: "Tidak ada item",
-          description: "Tidak ada item yang sesuai dengan filter kategori yang dipilih",
-          variant: "destructive"
-        });
-        return;
-      }
-
       const categoryItemsByClient = new Map<string, Map<string, { clientName: string; deliveryAddress: string; items: GroupedItem[] }>>();
-      clientDeliveries.forEach(client => {
+      filteredClientDeliveries.forEach(client => {
         const destKey = `${client.clientName}||${client.deliveryAddress}`;
         client.deliveryNotes.forEach(dn => {
           dn.items.forEach(item => {
@@ -441,7 +432,7 @@ export default function DeliveryPlanningPage() {
 
           <div class="destination-list">
             <div class="section-title">DAFTAR TUJUAN PENGIRIMAN</div>
-            ${clientDeliveries.map((client, idx) => `
+            ${allClientDeliveries.map((client, idx) => `
               <div class="dest-item">
                 <span class="dest-num">${idx + 1}.</span>
                 <div>
