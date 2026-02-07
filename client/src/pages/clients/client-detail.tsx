@@ -406,9 +406,9 @@ export default function ClientDetailPage() {
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border max-h-[500px] overflow-y-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10">
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
                     <TableHead>Date</TableHead>

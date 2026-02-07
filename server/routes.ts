@@ -4540,6 +4540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Email: client.email,
         Phone: client.phone || '',
         Address: client.address || '',
+        'Address Link': client.addressLink || '',
         'Tax Number': client.taxNumber || '',
         Notes: client.notes || ''
       }));
@@ -4552,6 +4553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { id: 'Email', title: 'Email' },
             { id: 'Phone', title: 'Phone' },
             { id: 'Address', title: 'Address' },
+            { id: 'Address Link', title: 'Address Link' },
             { id: 'Tax Number', title: 'Tax Number' },
             { id: 'Notes', title: 'Notes' }
           ]
