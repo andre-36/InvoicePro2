@@ -4363,9 +4363,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(purchaseOrders.storeId, storeId),
-          or(
-            eq(purchaseOrders.status, 'pending'),
-            eq(purchaseOrders.status, 'partial')
+          not(
+            inArray(purchaseOrders.status, ['received', 'cancelled'])
           )
         )
       )
