@@ -300,25 +300,6 @@ export default function DeliveryPlanningPage() {
         })).filter(dn => dn.items.length > 0)
       })).filter(client => client.deliveryNotes.length > 0);
 
-      const categoryItemsByClient = new Map<string, Map<string, { clientName: string; deliveryAddress: string; items: GroupedItem[] }>>();
-      filteredClientDeliveries.forEach(client => {
-        const destKey = `${client.clientName}||${client.deliveryAddress}`;
-        client.deliveryNotes.forEach(dn => {
-          dn.items.forEach(item => {
-            if (!categoryItemsByClient.has(item.categoryName)) {
-              categoryItemsByClient.set(item.categoryName, new Map());
-            }
-            const catClients = categoryItemsByClient.get(item.categoryName)!;
-            if (!catClients.has(destKey)) {
-              catClients.set(destKey, { clientName: client.clientName, deliveryAddress: client.deliveryAddress, items: [] });
-            }
-            catClients.get(destKey)!.items.push(item);
-          });
-        });
-      });
-
-      const sortedCategoryNames = Array.from(categoryItemsByClient.keys()).sort((a, b) => a.localeCompare(b));
-
       const printContent = `
         <!DOCTYPE html>
         <html>
@@ -444,42 +425,54 @@ export default function DeliveryPlanningPage() {
             `).join('')}
           </div>
 
-          <div class="section-title">DETAIL PER KATEGORI</div>
+          <div class="section-title">DETAIL BARANG</div>
           <div class="two-col">
-            ${sortedCategoryNames.map(catName => {
-              const clients = categoryItemsByClient.get(catName)!;
-              return `
-                <div class="cat-block">
-                  <div class="cat-title">${catName}</div>
-                  ${Array.from(clients.values()).map(c => `
-                    <div class="cat-client">
-                      <div class="cat-client-name">${c.clientName}</div>
-                      <ul class="cat-items">
-                        ${c.items.map(item => `
-                          <li><span class="checkbox"></span> <span class="qty">${item.quantity}</span> ${item.description}</li>
-                        `).join('')}
-                      </ul>
-                    </div>
-                  `).join('')}
-                </div>
-              `;
-            }).join('')}
+            ${(() => {
+              return filteredClientDeliveries.map(client => {
+                const groupedByCategory = new Map<string, GroupedItem[]>();
+                client.deliveryNotes.forEach(dn => {
+                  dn.items.forEach(item => {
+                    if (!groupedByCategory.has(item.categoryName)) {
+                      groupedByCategory.set(item.categoryName, []);
+                    }
+                    groupedByCategory.get(item.categoryName)!.push(item);
+                  });
+                });
+                const sortedCats = Array.from(groupedByCategory.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+                let html = '<div class="cat-block">';
+                html += '<div class="cat-title">' + client.clientName + '</div>';
+                sortedCats.forEach(([catName, items]) => {
+                  html += '<div class="cat-client">';
+                  html += '<div class="cat-client-name">' + catName + '</div>';
+                  html += '<ul class="cat-items">';
+                  items.forEach(item => {
+                    html += '<li><span class="checkbox"></span> <span class="qty">' + item.quantity + '</span> ' + item.description + '</li>';
+                  });
+                  html += '</ul></div>';
+                });
+                html += '</div>';
+                return html;
+              }).join('');
+            })()}
           </div>
 
           <div class="summary">
             <div class="section-title" style="margin-bottom: 6px;">RINGKASAN</div>
             <div class="summary-grid">
-              ${sortedCategoryNames.map(catName => {
-                const clients = categoryItemsByClient.get(catName)!;
-                let total = 0;
-                clients.forEach(c => c.items.forEach(item => { total += parseFloat(item.quantity); }));
-                return `
-                  <div class="summary-item">
-                    <div class="summary-cat">${catName}</div>
-                    <div class="summary-count">${total} pcs</div>
-                  </div>
-                `;
-              }).join('')}
+              ${(() => {
+                const categoryTotals = new Map<string, number>();
+                filteredClientDeliveries.forEach(client => {
+                  client.deliveryNotes.forEach(dn => {
+                    dn.items.forEach(item => {
+                      const current = categoryTotals.get(item.categoryName) || 0;
+                      categoryTotals.set(item.categoryName, current + parseFloat(item.quantity));
+                    });
+                  });
+                });
+                return Array.from(categoryTotals.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, total]) => 
+                  '<div class="summary-item"><div class="summary-cat">' + cat + '</div><div class="summary-count">' + total + ' pcs</div></div>'
+                ).join('');
+              })()}
             </div>
           </div>
         </body>
