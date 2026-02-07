@@ -64,6 +64,8 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [clientNumberSort, setClientNumberSort] = useState<SortOrder>('none');
+  const [nameSort, setNameSort] = useState<SortOrder>('none');
   const [lastPurchaseSort, setLastPurchaseSort] = useState<SortOrder>('none');
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -73,8 +75,15 @@ export default function ClientsPage() {
     queryKey: ['/api/clients'],
   });
 
-  const toggleSort = () => {
-    setLastPurchaseSort(prev => {
+  const toggleSort = (field: 'clientNumber' | 'name' | 'lastPurchase') => {
+    const setters = { clientNumber: setClientNumberSort, name: setNameSort, lastPurchase: setLastPurchaseSort };
+    const resetOthers = () => {
+      if (field !== 'clientNumber') setClientNumberSort('none');
+      if (field !== 'name') setNameSort('none');
+      if (field !== 'lastPurchase') setLastPurchaseSort('none');
+    };
+    resetOthers();
+    setters[field](prev => {
       if (prev === 'none') return 'asc';
       if (prev === 'asc') return 'desc';
       return 'none';
@@ -226,21 +235,26 @@ export default function ClientsPage() {
       client.clientNumber.toLowerCase().includes(searchQuery.toLowerCase())
     );
     
-    if (lastPurchaseSort !== 'none') {
+    if (clientNumberSort !== 'none') {
+      result = [...result].sort((a, b) => {
+        const cmp = a.clientNumber.localeCompare(b.clientNumber, undefined, { numeric: true });
+        return clientNumberSort === 'asc' ? cmp : -cmp;
+      });
+    } else if (nameSort !== 'none') {
+      result = [...result].sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name, 'id');
+        return nameSort === 'asc' ? cmp : -cmp;
+      });
+    } else if (lastPurchaseSort !== 'none') {
       result = [...result].sort((a, b) => {
         const dateA = a.lastPurchase ? new Date(a.lastPurchase).getTime() : 0;
         const dateB = b.lastPurchase ? new Date(b.lastPurchase).getTime() : 0;
-        
-        if (lastPurchaseSort === 'asc') {
-          return dateA - dateB;
-        } else {
-          return dateB - dateA;
-        }
+        return lastPurchaseSort === 'asc' ? dateA - dateB : dateB - dateA;
       });
     }
     
     return result;
-  }, [clients, searchQuery, lastPurchaseSort]);
+  }, [clients, searchQuery, clientNumberSort, nameSort, lastPurchaseSort]);
   
   const handleViewDetails = (id: number) => {
     navigate(`/clients/${id}`);
@@ -361,8 +375,32 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[140px] whitespace-nowrap">Client #</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[140px] whitespace-nowrap">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 -ml-3 font-medium"
+                      onClick={() => toggleSort('clientNumber')}
+                    >
+                      Client #
+                      {clientNumberSort === 'none' && <ArrowUpDown className="ml-2 h-4 w-4" />}
+                      {clientNumberSort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
+                      {clientNumberSort === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 -ml-3 font-medium"
+                      onClick={() => toggleSort('name')}
+                    >
+                      Name
+                      {nameSort === 'none' && <ArrowUpDown className="ml-2 h-4 w-4" />}
+                      {nameSort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
+                      {nameSort === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+                    </Button>
+                  </TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead className="w-[130px]">
@@ -370,7 +408,7 @@ export default function ClientsPage() {
                       variant="ghost" 
                       size="sm" 
                       className="h-8 -ml-3 font-medium"
-                      onClick={toggleSort}
+                      onClick={() => toggleSort('lastPurchase')}
                     >
                       Last Purchase
                       {lastPurchaseSort === 'none' && <ArrowUpDown className="ml-2 h-4 w-4" />}
