@@ -2832,6 +2832,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/transactions/:id", requireAuth, async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
+      
+      const existing = await storage.getTransaction(transactionId);
+      if (!existing) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      if (existing.invoiceId || existing.invoicePaymentId || existing.goodsReceiptId || 
+          existing.goodsReceiptPaymentId || existing.purchaseOrderPaymentId || existing.returnId) {
+        return res.status(403).json({ error: "Transaksi ini terkait dengan dokumen (Invoice/GR/PO/Return). Edit hanya dari dokumen asalnya." });
+      }
+      
       const validatedData = validateRequestBody(insertTransactionSchema.partial(), req, res);
       if (!validatedData) return;
       
@@ -2846,6 +2856,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/transactions/:id", requireAuth, async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
+      
+      const existing = await storage.getTransaction(transactionId);
+      if (!existing) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      if (existing.invoiceId || existing.invoicePaymentId || existing.goodsReceiptId || 
+          existing.goodsReceiptPaymentId || existing.purchaseOrderPaymentId || existing.returnId) {
+        return res.status(403).json({ error: "Transaksi ini terkait dengan dokumen (Invoice/GR/PO/Return). Hapus hanya dari dokumen asalnya." });
+      }
+      
       await storage.deleteTransaction(transactionId);
       res.json({ success: true });
     } catch (error) {

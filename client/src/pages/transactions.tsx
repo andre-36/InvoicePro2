@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle, Download, Wallet } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle, Download, Wallet, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,7 @@ import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const transactionFormSchema = insertTransactionSchema.extend({
   date: z.string().min(1, "Date is required"),
@@ -208,6 +209,20 @@ export default function TransactionsPage() {
     if (deletingTransaction) {
       deleteMutation.mutate(deletingTransaction.id);
     }
+  };
+
+  const isLinkedTransaction = (transaction: Transaction) => {
+    return !!(transaction.invoiceId || transaction.invoicePaymentId || 
+              transaction.goodsReceiptId || transaction.goodsReceiptPaymentId || 
+              transaction.purchaseOrderPaymentId || transaction.returnId);
+  };
+
+  const getLinkedSource = (transaction: Transaction) => {
+    if (transaction.invoiceId || transaction.invoicePaymentId) return 'Invoice';
+    if (transaction.goodsReceiptId || transaction.goodsReceiptPaymentId) return 'Goods Receipt';
+    if (transaction.purchaseOrderPaymentId) return 'Purchase Order';
+    if (transaction.returnId) return 'Return';
+    return 'Dokumen';
   };
 
   // Handle export to Excel
@@ -392,24 +407,41 @@ export default function TransactionsPage() {
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(transaction)}
-                            data-testid={`button-edit-${transaction.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeletingTransaction(transaction)}
-                            data-testid={`button-delete-${transaction.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
+                        {isLinkedTransaction(transaction) ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex justify-end items-center gap-1 text-gray-400">
+                                  <Lock className="h-3.5 w-3.5" />
+                                  <span className="text-xs">{getLinkedSource(transaction)}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Transaksi ini dibuat dari {getLinkedSource(transaction)}.</p>
+                                <p>Edit/hapus hanya dari dokumen asalnya.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(transaction)}
+                              data-testid={`button-edit-${transaction.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingTransaction(transaction)}
+                              data-testid={`button-delete-${transaction.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
