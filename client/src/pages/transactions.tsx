@@ -45,7 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTransactionSchema, type Transaction, type InsertTransaction, type CashAccount } from "@shared/schema";
+import { insertTransactionSchema, type Transaction, type InsertTransaction, type CashAccount, type InflowCategory, type OutflowCategory } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -78,6 +78,14 @@ export default function TransactionsPage() {
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ['/api/stores/1/cash-accounts'],
+  });
+
+  const { data: inflowCategories } = useQuery<InflowCategory[]>({
+    queryKey: ['/api/stores/1/inflow-categories'],
+  });
+
+  const { data: outflowCategories } = useQuery<OutflowCategory[]>({
+    queryKey: ['/api/stores/1/outflow-categories'],
   });
 
   const form = useForm<TransactionFormData>({
@@ -474,7 +482,7 @@ export default function TransactionsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={(val) => { field.onChange(val); form.setValue("category", ""); }} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-type">
                           <SelectValue placeholder="Select type" />
@@ -574,20 +582,36 @@ export default function TransactionsPage() {
               <FormField
                 control={form.control}
                 name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category (Optional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g., Sales, Equipment, Utilities" 
-                        {...field}
+                render={({ field }) => {
+                  const selectedType = form.watch("type");
+                  const categories = selectedType === "income" 
+                    ? (inflowCategories?.filter(c => c.isActive) || [])
+                    : (outflowCategories?.filter(c => c.isActive) || []);
+                  return (
+                    <FormItem>
+                      <FormLabel>Category (Optional)</FormLabel>
+                      <Select
                         value={field.value || ""}
-                        data-testid="input-category"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                        onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="input-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">— No Category —</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
