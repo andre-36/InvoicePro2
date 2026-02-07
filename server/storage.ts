@@ -192,7 +192,7 @@ export interface IStorage {
   createDeliveryNote(deliveryNote: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote>;
   updateDeliveryNote(id: number, deliveryNote: Partial<InsertDeliveryNote>): Promise<DeliveryNote>;
   deleteDeliveryNote(id: number): Promise<void>;
-  getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number): Promise<string>;
+  getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number, dnItemCount?: number): Promise<string>;
   allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
   reverseDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
   revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote>;
@@ -2714,7 +2714,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Generate DN number based on invoice number
-      // INV-2601-0005 → DN-2601-0005 (first), DN-2601-0005-1 (second), DN-2601-0005-2 (third), etc.
+      // INV-2601-0005 → DN-2601-0005 (full delivery), DN-2601-0005-1, -2 (partial deliveries)
       const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber;
       const baseDnNumber = invoiceNumber.replace(/^INV/, 'DN');
       
@@ -2726,7 +2726,34 @@ export class DatabaseStorage implements IStorage {
       
       let deliveryNumber: string;
       if (existingDNs.length === 0) {
-        deliveryNumber = baseDnNumber;
+        // First DN: check if it carries ALL invoice items with full quantities
+        const allInvoiceItems = await tx
+          .select({ id: invoiceItems.id, quantity: invoiceItems.quantity })
+          .from(invoiceItems)
+          .where(eq(invoiceItems.invoiceId, deliveryNoteData.invoiceId));
+        
+        // Build a map of invoice item quantities
+        const invoiceItemQtyMap = new Map<number, number>();
+        for (const ii of allInvoiceItems) {
+          invoiceItemQtyMap.set(ii.id, parseFloat(ii.quantity));
+        }
+        
+        // Check if DN items cover all invoice items with full quantities
+        const dnItemMap = new Map<number, number>();
+        for (const item of items) {
+          dnItemMap.set(item.invoiceItemId, parseFloat(item.deliveredQuantity.toString()));
+        }
+        
+        let isFullDelivery = true;
+        for (const [itemId, qty] of invoiceItemQtyMap) {
+          const dnQty = dnItemMap.get(itemId) || 0;
+          if (dnQty < qty) {
+            isFullDelivery = false;
+            break;
+          }
+        }
+        
+        deliveryNumber = isFullDelivery ? baseDnNumber : `${baseDnNumber}-1`;
       } else {
         // Parse existing suffixes to find max
         let maxSuffix = 0;
@@ -2735,7 +2762,6 @@ export class DatabaseStorage implements IStorage {
           if (match) {
             maxSuffix = Math.max(maxSuffix, parseInt(match[1]));
           } else if (dn.deliveryNumber === baseDnNumber) {
-            // Base number without suffix exists, suffix starts at 1
             maxSuffix = Math.max(maxSuffix, 0);
           }
         }
@@ -2831,7 +2857,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(deliveryNotes).where(eq(deliveryNotes.id, id));
   }
 
-  async getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number): Promise<string> {
+  async getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number, dnItemCount?: number): Promise<string> {
     if (invoiceId) {
       const invoice = await this.getInvoice(invoiceId);
       if (invoice) {
@@ -2841,6 +2867,17 @@ export class DatabaseStorage implements IStorage {
           .from(deliveryNotes)
           .where(eq(deliveryNotes.invoiceId, invoiceId));
         if (existingDNs.length === 0) {
+          // For preview: if dnItemCount is provided, compare with invoice item count
+          // If not provided or they match, assume full delivery
+          if (dnItemCount !== undefined) {
+            const allInvoiceItems = await db
+              .select({ id: invoiceItems.id })
+              .from(invoiceItems)
+              .where(eq(invoiceItems.invoiceId, invoiceId));
+            if (dnItemCount < allInvoiceItems.length) {
+              return `${baseDnNumber}-1`;
+            }
+          }
           return baseDnNumber;
         }
         let maxSuffix = 0;

@@ -55,7 +55,7 @@ export default function DeliveryPlanningPage() {
   const [routeLink, setRouteLink] = useState("");
   const { toast } = useToast();
 
-  const { data: deliveryNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
+  const { data: allPendingNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
     queryKey: ['/api/stores/1/delivery-notes', 'pending'],
     queryFn: async () => {
       const res = await fetch('/api/stores/1/delivery-notes?status=pending', { credentials: 'include' });
@@ -63,6 +63,8 @@ export default function DeliveryPlanningPage() {
       return res.json();
     }
   });
+
+  const deliveryNotes = allPendingNotes?.filter(n => n.deliveryType !== 'self_pickup');
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['/api/categories']

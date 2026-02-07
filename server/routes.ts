@@ -2424,9 +2424,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateStr = req.query.date as string | undefined;
       const invoiceIdStr = req.query.invoiceId as string | undefined;
+      const dnItemCountStr = req.query.dnItemCount as string | undefined;
       const date = dateStr ? new Date(dateStr) : undefined;
       const invoiceId = invoiceIdStr ? parseInt(invoiceIdStr) : undefined;
-      const nextNumber = await storage.getNextDeliveryNoteNumber(date, invoiceId);
+      const dnItemCount = dnItemCountStr ? parseInt(dnItemCountStr) : undefined;
+      const nextNumber = await storage.getNextDeliveryNoteNumber(date, invoiceId, dnItemCount);
       res.json({ deliveryNumber: nextNumber });
     } catch (error) {
       console.error("Error getting next delivery note number:", error);
