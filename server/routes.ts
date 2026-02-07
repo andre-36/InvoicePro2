@@ -2423,8 +2423,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/delivery-notes/next-number", requireAuth, async (req, res) => {
     try {
       const dateStr = req.query.date as string | undefined;
+      const invoiceIdStr = req.query.invoiceId as string | undefined;
       const date = dateStr ? new Date(dateStr) : undefined;
-      const nextNumber = await storage.getNextDeliveryNoteNumber(date);
+      const invoiceId = invoiceIdStr ? parseInt(invoiceIdStr) : undefined;
+      const nextNumber = await storage.getNextDeliveryNoteNumber(date, invoiceId);
       res.json({ deliveryNumber: nextNumber });
     } catch (error) {
       console.error("Error getting next delivery note number:", error);

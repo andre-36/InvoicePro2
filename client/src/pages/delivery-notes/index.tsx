@@ -138,7 +138,7 @@ export default function DeliveryNotesPage() {
   const typeFilteredNotes = useMemo(() => {
     if (!deliveryNotes) return [];
     if (typeTab === 'all') return deliveryNotes;
-    if (typeTab === 'delivery') return deliveryNotes.filter(note => note.deliveryType === 'delivery' || note.deliveryType === 'combination');
+    if (typeTab === 'delivery') return deliveryNotes.filter(note => note.deliveryType !== 'self_pickup');
     return deliveryNotes.filter(note => note.deliveryType === 'self_pickup');
   }, [deliveryNotes, typeTab]);
 
@@ -154,7 +154,7 @@ export default function DeliveryNotesPage() {
     return sortDirection === 'desc' ? dateB - dateA : dateA - dateB;
   });
 
-  const deliveryCount = deliveryNotes?.filter(n => n.deliveryType === 'delivery' || n.deliveryType === 'combination').length || 0;
+  const deliveryCount = deliveryNotes?.filter(n => n.deliveryType !== 'self_pickup').length || 0;
   const selfPickupCount = deliveryNotes?.filter(n => n.deliveryType === 'self_pickup').length || 0;
 
   const getStatusBadge = (status: string) => {
@@ -194,10 +194,12 @@ export default function DeliveryNotesPage() {
               Tandai {selectedIds.size} Selesai
             </Button>
           )}
-          <Button onClick={() => navigate('/delivery-notes/planning')} variant="outline">
-            <Printer className="h-4 w-4 mr-2" />
-            Buat Daftar Pengiriman
-          </Button>
+          {typeTab !== 'self_pickup' && (
+            <Button onClick={() => navigate('/delivery-notes/planning')} variant="outline">
+              <Printer className="h-4 w-4 mr-2" />
+              Buat Daftar Pengiriman
+            </Button>
+          )}
         </div>
       </div>
 

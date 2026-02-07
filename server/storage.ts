@@ -192,7 +192,7 @@ export interface IStorage {
   createDeliveryNote(deliveryNote: InsertDeliveryNote, items: InsertDeliveryNoteItem[]): Promise<DeliveryNote>;
   updateDeliveryNote(id: number, deliveryNote: Partial<InsertDeliveryNote>): Promise<DeliveryNote>;
   deleteDeliveryNote(id: number): Promise<void>;
-  getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string>;
+  getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number): Promise<string>;
   allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
   reverseDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
   revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote>;
@@ -2713,12 +2713,34 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Invoice with ID ${deliveryNoteData.invoiceId} not found`);
       }
 
-      // Generate DN number: DN-YYMM-XXXX (independent format)
-      const dnDate = deliveryNoteData.deliveryDate ? new Date(deliveryNoteData.deliveryDate) : new Date();
-      const dnYear = dnDate.getFullYear().toString().slice(-2);
-      const dnMonth = (dnDate.getMonth() + 1).toString().padStart(2, '0');
-      const dnYearMonth = dnYear + dnMonth;
-      const deliveryNumber = await generateNextNumber("DN", dnYearMonth, deliveryNotes, deliveryNotes.deliveryNumber, tx);
+      // Generate DN number based on invoice number
+      // INV-2601-0005 → DN-2601-0005 (first), DN-2601-0005-1 (second), DN-2601-0005-2 (third), etc.
+      const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber;
+      const baseDnNumber = invoiceNumber.replace(/^INV/, 'DN');
+      
+      // Get existing delivery note numbers for this invoice to determine next suffix
+      const existingDNs = await tx
+        .select({ deliveryNumber: deliveryNotes.deliveryNumber })
+        .from(deliveryNotes)
+        .where(eq(deliveryNotes.invoiceId, deliveryNoteData.invoiceId));
+      
+      let deliveryNumber: string;
+      if (existingDNs.length === 0) {
+        deliveryNumber = baseDnNumber;
+      } else {
+        // Parse existing suffixes to find max
+        let maxSuffix = 0;
+        for (const dn of existingDNs) {
+          const match = dn.deliveryNumber.match(new RegExp(`^${baseDnNumber.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}-(\\d+)$`));
+          if (match) {
+            maxSuffix = Math.max(maxSuffix, parseInt(match[1]));
+          } else if (dn.deliveryNumber === baseDnNumber) {
+            // Base number without suffix exists, suffix starts at 1
+            maxSuffix = Math.max(maxSuffix, 0);
+          }
+        }
+        deliveryNumber = `${baseDnNumber}-${maxSuffix + 1}`;
+      }
 
       const [newDeliveryNote] = await tx
         .insert(deliveryNotes)
@@ -2809,7 +2831,28 @@ export class DatabaseStorage implements IStorage {
     await db.delete(deliveryNotes).where(eq(deliveryNotes.id, id));
   }
 
-  async getNextDeliveryNoteNumber(deliveryDate?: Date): Promise<string> {
+  async getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number): Promise<string> {
+    if (invoiceId) {
+      const invoice = await this.getInvoice(invoiceId);
+      if (invoice) {
+        const baseDnNumber = invoice.invoiceNumber.replace(/^INV/, 'DN');
+        const existingDNs = await db
+          .select({ deliveryNumber: deliveryNotes.deliveryNumber })
+          .from(deliveryNotes)
+          .where(eq(deliveryNotes.invoiceId, invoiceId));
+        if (existingDNs.length === 0) {
+          return baseDnNumber;
+        }
+        let maxSuffix = 0;
+        for (const dn of existingDNs) {
+          const match = dn.deliveryNumber.match(new RegExp(`^${baseDnNumber.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}-(\\d+)$`));
+          if (match) {
+            maxSuffix = Math.max(maxSuffix, parseInt(match[1]));
+          }
+        }
+        return `${baseDnNumber}-${maxSuffix + 1}`;
+      }
+    }
     const date = deliveryDate || new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
