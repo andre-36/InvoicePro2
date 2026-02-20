@@ -105,6 +105,8 @@ export interface IStorage {
   getProductStats(productId: number): Promise<ProductStats>;
   getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]>;
   getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]>;
+  getProductSalesTrend(productId: number, groupBy: 'daily' | 'monthly'): Promise<ProductSalesTrend[]>;
+  getBundleComponentSales(bundleProductId: number): Promise<BundleComponentSales[]>;
 
   // Product reservation methods
   getProductReservedQuantity(productId: number, storeId: number): Promise<number>;
@@ -506,6 +508,7 @@ export type ProductStats = {
   averageSellingPrice: string;
   averageCost: string;
   profitMargin: string;
+  averageMonthlySales: number;
 };
 
 // Client dashboard types
@@ -523,6 +526,7 @@ export type ClientMonthlyPurchase = {
 
 export type ProductSalesHistory = {
   id: number;
+  invoiceId: number;
   invoiceNumber: string;
   clientName: string;
   quantity: number;
@@ -534,6 +538,7 @@ export type ProductSalesHistory = {
 
 export type ProductPurchaseHistory = {
   id: number;
+  goodsReceiptId: number;
   receiptNumber: string;
   supplierName: string;
   quantity: number;
@@ -541,6 +546,24 @@ export type ProductPurchaseHistory = {
   total: string;
   date: string;
   status: string;
+};
+
+export type ProductSalesTrend = {
+  period: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  count: number;
+};
+
+export type BundleComponentSales = {
+  componentProductId: number;
+  componentName: string;
+  componentSku: string;
+  qtyPerBundle: number;
+  bundleSalesQty: number;
+  individualSalesQty: number;
+  bundleRevenue: number;
+  individualRevenue: number;
 };
 
 // Helper function to generate unique numbers with retry logic for concurrency
@@ -1073,15 +1096,30 @@ export class DatabaseStorage implements IStorage {
     const avgCostNum = parseFloat(avgCost);
     const profitMargin = avgPriceNum > 0 ? (((avgPriceNum - avgCostNum) / avgPriceNum) * 100).toFixed(2) + '%' : '0%';
 
+    // Calculate average monthly sales
+    const monthlyResult = await db.execute(sql`
+      SELECT 
+        COUNT(DISTINCT TO_CHAR(i.issue_date, 'YYYY-MM')) as month_count,
+        COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as total_qty
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+        AND i.issue_date IS NOT NULL
+    `);
+    const monthCount = parseInt(monthlyResult[0]?.month_count?.toString() || '1') || 1;
+    const totalQtyForAvg = parseFloat(monthlyResult[0]?.total_qty?.toString() || '0');
+    const averageMonthlySales = Math.round(totalQtyForAvg / monthCount);
+
     return {
       totalSales,
       totalRevenue,
-      totalPurchases: 0, // TODO: Implement when purchase orders are added
+      totalPurchases: 0,
       totalCost: '0',
       currentStock,
       averageSellingPrice: avgPrice,
       averageCost: avgCost,
-      profitMargin
+      profitMargin,
+      averageMonthlySales
     };
   }
 
@@ -1089,6 +1127,7 @@ export class DatabaseStorage implements IStorage {
     const salesHistory = await db.execute(sql`
       SELECT 
         ii.id,
+        i.id as invoice_id,
         i.invoice_number,
         c.name as client_name,
         CAST(ii.quantity AS DECIMAL) as quantity,
@@ -1105,6 +1144,7 @@ export class DatabaseStorage implements IStorage {
 
     return salesHistory.map((row: any) => ({
       id: row.id,
+      invoiceId: row.invoice_id,
       invoiceNumber: row.invoice_number,
       clientName: row.client_name || 'Unknown Client',
       quantity: parseInt(row.quantity?.toString() || '0'),
@@ -1119,6 +1159,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: goodsReceiptItems.id,
+        goodsReceiptId: goodsReceipts.id,
         receiptNumber: goodsReceipts.receiptNumber,
         supplierName: goodsReceipts.supplierName,
         quantity: goodsReceiptItems.quantity,
@@ -1134,6 +1175,7 @@ export class DatabaseStorage implements IStorage {
 
     return result.map(row => ({
       id: row.id,
+      goodsReceiptId: row.goodsReceiptId,
       receiptNumber: row.receiptNumber,
       supplierName: row.supplierName,
       quantity: parseFloat(row.quantity),
@@ -1142,6 +1184,81 @@ export class DatabaseStorage implements IStorage {
       date: row.receiptDate,
       status: row.status,
     }));
+  }
+
+  async getProductSalesTrend(productId: number, groupBy: 'daily' | 'monthly'): Promise<ProductSalesTrend[]> {
+    const dateFormat = groupBy === 'daily' ? 'YYYY-MM-DD' : 'YYYY-MM';
+    
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(i.issue_date, ${dateFormat}) as period,
+        COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as total_quantity,
+        COALESCE(SUM(CAST(ii.total_amount AS DECIMAL)), 0) as total_revenue,
+        COUNT(*) as count
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+        AND i.issue_date IS NOT NULL
+      GROUP BY TO_CHAR(i.issue_date, ${dateFormat})
+      ORDER BY period ASC
+    `);
+
+    return (result as any[]).map((row: any) => ({
+      period: row.period,
+      totalQuantity: parseFloat(row.total_quantity?.toString() || '0'),
+      totalRevenue: parseFloat(row.total_revenue?.toString() || '0'),
+      count: parseInt(row.count?.toString() || '0'),
+    }));
+  }
+
+  async getBundleComponentSales(bundleProductId: number): Promise<BundleComponentSales[]> {
+    const components = await db
+      .select({
+        componentProductId: productBundleComponents.componentProductId,
+        quantity: productBundleComponents.quantity,
+        componentName: products.name,
+        componentSku: products.sku,
+      })
+      .from(productBundleComponents)
+      .innerJoin(products, eq(productBundleComponents.componentProductId, products.id))
+      .where(eq(productBundleComponents.bundleProductId, bundleProductId));
+
+    if (components.length === 0) return [];
+
+    const bundleSalesResult = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as bundle_qty,
+        COALESCE(SUM(CAST(ii.total_amount AS DECIMAL)), 0) as bundle_revenue
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${bundleProductId} AND i.status != 'draft'
+    `);
+    const totalBundleQty = parseFloat(bundleSalesResult[0]?.bundle_qty?.toString() || '0');
+    const totalBundleRevenue = parseFloat(bundleSalesResult[0]?.bundle_revenue?.toString() || '0');
+
+    const results: BundleComponentSales[] = [];
+    for (const comp of components) {
+      const individualResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as individual_qty,
+          COALESCE(SUM(CAST(ii.total_amount AS DECIMAL)), 0) as individual_revenue
+        FROM ${invoiceItems} ii
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        WHERE ii.product_id = ${comp.componentProductId} AND i.status != 'draft'
+      `);
+      const qtyPerBundle = parseFloat(comp.quantity);
+      results.push({
+        componentProductId: comp.componentProductId,
+        componentName: comp.componentName,
+        componentSku: comp.componentSku || '',
+        qtyPerBundle,
+        bundleSalesQty: totalBundleQty * qtyPerBundle,
+        individualSalesQty: parseFloat(individualResult[0]?.individual_qty?.toString() || '0'),
+        bundleRevenue: totalBundleRevenue,
+        individualRevenue: parseFloat(individualResult[0]?.individual_revenue?.toString() || '0'),
+      });
+    }
+    return results;
   }
 
   // Get reserved quantity for a product (from invoices with payment but not fully delivered)

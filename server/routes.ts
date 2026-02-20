@@ -1548,6 +1548,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bundle component sales comparison
+  app.get("/api/products/:id/bundle-analytics", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const analytics = await storage.getBundleComponentSales(productId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error getting bundle analytics:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Product sales trend (daily or monthly)
+  app.get("/api/products/:id/sales-trend", requireAuth, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const groupBy = (req.query.groupBy as string) === 'daily' ? 'daily' : 'monthly';
+      const trend = await storage.getProductSalesTrend(productId, groupBy);
+      res.json(trend);
+    } catch (error) {
+      console.error("Error getting product sales trend:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Product available quantity (stock - reserved)
   app.get("/api/products/:id/availability", requireAuth, async (req, res) => {
     try {

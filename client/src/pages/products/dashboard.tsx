@@ -1,12 +1,16 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, TrendingUp, TrendingDown, Package, DollarSign, Clock, Truck } from "lucide-react";
+import { ArrowLeft, TrendingUp, Package, DollarSign, Clock, Truck, BarChart3, CalendarDays, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, ComposedChart
+} from "recharts";
 
 interface ProductDashboardProps {
   id: number;
@@ -14,6 +18,7 @@ interface ProductDashboardProps {
 
 type SalesHistory = {
   id: number;
+  invoiceId: number;
   invoiceNumber: string;
   clientName: string;
   quantity: number;
@@ -25,6 +30,7 @@ type SalesHistory = {
 
 type PurchaseHistory = {
   id: number;
+  goodsReceiptId: number;
   receiptNumber: string;
   supplierName: string;
   quantity: number;
@@ -43,6 +49,14 @@ type ProductStats = {
   averageSellingPrice: string;
   averageCost: string;
   profitMargin: string;
+  averageMonthlySales: number;
+};
+
+type SalesTrend = {
+  period: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  count: number;
 };
 
 type Reservation = {
@@ -64,18 +78,31 @@ type PendingPO = {
   pendingQty: number;
 };
 
+type BundleComponentSales = {
+  componentProductId: number;
+  componentName: string;
+  componentSku: string;
+  qtyPerBundle: number;
+  bundleSalesQty: number;
+  individualSalesQty: number;
+  bundleRevenue: number;
+  individualRevenue: number;
+};
+
 type Product = {
   id: number;
   name: string;
   sku: string;
   description: string;
   currentSellingPrice: string;
+  productType?: string;
 };
 
 export default function ProductDashboard({ id }: ProductDashboardProps) {
   const [, setLocation] = useLocation();
+  const [trendGroupBy, setTrendGroupBy] = useState<'daily' | 'monthly'>('monthly');
 
-  const { data: product, isLoading: isLoadingProduct, error: productError } = useQuery<Product>({
+  const { data: product, isLoading: isLoadingProduct } = useQuery<Product>({
     queryKey: [`/api/products/${id}`],
   });
 
@@ -99,12 +126,31 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
     queryKey: [`/api/products/${id}/pending-pos`],
   });
 
+  const { data: salesTrend, isLoading: isLoadingTrend } = useQuery<SalesTrend[]>({
+    queryKey: ['/api/products', id, 'sales-trend', trendGroupBy],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${id}/sales-trend?groupBy=${trendGroupBy}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
+  const { data: bundleAnalytics, isLoading: isLoadingBundleAnalytics } = useQuery<BundleComponentSales[]>({
+    queryKey: ['/api/products', id, 'bundle-analytics'],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${id}/bundle-analytics`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    enabled: product?.productType === 'bundle',
+  });
+
   if (isLoadingProduct) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array(4).fill(0).map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array(5).fill(0).map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
@@ -126,6 +172,8 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
       </div>
     );
   }
+
+  const isBundle = product.productType === 'bundle';
 
   const getStatusBadge = (status: string, type: 'sales' | 'purchase') => {
     if (type === 'sales') {
@@ -153,9 +201,17 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
     }
   };
 
+  const formatTrendLabel = (period: string) => {
+    if (trendGroupBy === 'monthly') {
+      const [year, month] = period.split('-');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[parseInt(month) - 1]} ${year}`;
+    }
+    return period;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button 
@@ -168,7 +224,10 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
             Back to Products
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{product.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground">{product.name}</h1>
+              {isBundle && <Badge variant="secondary" className="bg-purple-100 text-purple-800">Bundle</Badge>}
+            </div>
             <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
           </div>
         </div>
@@ -178,14 +237,13 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {isLoadingStats ? (
-          Array(4).fill(0).map((_, i) => (
+          Array(5).fill(0).map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))
         ) : statsError ? (
-          <div className="col-span-4">
+          <div className="col-span-5">
             <Card>
               <CardContent className="p-6 text-center">
                 <p className="text-destructive">Failed to load product statistics</p>
@@ -223,7 +281,7 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">{stats?.currentStock || 0}</div>
-                <p className="text-xs text-muted-foreground">Units in stock</p>
+                <p className="text-xs text-muted-foreground">{isBundle ? 'Calculated from components' : 'Units in stock'}</p>
               </CardContent>
             </Card>
 
@@ -237,11 +295,100 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
                 <p className="text-xs text-muted-foreground">Average margin</p>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Avg. Sales/Month</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{stats?.averageMonthlySales || 0}</div>
+                <p className="text-xs text-muted-foreground">Units per month</p>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
 
-      {/* Reserved Stock */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg text-foreground flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Sales Trend
+          </CardTitle>
+          <div className="flex gap-1">
+            <Button
+              variant={trendGroupBy === 'daily' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTrendGroupBy('daily')}
+            >
+              Daily
+            </Button>
+            <Button
+              variant={trendGroupBy === 'monthly' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTrendGroupBy('monthly')}
+            >
+              Monthly
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingTrend ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : salesTrend && salesTrend.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={salesTrend}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis 
+                  dataKey="period" 
+                  tickFormatter={formatTrendLabel}
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  yAxisId="qty"
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  label={{ value: 'Qty', angle: -90, position: 'insideLeft', style: { fill: 'hsl(var(--muted-foreground))' } }}
+                />
+                <YAxis 
+                  yAxisId="revenue"
+                  orientation="right"
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                  label={{ value: 'Revenue', angle: 90, position: 'insideRight', style: { fill: 'hsl(var(--muted-foreground))' } }}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => {
+                    if (name === 'totalRevenue') return [formatCurrency(value.toString()), 'Revenue'];
+                    if (name === 'totalQuantity') return [value, 'Quantity'];
+                    return [value, name];
+                  }}
+                  labelFormatter={formatTrendLabel}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend 
+                  formatter={(value: string) => value === 'totalQuantity' ? 'Quantity' : 'Revenue'}
+                />
+                <Bar yAxisId="qty" dataKey="totalQuantity" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.8} />
+                <Line yAxisId="revenue" type="monotone" dataKey="totalRevenue" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-12">
+              <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+              <p className="text-muted-foreground">No sales data available yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {((reservations && reservations.length > 0) || isLoadingReservations) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -302,7 +449,6 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
         </Card>
       )}
 
-      {/* Pending Purchase Orders */}
       {((pendingPOs && pendingPOs.length > 0) || isLoadingPendingPOs) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -363,61 +509,66 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
         </Card>
       )}
 
-      {/* Sales and Purchase History */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">Sales History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSales ? (
-              <div className="space-y-4">
-                {Array(5).fill(0).map((_, i) => (
-                  <Skeleton key={i} className="h-16" />
-                ))}
-              </div>
-            ) : salesError ? (
-              <div className="text-center py-8">
-                <p className="text-destructive">Failed to load sales history</p>
-              </div>
-            ) : salesHistory && salesHistory.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Qty</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg text-foreground">Sales History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingSales ? (
+            <div className="space-y-4">
+              {Array(5).fill(0).map((_, i) => (
+                <Skeleton key={i} className="h-16" />
+              ))}
+            </div>
+          ) : salesError ? (
+            <div className="text-center py-8">
+              <p className="text-destructive">Failed to load sales history</p>
+            </div>
+          ) : salesHistory && salesHistory.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Unit Price</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salesHistory.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">{sale.date}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/invoices/${sale.invoiceId}`} className="text-primary hover:underline">
+                          {sale.invoiceNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{sale.clientName}</TableCell>
+                      <TableCell className="text-right">{sale.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(sale.unitPrice)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
+                      <TableCell>{getStatusBadge(sale.status, 'sales')}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salesHistory.map((sale) => (
-                      <TableRow key={sale.id}>
-                        <TableCell className="font-medium">{sale.invoiceNumber}</TableCell>
-                        <TableCell>{sale.clientName}</TableCell>
-                        <TableCell>{sale.quantity}</TableCell>
-                        <TableCell>{formatCurrency(sale.total)}</TableCell>
-                        <TableCell>{getStatusBadge(sale.status, 'sales')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No sales history available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No sales history available</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Purchase History */}
+      {!isBundle && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Purchase History</CardTitle>
+            <CardTitle className="text-lg text-foreground">Goods Receipt History</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingPurchases ? (
@@ -428,28 +579,36 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
               </div>
             ) : purchasesError ? (
               <div className="text-center py-8">
-                <p className="text-destructive">Failed to load purchase history</p>
+                <p className="text-destructive">Failed to load goods receipt history</p>
               </div>
             ) : purchaseHistory && purchaseHistory.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Date</TableHead>
                       <TableHead>GR #</TableHead>
                       <TableHead>Supplier</TableHead>
-                      <TableHead>Qty</TableHead>
-                      <TableHead>Unit Cost</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Cost</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {purchaseHistory.map((purchase) => (
                       <TableRow key={purchase.id}>
-                        <TableCell className="font-medium">{purchase.receiptNumber}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{purchase.date}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/goods-receipts/${purchase.goodsReceiptId}`} className="text-primary hover:underline">
+                            {purchase.receiptNumber}
+                          </Link>
+                        </TableCell>
                         <TableCell>{purchase.supplierName}</TableCell>
-                        <TableCell>{purchase.quantity}</TableCell>
-                        <TableCell>{formatCurrency(purchase.unitCost)}</TableCell>
-                        <TableCell>{purchase.date}</TableCell>
+                        <TableCell className="text-right">{purchase.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(purchase.unitCost)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(purchase.total)}</TableCell>
+                        <TableCell>{getStatusBadge(purchase.status, 'purchase')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -457,12 +616,96 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No purchase history available</p>
+                <p className="text-muted-foreground">No goods receipt history available</p>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      )}
+
+      {isBundle && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-foreground flex items-center gap-2">
+              <Layers className="h-5 w-5 text-purple-500" />
+              Bundle vs Individual Sales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingBundleAnalytics ? (
+              <Skeleton className="h-48 w-full" />
+            ) : bundleAnalytics && bundleAnalytics.length > 0 ? (
+              <div className="space-y-6">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Component</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead className="text-right">Qty/Bundle</TableHead>
+                        <TableHead className="text-right">Sold via Bundle</TableHead>
+                        <TableHead className="text-right">Sold Individually</TableHead>
+                        <TableHead className="text-right">Bundle %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bundleAnalytics.map((comp) => {
+                        const totalSold = comp.bundleSalesQty + comp.individualSalesQty;
+                        const bundlePercent = totalSold > 0 ? ((comp.bundleSalesQty / totalSold) * 100).toFixed(1) : '0';
+                        return (
+                          <TableRow key={comp.componentProductId}>
+                            <TableCell className="font-medium">
+                              <Link href={`/products/${comp.componentProductId}/dashboard`} className="text-primary hover:underline">
+                                {comp.componentName}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{comp.componentSku}</TableCell>
+                            <TableCell className="text-right">{comp.qtyPerBundle}</TableCell>
+                            <TableCell className="text-right font-medium text-purple-600">{comp.bundleSalesQty}</TableCell>
+                            <TableCell className="text-right">{comp.individualSalesQty}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary" className={parseFloat(bundlePercent) > 50 ? 'bg-purple-100 text-purple-800' : ''}>
+                                {bundlePercent}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={bundleAnalytics.map(c => ({
+                    name: c.componentName.length > 20 ? c.componentName.slice(0, 20) + '...' : c.componentName,
+                    'Via Bundle': c.bundleSalesQty,
+                    'Individual': c.individualSalesQty,
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="name" fontSize={11} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                    <YAxis fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="Via Bundle" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Individual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.6} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Layers className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground">No bundle sales data available yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
