@@ -103,8 +103,8 @@ export interface IStorage {
 
   // Product dashboard methods
   getProductStats(productId: number): Promise<ProductStats>;
-  getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]>;
-  getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]>;
+  getProductSalesHistory(productId: number, page?: number, limit?: number): Promise<{ data: ProductSalesHistory[]; total: number }>;
+  getProductPurchaseHistory(productId: number, page?: number, limit?: number): Promise<{ data: ProductPurchaseHistory[]; total: number }>;
   getProductSalesTrend(productId: number, groupBy: 'daily' | 'monthly'): Promise<ProductSalesTrend[]>;
   getBundleComponentSales(bundleProductId: number): Promise<BundleComponentSales[]>;
 
@@ -1123,8 +1123,16 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getProductSalesHistory(productId: number): Promise<ProductSalesHistory[]> {
-    const salesHistory = await db.execute(sql`
+  async getProductSalesHistory(productId: number, page: number = 1, limit: number = 0): Promise<{ data: ProductSalesHistory[]; total: number }> {
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as total
+      FROM ${invoiceItems} ii
+      JOIN ${invoices} i ON ii.invoice_id = i.id
+      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+    `);
+    const total = parseInt((countResult[0] as any)?.total?.toString() || '0');
+
+    let query = sql`
       SELECT 
         ii.id,
         i.id as invoice_id,
@@ -1140,9 +1148,33 @@ export class DatabaseStorage implements IStorage {
       LEFT JOIN ${clients} c ON i.client_id = c.id
       WHERE ii.product_id = ${productId} AND i.status != 'draft'
       ORDER BY i.issue_date DESC
-    `);
+    `;
 
-    return salesHistory.map((row: any) => ({
+    if (limit > 0) {
+      const offset = (page - 1) * limit;
+      query = sql`
+        SELECT 
+          ii.id,
+          i.id as invoice_id,
+          i.invoice_number,
+          c.name as client_name,
+          CAST(ii.quantity AS DECIMAL) as quantity,
+          ii.unit_price,
+          ii.total_amount,
+          i.issue_date as date,
+          i.status
+        FROM ${invoiceItems} ii
+        JOIN ${invoices} i ON ii.invoice_id = i.id
+        LEFT JOIN ${clients} c ON i.client_id = c.id
+        WHERE ii.product_id = ${productId} AND i.status != 'draft'
+        ORDER BY i.issue_date DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    }
+
+    const salesHistory = await db.execute(query);
+
+    const data = salesHistory.map((row: any) => ({
       id: row.id,
       invoiceId: row.invoice_id,
       invoiceNumber: row.invoice_number,
@@ -1153,10 +1185,20 @@ export class DatabaseStorage implements IStorage {
       date: row.date ? new Date(row.date).toISOString().split('T')[0] : '',
       status: row.status || 'pending'
     }));
+
+    return { data, total };
   }
 
-  async getProductPurchaseHistory(productId: number): Promise<ProductPurchaseHistory[]> {
-    const result = await db
+  async getProductPurchaseHistory(productId: number, page: number = 1, limit: number = 0): Promise<{ data: ProductPurchaseHistory[]; total: number }> {
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as total
+      FROM ${goodsReceiptItems} gri
+      JOIN ${goodsReceipts} gr ON gri.goods_receipt_id = gr.id
+      WHERE gri.product_id = ${productId}
+    `);
+    const total = parseInt((countResult[0] as any)?.total?.toString() || '0');
+
+    let queryBuilder = db
       .select({
         id: goodsReceiptItems.id,
         goodsReceiptId: goodsReceipts.id,
@@ -1173,7 +1215,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(goodsReceiptItems.productId, productId))
       .orderBy(desc(goodsReceipts.receiptDate));
 
-    return result.map(row => ({
+    let result;
+    if (limit > 0) {
+      const offset = (page - 1) * limit;
+      result = await queryBuilder.limit(limit).offset(offset);
+    } else {
+      result = await queryBuilder;
+    }
+
+    const data = result.map(row => ({
       id: row.id,
       goodsReceiptId: row.goodsReceiptId,
       receiptNumber: row.receiptNumber,
@@ -1184,6 +1234,8 @@ export class DatabaseStorage implements IStorage {
       date: row.receiptDate,
       status: row.status,
     }));
+
+    return { data, total };
   }
 
   async getProductSalesTrend(productId: number, groupBy: 'daily' | 'monthly'): Promise<ProductSalesTrend[]> {

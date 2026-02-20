@@ -1528,8 +1528,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/:id/sales", requireAuth, async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
-      const salesHistory = await storage.getProductSalesHistory(productId);
-      res.json(salesHistory);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 0;
+      const result = await storage.getProductSalesHistory(productId, page, limit);
+      res.json(result);
     } catch (error) {
       console.error("Error getting product sales history:", error);
       res.status(500).json({ error: "Server error" });
@@ -1540,8 +1542,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/:id/purchases", requireAuth, async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
-      const purchaseHistory = await storage.getProductPurchaseHistory(productId);
-      res.json(purchaseHistory);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 0;
+      const result = await storage.getProductPurchaseHistory(productId, page, limit);
+      res.json(result);
     } catch (error) {
       console.error("Error getting product purchase history:", error);
       res.status(500).json({ error: "Server error" });

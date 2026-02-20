@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { ArrowLeft, TrendingUp, Package, DollarSign, Clock, Truck, BarChart3, CalendarDays, Layers } from "lucide-react";
+import { ArrowLeft, TrendingUp, Package, DollarSign, Clock, Truck, BarChart3, CalendarDays, Layers, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line, ComposedChart
 } from "recharts";
+
+const PAGE_SIZE = 10;
 
 interface ProductDashboardProps {
   id: number;
@@ -98,9 +101,21 @@ type Product = {
   productType?: string;
 };
 
+type PaginatedResponse<T> = {
+  data: T[];
+  total: number;
+};
+
 export default function ProductDashboard({ id }: ProductDashboardProps) {
   const [, setLocation] = useLocation();
   const [trendGroupBy, setTrendGroupBy] = useState<'daily' | 'monthly'>('monthly');
+  const [salesPage, setSalesPage] = useState(1);
+  const [purchasesPage, setPurchasesPage] = useState(1);
+
+  useEffect(() => {
+    setSalesPage(1);
+    setPurchasesPage(1);
+  }, [id]);
 
   const { data: product, isLoading: isLoadingProduct } = useQuery<Product>({
     queryKey: [`/api/products/${id}`],
@@ -110,13 +125,29 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
     queryKey: [`/api/products/${id}/stats`],
   });
 
-  const { data: salesHistory, isLoading: isLoadingSales, error: salesError } = useQuery<SalesHistory[]>({
-    queryKey: [`/api/products/${id}/sales`],
+  const { data: salesResult, isLoading: isLoadingSales, error: salesError } = useQuery<PaginatedResponse<SalesHistory>>({
+    queryKey: ['/api/products', id, 'sales', salesPage],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${id}/sales?page=${salesPage}&limit=${PAGE_SIZE}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
   });
+  const salesHistory = salesResult?.data;
+  const salesTotalCount = salesResult?.total || 0;
+  const salesTotalPages = Math.ceil(salesTotalCount / PAGE_SIZE);
 
-  const { data: purchaseHistory, isLoading: isLoadingPurchases, error: purchasesError } = useQuery<PurchaseHistory[]>({
-    queryKey: [`/api/products/${id}/purchases`],
+  const { data: purchaseResult, isLoading: isLoadingPurchases, error: purchasesError } = useQuery<PaginatedResponse<PurchaseHistory>>({
+    queryKey: ['/api/products', id, 'purchases', purchasesPage],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${id}/purchases?page=${purchasesPage}&limit=${PAGE_SIZE}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
   });
+  const purchaseHistory = purchaseResult?.data;
+  const purchasesTotalCount = purchaseResult?.total || 0;
+  const purchasesTotalPages = Math.ceil(purchasesTotalCount / PAGE_SIZE);
 
   const { data: reservations, isLoading: isLoadingReservations, error: reservationsError } = useQuery<Reservation[]>({
     queryKey: [`/api/products/${id}/reservations`],
@@ -511,7 +542,12 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg text-foreground">Sales History</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg text-foreground">Sales History</CardTitle>
+            {salesTotalCount > 0 && (
+              <span className="text-sm text-muted-foreground">{salesTotalCount} records</span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingSales ? (
@@ -525,37 +561,101 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
               <p className="text-destructive">Failed to load sales history</p>
             </div>
           ) : salesHistory && salesHistory.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salesHistory.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">{sale.date}</TableCell>
-                      <TableCell className="font-medium">
-                        <Link href={`/invoices/${sale.invoiceId}`} className="text-primary hover:underline">
-                          {sale.invoiceNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{sale.clientName}</TableCell>
-                      <TableCell className="text-right">{sale.quantity}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(sale.unitPrice)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
-                      <TableCell>{getStatusBadge(sale.status, 'sales')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-3">
+              {salesTotalCount > PAGE_SIZE ? (
+                <ScrollArea className="h-[440px]">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Invoice</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {salesHistory.map((sale) => (
+                          <TableRow key={sale.id}>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{sale.date}</TableCell>
+                            <TableCell className="font-medium">
+                              <Link href={`/invoices/${sale.invoiceId}`} className="text-primary hover:underline">
+                                {sale.invoiceNumber}
+                              </Link>
+                            </TableCell>
+                            <TableCell>{sale.clientName}</TableCell>
+                            <TableCell className="text-right">{sale.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(sale.unitPrice)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
+                            <TableCell>{getStatusBadge(sale.status, 'sales')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Unit Price</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {salesHistory.map((sale) => (
+                        <TableRow key={sale.id}>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">{sale.date}</TableCell>
+                          <TableCell className="font-medium">
+                            <Link href={`/invoices/${sale.invoiceId}`} className="text-primary hover:underline">
+                              {sale.invoiceNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{sale.clientName}</TableCell>
+                          <TableCell className="text-right">{sale.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(sale.unitPrice)}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
+                          <TableCell>{getStatusBadge(sale.status, 'sales')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {salesTotalPages > 1 && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Page {salesPage} of {salesTotalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSalesPage(p => Math.max(1, p - 1))}
+                      disabled={salesPage <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSalesPage(p => Math.min(salesTotalPages, p + 1))}
+                      disabled={salesPage >= salesTotalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8">
@@ -568,7 +668,12 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
       {!isBundle && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-foreground">Goods Receipt History</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-foreground">Goods Receipt History</CardTitle>
+              {purchasesTotalCount > 0 && (
+                <span className="text-sm text-muted-foreground">{purchasesTotalCount} records</span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingPurchases ? (
@@ -582,37 +687,101 @@ export default function ProductDashboard({ id }: ProductDashboardProps) {
                 <p className="text-destructive">Failed to load goods receipt history</p>
               </div>
             ) : purchaseHistory && purchaseHistory.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>GR #</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Unit Cost</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {purchaseHistory.map((purchase) => (
-                      <TableRow key={purchase.id}>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">{purchase.date}</TableCell>
-                        <TableCell className="font-medium">
-                          <Link href={`/goods-receipts/${purchase.goodsReceiptId}`} className="text-primary hover:underline">
-                            {purchase.receiptNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{purchase.supplierName}</TableCell>
-                        <TableCell className="text-right">{purchase.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(purchase.unitCost)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(purchase.total)}</TableCell>
-                        <TableCell>{getStatusBadge(purchase.status, 'purchase')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-3">
+                {purchasesTotalCount > PAGE_SIZE ? (
+                  <ScrollArea className="h-[440px]">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>GR #</TableHead>
+                            <TableHead>Supplier</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Unit Cost</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {purchaseHistory.map((purchase) => (
+                            <TableRow key={purchase.id}>
+                              <TableCell className="text-muted-foreground whitespace-nowrap">{purchase.date}</TableCell>
+                              <TableCell className="font-medium">
+                                <Link href={`/goods-receipts/${purchase.goodsReceiptId}`} className="text-primary hover:underline">
+                                  {purchase.receiptNumber}
+                                </Link>
+                              </TableCell>
+                              <TableCell>{purchase.supplierName}</TableCell>
+                              <TableCell className="text-right">{purchase.quantity}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(purchase.unitCost)}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(purchase.total)}</TableCell>
+                              <TableCell>{getStatusBadge(purchase.status, 'purchase')}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>GR #</TableHead>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Unit Cost</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {purchaseHistory.map((purchase) => (
+                          <TableRow key={purchase.id}>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{purchase.date}</TableCell>
+                            <TableCell className="font-medium">
+                              <Link href={`/goods-receipts/${purchase.goodsReceiptId}`} className="text-primary hover:underline">
+                                {purchase.receiptNumber}
+                              </Link>
+                            </TableCell>
+                            <TableCell>{purchase.supplierName}</TableCell>
+                            <TableCell className="text-right">{purchase.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(purchase.unitCost)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(purchase.total)}</TableCell>
+                            <TableCell>{getStatusBadge(purchase.status, 'purchase')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                {purchasesTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">
+                      Page {purchasesPage} of {purchasesTotalPages}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPurchasesPage(p => Math.max(1, p - 1))}
+                        disabled={purchasesPage <= 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPurchasesPage(p => Math.min(purchasesTotalPages, p + 1))}
+                        disabled={purchasesPage >= purchasesTotalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">
