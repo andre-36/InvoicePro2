@@ -74,26 +74,56 @@ export function InvoiceItemRow({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const commandRef = useRef<HTMLDivElement>(null);
 
-  // Sync local state when item prop changes (e.g., when loading from API)
-  // Use JSON stringified item as dependency to catch all changes
-  const itemKey = JSON.stringify({
-    id: item.id,
-    description: item.description,
-    quantity: item.quantity,
-    price: item.price,
-    taxRate: item.taxRate,
-    productId: item.productId,
-    productUnitId: item.productUnitId
-  });
-  
+  const itemRef = useRef(item);
+  const updateItemRef = useRef(updateItem);
+  const onProductSelectRef = useRef(onProductSelect);
+  const lastSentKeyRef = useRef("");
+  const isMountedRef = useRef(false);
+
   useEffect(() => {
+    itemRef.current = item;
+  }, [item]);
+  useEffect(() => {
+    updateItemRef.current = updateItem;
+  }, [updateItem]);
+  useEffect(() => {
+    onProductSelectRef.current = onProductSelect;
+  }, [onProductSelect]);
+
+  const makeItemKey = (data: { price: string; quantity: string; description: string; taxRate: string; productId?: number | string | null; productUnitId?: number | string | null }) => {
+    return JSON.stringify({
+      description: data.description,
+      quantity: data.quantity,
+      price: data.price,
+      taxRate: data.taxRate,
+      productId: data.productId?.toString() || "",
+      productUnitId: data.productUnitId?.toString() || ""
+    });
+  };
+
+  // Sync local state when item prop changes from EXTERNAL source (e.g., loading from API)
+  // Skip if the incoming item matches what we last sent to parent
+  useEffect(() => {
+    const incomingKey = makeItemKey({
+      price: item.price,
+      quantity: item.quantity,
+      description: item.description,
+      taxRate: item.taxRate,
+      productId: item.productId,
+      productUnitId: item.productUnitId
+    });
+    if (incomingKey === lastSentKeyRef.current) return;
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
     setDescription(item.description || "");
     setQuantity(item.quantity || "1");
     setPrice(item.price || "0");
     setTaxRate(item.taxRate || "0");
     setProductId(item.productId?.toString() || "");
     setProductUnitId(item.productUnitId?.toString() || "");
-  }, [itemKey]);
+  }, [item.id, item.description, item.quantity, item.price, item.taxRate, item.productId, item.productUnitId]);
 
   // Fetch product units when product changes
   useEffect(() => {
@@ -109,20 +139,16 @@ export function InvoiceItemRow({
   }, [productId]);
 
   // Define onUpdate to be used within handleProductChange for direct state updates
-  const onUpdate = (index: number, updatedItem: InvoiceItem) => {
+  const onUpdate = (idx: number, updatedItem: InvoiceItem) => {
     setProductId(updatedItem.productId?.toString() || "");
     setProductUnitId(updatedItem.productUnitId?.toString() || "");
     setDescription(updatedItem.description);
     setQuantity(updatedItem.quantity);
     setPrice(updatedItem.price);
     setTaxRate(updatedItem.taxRate);
-    updateItem(index, updatedItem);
+    lastSentKeyRef.current = makeItemKey(updatedItem);
+    updateItemRef.current(idx, updatedItem);
   };
-
-  const itemRef = useRef(item);
-  useEffect(() => {
-    itemRef.current = item;
-  }, [item]);
 
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
@@ -143,10 +169,10 @@ export function InvoiceItemRow({
       setPrice(basePrice);
       itemRef.current = { ...itemRef.current, selectedUnit: null };
     }
-    onProductSelect(index, currentProductId, newUnitId ? parseInt(newUnitId) : null);
+    onProductSelectRef.current(index, currentProductId, newUnitId ? parseInt(newUnitId) : null);
   };
 
-  // Calculate totals when inputs change
+  // Calculate totals when inputs change and push to parent
   useEffect(() => {
     const qty = parseFloat(quantity) || 0;
     const prc = parseFloat(price) || 0;
@@ -170,8 +196,11 @@ export function InvoiceItemRow({
       productUnitId: productUnitId && productUnitId !== "" ? parseInt(productUnitId) : null
     };
 
-    updateItem(index, updatedItem);
-  }, [description, quantity, price, taxRate, productId, productUnitId, index, updateItem]);
+    const newKey = makeItemKey(updatedItem);
+    if (newKey === lastSentKeyRef.current) return;
+    lastSentKeyRef.current = newKey;
+    updateItemRef.current(index, updatedItem);
+  }, [description, quantity, price, taxRate, productId, productUnitId, index]);
 
   // Handle product selection
   const handleProductChange = (value: string) => {

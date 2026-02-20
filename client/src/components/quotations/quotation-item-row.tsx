@@ -69,8 +69,45 @@ export function QuotationItemRow({
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
 
-  // Sync state when item prop changes (e.g., when loading data from API)
+  const itemRef = useRef(item);
+  const onUpdateRef = useRef(onUpdate);
+  const lastSentKeyRef = useRef("");
+  const isMountedRef = useRef(false);
+
   useEffect(() => {
+    itemRef.current = item;
+  }, [item]);
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  const makeItemKey = (data: { unitPrice: string; quantity: string; description: string; taxRate?: string; productId?: number | string | null; productUnitId?: number | string | null }) => {
+    return JSON.stringify({
+      description: data.description,
+      quantity: data.quantity,
+      unitPrice: data.unitPrice,
+      taxRate: data.taxRate || "0",
+      productId: data.productId?.toString() || "",
+      productUnitId: data.productUnitId?.toString() || ""
+    });
+  };
+
+  // Sync state when item prop changes from EXTERNAL source (e.g., loading from API)
+  // Skip if the incoming item matches what we last sent to parent
+  useEffect(() => {
+    const incomingKey = makeItemKey({
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      description: item.description,
+      taxRate: item.taxRate,
+      productId: item.productId,
+      productUnitId: item.productUnitId
+    });
+    if (incomingKey === lastSentKeyRef.current) return;
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
     setDescription(item.description || "");
     setQuantity(item.quantity || "1");
     setUnitPrice(item.unitPrice || "0");
@@ -91,11 +128,6 @@ export function QuotationItemRow({
       setProductUnitId("");
     }
   }, [productId]);
-  
-  const itemRef = useRef(item);
-  useEffect(() => {
-    itemRef.current = item;
-  }, [item]);
 
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
@@ -114,7 +146,7 @@ export function QuotationItemRow({
     }
   };
 
-  // Calculate totals when inputs change
+  // Calculate totals when inputs change and push to parent
   useEffect(() => {
     const qty = parseFloat(quantity) || 0;
     const price = parseFloat(unitPrice) || 0;
@@ -137,8 +169,11 @@ export function QuotationItemRow({
       productUnitId: productUnitId && productUnitId !== "" ? parseInt(productUnitId) : null
     };
     
-    onUpdate(index, updatedItem);
-  }, [description, quantity, unitPrice, taxRate, productId, productUnitId, index, onUpdate]);
+    const newKey = makeItemKey(updatedItem);
+    if (newKey === lastSentKeyRef.current) return;
+    lastSentKeyRef.current = newKey;
+    onUpdateRef.current(index, updatedItem);
+  }, [description, quantity, unitPrice, taxRate, productId, productUnitId, index]);
   
   // Handle product selection
   const handleProductChange = (value: string) => {
