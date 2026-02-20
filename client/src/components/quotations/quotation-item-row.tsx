@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -92,10 +92,14 @@ export function QuotationItemRow({
     }
   }, [productId]);
   
+  const itemRef = useRef(item);
+  useEffect(() => {
+    itemRef.current = item;
+  }, [item]);
+
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
     setProductUnitId(unitId === "base" ? "" : unitId);
-    const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
     const selectedProduct = products.find(p => p.id.toString() === productId);
     
     if (unitId && unitId !== "base") {
@@ -105,7 +109,6 @@ export function QuotationItemRow({
         setUnitPrice(newPrice);
       }
     } else {
-      // Switching back to base unit - reset price to product's original selling price
       const basePrice = selectedProduct?.currentSellingPrice || unitPrice;
       setUnitPrice(basePrice);
     }
@@ -122,7 +125,7 @@ export function QuotationItemRow({
     const totalAmount = subtotal + taxAmount;
     
     const updatedItem: QuotationItem = {
-      ...item,
+      id: itemRef.current.id,
       description,
       quantity,
       unitPrice,
@@ -135,7 +138,7 @@ export function QuotationItemRow({
     };
     
     onUpdate(index, updatedItem);
-  }, [description, quantity, unitPrice, taxRate, productId, productUnitId, index, onUpdate, item]);
+  }, [description, quantity, unitPrice, taxRate, productId, productUnitId, index, onUpdate]);
   
   // Handle product selection
   const handleProductChange = (value: string) => {

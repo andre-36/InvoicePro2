@@ -119,9 +119,15 @@ export function InvoiceItemRow({
     updateItem(index, updatedItem);
   };
 
+  const itemRef = useRef(item);
+  useEffect(() => {
+    itemRef.current = item;
+  }, [item]);
+
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
-    setProductUnitId(unitId === "base" ? "" : unitId);
+    const newUnitId = unitId === "base" ? "" : unitId;
+    setProductUnitId(newUnitId);
     const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
     const selectedProduct = products.find(p => p.id.toString() === productId);
     
@@ -130,54 +136,14 @@ export function InvoiceItemRow({
       if (selectedUnit) {
         const newPrice = selectedUnit.price || price;
         setPrice(newPrice);
-        
-        // Recalculate totals with new price
-        const qty = parseFloat(quantity) || 0;
-        const prc = parseFloat(newPrice) || 0;
-        const rate = parseFloat(taxRate) || 0;
-        const newSubtotal = (qty * prc).toString();
-        const newTax = (parseFloat(newSubtotal) * rate / 100).toString();
-        const newTotal = (parseFloat(newSubtotal) + parseFloat(newTax)).toString();
-        
-        const updatedItem: InvoiceItem = {
-          ...item,
-          productId: currentProductId,
-          productUnitId: parseInt(unitId),
-          selectedUnit,
-          price: newPrice,
-          subtotal: newSubtotal,
-          tax: newTax,
-          total: newTotal,
-        };
-        updateItem(index, updatedItem);
-        onProductSelect(index, currentProductId, parseInt(unitId));
+        itemRef.current = { ...itemRef.current, selectedUnit };
       }
     } else {
-      // Switching back to base unit - reset price to product's original selling price
       const basePrice = selectedProduct?.currentSellingPrice || price;
       setPrice(basePrice);
-      
-      // Recalculate totals with base price
-      const qty = parseFloat(quantity) || 0;
-      const prc = parseFloat(basePrice) || 0;
-      const rate = parseFloat(taxRate) || 0;
-      const newSubtotal = (qty * prc).toString();
-      const newTax = (parseFloat(newSubtotal) * rate / 100).toString();
-      const newTotal = (parseFloat(newSubtotal) + parseFloat(newTax)).toString();
-      
-      const updatedItem: InvoiceItem = {
-        ...item,
-        productId: currentProductId,
-        productUnitId: null,
-        selectedUnit: null,
-        price: basePrice,
-        subtotal: newSubtotal,
-        tax: newTax,
-        total: newTotal,
-      };
-      updateItem(index, updatedItem);
-      onProductSelect(index, currentProductId, null);
+      itemRef.current = { ...itemRef.current, selectedUnit: null };
     }
+    onProductSelect(index, currentProductId, newUnitId ? parseInt(newUnitId) : null);
   };
 
   // Calculate totals when inputs change
@@ -191,7 +157,8 @@ export function InvoiceItemRow({
     const total = (parseFloat(subtotal) + parseFloat(tax)).toString();
 
     const updatedItem: InvoiceItem = {
-      ...item,
+      id: itemRef.current.id,
+      selectedUnit: itemRef.current.selectedUnit,
       description,
       quantity,
       price,
@@ -204,7 +171,7 @@ export function InvoiceItemRow({
     };
 
     updateItem(index, updatedItem);
-  }, [description, quantity, price, taxRate, productId, productUnitId, index, updateItem, item]);
+  }, [description, quantity, price, taxRate, productId, productUnitId, index, updateItem]);
 
   // Handle product selection
   const handleProductChange = (value: string) => {
