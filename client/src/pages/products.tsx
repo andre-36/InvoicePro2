@@ -488,7 +488,19 @@ export default function ProductsPage() {
       // First save the product
       let productId = editingProduct?.id;
       
-      // Map baseUnit to unit for database storage
+      if (data.productType === "bundle") {
+        const validComponents = bundleComponents.filter(c => c.componentProductId > 0 && parseFloat(c.quantity) > 0);
+        if (validComponents.length < 2) {
+          toast({
+            title: "Bundle requires at least 2 components",
+            description: "A bundle product must contain at least 2 different component products.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const productData = {
         name: data.name,
         sku: data.sku,
@@ -497,7 +509,7 @@ export default function ProductsPage() {
         costPrice: data.costPrice,
         lowestPrice: data.lowestPrice,
         productType: data.productType,
-        unit: data.baseUnit || "pcs", // Map baseUnit to unit
+        unit: data.baseUnit || "pcs",
         categoryId: data.categoryId,
         isActive: data.isActive,
       };
@@ -1090,6 +1102,7 @@ export default function ProductsPage() {
                         </FormItem>
                       )}
                     />
+                    {productType !== "bundle" && (
                     <FormField
                       control={form.control}
                       name="minStock"
@@ -1108,6 +1121,7 @@ export default function ProductsPage() {
                         </FormItem>
                       )}
                     />
+                    )}
                   </div>
                 
                 {/* Bundle Components Section - only visible when productType is bundle */}
