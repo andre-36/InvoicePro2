@@ -736,12 +736,18 @@ export default function ProductsPage() {
                         {product.sku || "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {product.currentStock || 0}
-                        </span>
+                        {product.productType === 'bundle' ? (
+                          <span className="text-sm text-gray-400">—</span>
+                        ) : (
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {product.currentStock || 0}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {(product.reservedQty || 0) > 0 ? (
+                        {product.productType === 'bundle' ? (
+                          <span className="text-sm text-gray-400">—</span>
+                        ) : (product.reservedQty || 0) > 0 ? (
                           <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                             {product.reservedQty}
                           </span>
@@ -763,19 +769,23 @@ export default function ProductsPage() {
                               <span className="text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">
                                 Out
                               </span>
-                            ) : (product.availableStock ?? product.currentStock ?? 0) <= (product.minStock || 0) && (product.minStock || 0) > 0 && (
+                            ) : product.productType !== 'bundle' && (product.availableStock ?? product.currentStock ?? 0) <= (product.minStock || 0) && (product.minStock || 0) > 0 && (
                               <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 rounded-full">
                                 Low
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-gray-400">
-                            Min: {product.minStock || 0}
-                          </span>
+                          {product.productType !== 'bundle' && (
+                            <span className="text-xs text-gray-400">
+                              Min: {product.minStock || 0}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {(product.pendingPOQuantity || 0) > 0 ? (
+                        {product.productType === 'bundle' ? (
+                          <span className="text-sm text-gray-400">—</span>
+                        ) : (product.pendingPOQuantity || 0) > 0 ? (
                           <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                             {product.pendingPOQuantity}
                           </span>

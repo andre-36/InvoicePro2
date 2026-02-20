@@ -4849,6 +4849,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const productsWithStock = await Promise.all(
         products.map(async (product) => {
+          if (product.productType === 'bundle') {
+            const bundleAvailable = await storage.getBundleStock(product.id, storeId);
+            return {
+              ...product,
+              currentStock: 0,
+              reservedQty: 0,
+              availableStock: bundleAvailable,
+              pendingPOQuantity: 0,
+              isLowStock: false,
+              stockStatus: bundleAvailable === 0 ? 'out_of_stock' : 'in_stock',
+              isBundle: true,
+            };
+          }
+
           const batches = await storage.getProductBatches(product.id, storeId);
           const currentStock = batches.reduce((sum, batch) => 
             sum + parseFloat(batch.remainingQuantity.toString()), 0
@@ -4856,7 +4870,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const pendingPOQuantity = pendingPOQuantities.get(product.id) || 0;
           
-          // Get reserved quantity (from invoices with payment but not fully delivered)
           const reservedQty = await storage.getProductReservedQuantity(product.id, storeId);
           const availableStock = Math.max(0, currentStock - reservedQty);
           

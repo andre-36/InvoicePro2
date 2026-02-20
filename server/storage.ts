@@ -1323,7 +1323,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBundleStock(bundleProductId: number, storeId: number): Promise<number> {
-    // Get bundle components
     const components = await db
       .select()
       .from(productBundleComponents)
@@ -1333,13 +1332,14 @@ export class DatabaseStorage implements IStorage {
       return 0;
     }
     
-    // Calculate minimum number of bundles that can be formed
     let minBundles = Infinity;
     
     for (const component of components) {
-      // Get total stock for this component product in the store
       const batches = await db
-        .select({ remainingQuantity: productBatches.remainingQuantity })
+        .select({ 
+          remainingQuantity: productBatches.remainingQuantity,
+          reservedQuantity: productBatches.reservedQuantity
+        })
         .from(productBatches)
         .where(
           and(
@@ -1349,8 +1349,10 @@ export class DatabaseStorage implements IStorage {
         );
       
       const totalStock = batches.reduce((sum, b) => sum + parseFloat(b.remainingQuantity || '0'), 0);
+      const totalReserved = batches.reduce((sum, b) => sum + parseFloat(b.reservedQuantity?.toString() || '0'), 0);
+      const availableStock = Math.max(0, totalStock - totalReserved);
       const requiredQty = parseFloat(component.quantity);
-      const possibleBundles = Math.floor(totalStock / requiredQty);
+      const possibleBundles = Math.floor(availableStock / requiredQty);
       
       minBundles = Math.min(minBundles, possibleBundles);
     }
@@ -2090,28 +2092,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invoicePayments.id, id));
   }
 
+  private async expandBundleItems(tx: any, items: { productId: number; quantity: string; baseQuantity?: string | null }[]): Promise<{ productId: number; quantity: number }[]> {
+    const expandedItems: { productId: number; quantity: number }[] = [];
+    
+    for (const item of items) {
+      const itemQty = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+      const [product] = await tx.select().from(products).where(eq(products.id, item.productId));
+      
+      if (product && product.productType === 'bundle') {
+        const components = await tx
+          .select()
+          .from(productBundleComponents)
+          .where(eq(productBundleComponents.bundleProductId, product.id));
+        
+        for (const comp of components) {
+          const compQty = parseFloat(comp.quantity) * itemQty;
+          expandedItems.push({ productId: comp.componentProductId, quantity: compQty });
+        }
+      } else {
+        expandedItems.push({ productId: item.productId, quantity: itemQty });
+      }
+    }
+    
+    return expandedItems;
+  }
+
   // Stock reservation methods (for paid invoices awaiting delivery)
   async reserveStockForInvoice(invoiceId: number): Promise<void> {
     return withTransaction(async (tx) => {
-      // Get the invoice with its items
       const invoice = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
       if (!invoice.length) {
         throw new Error(`Invoice with ID ${invoiceId} not found`);
       }
 
       const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+      const expandedItems = await this.expandBundleItems(tx, items);
 
-      // For each item, reserve stock from available batches using FIFO
-      for (const item of items) {
-        const quantityToReserve = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        
-        // Get available batches for this product, ordered by purchase date (FIFO)
+      for (const { productId, quantity: quantityToReserve } of expandedItems) {
         const availableBatches = await tx
           .select()
           .from(productBatches)
           .where(
             and(
-              eq(productBatches.productId, item.productId),
+              eq(productBatches.productId, productId),
               eq(productBatches.storeId, invoice[0].storeId)
             )
           )
@@ -2122,7 +2145,6 @@ export class DatabaseStorage implements IStorage {
         for (const batch of availableBatches) {
           if (remainingToReserve <= 0) break;
 
-          // Calculate available stock (remaining - already reserved)
           const remaining = parseFloat(batch.remainingQuantity.toString());
           const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
           const availableToReserve = remaining - reserved;
@@ -2131,7 +2153,6 @@ export class DatabaseStorage implements IStorage {
 
           const quantityFromBatch = Math.min(remainingToReserve, availableToReserve);
 
-          // Update reserved quantity
           await tx
             .update(productBatches)
             .set({ 
@@ -2155,18 +2176,15 @@ export class DatabaseStorage implements IStorage {
       }
 
       const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+      const expandedItems = await this.expandBundleItems(tx, items);
 
-      // For each item, release reserved stock from batches using FIFO (reverse order for release)
-      for (const item of items) {
-        const quantityToRelease = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        
-        // Get batches with reserved quantity, ordered by purchase date (FIFO)
+      for (const { productId, quantity: quantityToRelease } of expandedItems) {
         const reservedBatches = await tx
           .select()
           .from(productBatches)
           .where(
             and(
-              eq(productBatches.productId, item.productId),
+              eq(productBatches.productId, productId),
               eq(productBatches.storeId, invoice[0].storeId),
               gt(productBatches.reservedQuantity, 0)
             )
@@ -2181,7 +2199,6 @@ export class DatabaseStorage implements IStorage {
           const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
           const releaseFromBatch = Math.min(remainingToRelease, reserved);
 
-          // Update reserved quantity
           await tx
             .update(productBatches)
             .set({ 
@@ -2214,62 +2231,60 @@ export class DatabaseStorage implements IStorage {
       let totalCost = 0;
       let totalRevenue = 0;
 
-      // For each item, deduct stock using FIFO
       for (const item of items) {
-        const quantityToDeduct = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        
-        // Calculate revenue
         const unitPrice = parseFloat(item.unitPrice.toString());
         const itemQty = parseFloat(item.quantity.toString());
         totalRevenue += itemQty * unitPrice;
 
-        // Get available batches for this product (FIFO)
-        const availableBatches = await tx
-          .select()
-          .from(productBatches)
-          .where(
-            and(
-              eq(productBatches.productId, item.productId),
-              eq(productBatches.storeId, invoice.storeId),
-              gt(productBatches.remainingQuantity, 0)
+        const expandedItems = await this.expandBundleItems(tx, [item]);
+        let itemCost = 0;
+
+        for (const { productId, quantity: quantityToDeduct } of expandedItems) {
+          const availableBatches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, productId),
+                eq(productBatches.storeId, invoice.storeId),
+                gt(productBatches.remainingQuantity, 0)
+              )
             )
-          )
-          .orderBy(productBatches.purchaseDate);
+            .orderBy(productBatches.purchaseDate);
 
-        let remainingToDeduct = quantityToDeduct;
+          let remainingToDeduct = quantityToDeduct;
 
-        for (const batch of availableBatches) {
-          if (remainingToDeduct <= 0) break;
+          for (const batch of availableBatches) {
+            if (remainingToDeduct <= 0) break;
 
-          const remaining = parseFloat(batch.remainingQuantity.toString());
-          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-          const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const remaining = parseFloat(batch.remainingQuantity.toString());
+            const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
 
-          // Deduct from remaining quantity
-          const deductFromBatch = Math.min(remainingToDeduct, remaining);
-          
-          // Calculate cost for profit tracking
-          totalCost += deductFromBatch * baseCost;
+            const deductFromBatch = Math.min(remainingToDeduct, remaining);
+            itemCost += deductFromBatch * baseCost;
 
-          // First release reserved if any, then deduct from remaining
-          const newReserved = Math.max(0, reserved - deductFromBatch);
-          const newRemaining = remaining - deductFromBatch;
+            const newReserved = Math.max(0, reserved - deductFromBatch);
+            const newRemaining = remaining - deductFromBatch;
 
-          await tx
-            .update(productBatches)
-            .set({
-              remainingQuantity: newRemaining.toString(),
-              reservedQuantity: newReserved.toString(),
-              updatedAt: new Date()
-            })
-            .where(eq(productBatches.id, batch.id));
+            await tx
+              .update(productBatches)
+              .set({
+                remainingQuantity: newRemaining.toString(),
+                reservedQuantity: newReserved.toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
 
-          remainingToDeduct -= deductFromBatch;
+            remainingToDeduct -= deductFromBatch;
+          }
         }
 
-        // Update unit cost in invoice item for COGS tracking
-        if (quantityToDeduct > 0) {
-          const avgCost = totalCost / quantityToDeduct;
+        totalCost += itemCost;
+
+        const baseQty = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
+        if (baseQty > 0) {
+          const avgCost = itemCost / baseQty;
           await tx
             .update(invoiceItems)
             .set({ unitCost: avgCost.toString() })
@@ -2784,9 +2799,8 @@ export class DatabaseStorage implements IStorage {
             deliveryNoteId: newDeliveryNote.id
           })));
 
-        // Reduce stock for each delivered item using FIFO
+        // Reduce stock for each delivered item using FIFO (with bundle expansion)
         for (const item of items) {
-          // Get the invoice item to find the product
           const [invoiceItem] = await tx
             .select()
             .from(invoiceItems)
@@ -2794,43 +2808,60 @@ export class DatabaseStorage implements IStorage {
 
           if (!invoiceItem || !invoiceItem.productId) continue;
 
-          const quantityToReduce = parseFloat(item.deliveredQuantity.toString());
-          if (quantityToReduce <= 0) continue;
+          const deliveredQty = parseFloat(item.deliveredQuantity.toString());
+          if (deliveredQty <= 0) continue;
 
-          // Get available batches for this product, ordered by purchase date (FIFO)
-          const availableBatches = await tx
-            .select()
-            .from(productBatches)
-            .where(
-              and(
-                eq(productBatches.productId, invoiceItem.productId),
-                eq(productBatches.storeId, invoice.store_id),
-                gt(productBatches.remainingQuantity, 0)
+          const [product] = await tx.select().from(products).where(eq(products.id, invoiceItem.productId));
+          
+          let stockItems: { productId: number; quantity: number }[] = [];
+          if (product && product.productType === 'bundle') {
+            const components = await tx
+              .select()
+              .from(productBundleComponents)
+              .where(eq(productBundleComponents.bundleProductId, product.id));
+            for (const comp of components) {
+              stockItems.push({
+                productId: comp.componentProductId,
+                quantity: parseFloat(comp.quantity) * deliveredQty
+              });
+            }
+          } else {
+            stockItems.push({ productId: invoiceItem.productId, quantity: deliveredQty });
+          }
+
+          for (const { productId: stockProductId, quantity: quantityToReduce } of stockItems) {
+            const availableBatches = await tx
+              .select()
+              .from(productBatches)
+              .where(
+                and(
+                  eq(productBatches.productId, stockProductId),
+                  eq(productBatches.storeId, invoice.store_id),
+                  gt(productBatches.remainingQuantity, 0)
+                )
               )
-            )
-            .orderBy(productBatches.purchaseDate);
+              .orderBy(productBatches.purchaseDate);
 
-          let remainingQuantity = quantityToReduce;
+            let remainingQuantity = quantityToReduce;
 
-          // Reduce from each batch until we've fulfilled the quantity
-          for (const batch of availableBatches) {
-            if (remainingQuantity <= 0) break;
+            for (const batch of availableBatches) {
+              if (remainingQuantity <= 0) break;
 
-            const batchRemaining = parseFloat(batch.remainingQuantity.toString());
-            const quantityFromBatch = Math.min(remainingQuantity, batchRemaining);
+              const batchRemaining = parseFloat(batch.remainingQuantity.toString());
+              const quantityFromBatch = Math.min(remainingQuantity, batchRemaining);
 
-            if (quantityFromBatch <= 0) continue;
+              if (quantityFromBatch <= 0) continue;
 
-            // Update the batch's remaining quantity
-            await tx
-              .update(productBatches)
-              .set({ 
-                remainingQuantity: (batchRemaining - quantityFromBatch).toString(),
-                updatedAt: new Date()
-              })
-              .where(eq(productBatches.id, batch.id));
+              await tx
+                .update(productBatches)
+                .set({ 
+                  remainingQuantity: (batchRemaining - quantityFromBatch).toString(),
+                  updatedAt: new Date()
+                })
+                .where(eq(productBatches.id, batch.id));
 
-            remainingQuantity -= quantityFromBatch;
+              remainingQuantity -= quantityFromBatch;
+            }
           }
         }
       }
@@ -2917,115 +2948,122 @@ export class DatabaseStorage implements IStorage {
       let totalCost = 0;
       let totalRevenue = 0;
 
-      // For each delivery item, allocate stock using FIFO and calculate profit
       for (const dnItem of dnItems) {
-        // Get invoice item details
         const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
         if (!invItem) continue;
 
         const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
         
-        // Calculate base quantity to deduct from batches
-        // If invoice item has baseQuantity set, use the ratio
         let baseDeliveredQty = deliveredQty;
         if (invItem.baseQuantity && invItem.quantity) {
           const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
           baseDeliveredQty = deliveredQty * ratio;
         }
 
-        // Calculate revenue contribution for this item
         const unitPrice = parseFloat(invItem.unitPrice.toString());
         totalRevenue += deliveredQty * unitPrice;
 
-        // Get available batches for this product (FIFO)
-        const availableBatches = await tx
-          .select()
-          .from(productBatches)
-          .where(
-            and(
-              eq(productBatches.productId, invItem.productId),
-              eq(productBatches.storeId, invoice.storeId),
-              gt(productBatches.remainingQuantity, 0)
-            )
-          )
-          .orderBy(productBatches.purchaseDate);
-
-        let remainingToAllocate = baseDeliveredQty;
-
-        for (const batch of availableBatches) {
-          if (remainingToAllocate <= 0) break;
-
-          const remaining = parseFloat(batch.remainingQuantity.toString());
-          const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-          const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
-          
-          const quantityFromBatch = Math.min(remainingToAllocate, remaining);
-
-          // Calculate cost for this allocation
-          totalCost += quantityFromBatch * baseCost;
-
-          // Reduce remaining quantity in batch
-          const newRemaining = remaining - quantityFromBatch;
-          // Also reduce reserved quantity (proportionally)
-          const reservedReduction = Math.min(reserved, quantityFromBatch);
-          const newReserved = reserved - reservedReduction;
-
-          await tx
-            .update(productBatches)
-            .set({
-              remainingQuantity: newRemaining.toString(),
-              reservedQuantity: Math.max(0, newReserved).toString(),
-              updatedAt: new Date()
-            })
-            .where(eq(productBatches.id, batch.id));
-
-          remainingToAllocate -= quantityFromBatch;
+        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
+        
+        let stockItems: { productId: number; quantity: number }[] = [];
+        if (product && product.productType === 'bundle') {
+          const components = await tx
+            .select()
+            .from(productBundleComponents)
+            .where(eq(productBundleComponents.bundleProductId, product.id));
+          for (const comp of components) {
+            stockItems.push({
+              productId: comp.componentProductId,
+              quantity: parseFloat(comp.quantity) * baseDeliveredQty
+            });
+          }
+        } else {
+          stockItems.push({ productId: invItem.productId, quantity: baseDeliveredQty });
         }
 
-        // Allow negative stock: if there's still quantity to allocate after exhausting all batches
-        if (remainingToAllocate > 0) {
-          // Get any batch for this product (even with 0 or negative stock) to make it more negative
-          const anyBatch = await tx
+        for (const { productId: stockProductId, quantity: qtyToAllocate } of stockItems) {
+          const availableBatches = await tx
             .select()
             .from(productBatches)
             .where(
               and(
-                eq(productBatches.productId, invItem.productId),
-                eq(productBatches.storeId, invoice.storeId)
+                eq(productBatches.productId, stockProductId),
+                eq(productBatches.storeId, invoice.storeId),
+                gt(productBatches.remainingQuantity, 0)
               )
             )
-            .orderBy(desc(productBatches.purchaseDate))
-            .limit(1);
+            .orderBy(productBatches.purchaseDate);
 
-          if (anyBatch.length > 0) {
-            // Deduct from the most recent batch (allow negative)
-            const batch = anyBatch[0];
-            const currentRemaining = parseFloat(batch.remainingQuantity.toString());
-            const newRemaining = currentRemaining - remainingToAllocate;
+          let remainingToAllocate = qtyToAllocate;
+
+          for (const batch of availableBatches) {
+            if (remainingToAllocate <= 0) break;
+
+            const remaining = parseFloat(batch.remainingQuantity.toString());
+            const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            
+            const quantityFromBatch = Math.min(remainingToAllocate, remaining);
+
+            totalCost += quantityFromBatch * baseCost;
+
+            const newRemaining = remaining - quantityFromBatch;
+            const reservedReduction = Math.min(reserved, quantityFromBatch);
+            const newReserved = reserved - reservedReduction;
 
             await tx
               .update(productBatches)
               .set({
                 remainingQuantity: newRemaining.toString(),
+                reservedQuantity: Math.max(0, newReserved).toString(),
                 updatedAt: new Date()
               })
               .where(eq(productBatches.id, batch.id));
-          } else {
-            // No batch exists at all, create a negative batch
-            const today = new Date().toISOString().split('T')[0];
-            await tx.insert(productBatches).values({
-              productId: invItem.productId,
-              storeId: invoice.storeId,
-              batchNumber: `NEG-${invItem.productId}-${today}`,
-              purchaseDate: today,
-              capitalCost: '0',
-              cost: '0',
-              baseCost: '0',
-              initialQuantity: '0',
-              remainingQuantity: (-remainingToAllocate).toString(),
-              reservedQuantity: '0',
-              notes: 'Negative stock from overselling'
-            });
+
+            remainingToAllocate -= quantityFromBatch;
+          }
+
+          if (remainingToAllocate > 0) {
+            const anyBatch = await tx
+              .select()
+              .from(productBatches)
+              .where(
+                and(
+                  eq(productBatches.productId, stockProductId),
+                  eq(productBatches.storeId, invoice.storeId)
+                )
+              )
+              .orderBy(desc(productBatches.purchaseDate))
+              .limit(1);
+
+            if (anyBatch.length > 0) {
+              const batch = anyBatch[0];
+              const currentRemaining = parseFloat(batch.remainingQuantity.toString());
+              const newRemaining = currentRemaining - remainingToAllocate;
+
+              await tx
+                .update(productBatches)
+                .set({
+                  remainingQuantity: newRemaining.toString(),
+                  updatedAt: new Date()
+                })
+                .where(eq(productBatches.id, batch.id));
+            } else {
+              const today = new Date().toISOString().split('T')[0];
+              await tx.insert(productBatches).values({
+                productId: stockProductId,
+                storeId: invoice.storeId,
+                batchNumber: `NEG-${stockProductId}-${today}`,
+                purchaseDate: today,
+                capitalCost: '0',
+                cost: '0',
+                baseCost: '0',
+                initialQuantity: '0',
+                remainingQuantity: (-remainingToAllocate).toString(),
+                reservedQuantity: '0',
+                notes: 'Negative stock from overselling'
+              });
+            }
           }
         }
       }
@@ -3066,55 +3104,69 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
       }
 
-      // For each delivery item, restore stock to batches using LIFO (reverse of FIFO)
       for (const dnItem of dnItems) {
         const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
         if (!invItem) continue;
 
         const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
         
-        // Calculate base quantity that was deducted from batches
         let baseDeliveredQty = deliveredQty;
         if (invItem.baseQuantity && invItem.quantity) {
           const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
           baseDeliveredQty = deliveredQty * ratio;
         }
 
-        // Get batches for this product (ordered by purchase date desc - LIFO to reverse FIFO)
-        const batches = await tx
-          .select()
-          .from(productBatches)
-          .where(
-            and(
-              eq(productBatches.productId, invItem.productId),
-              eq(productBatches.storeId, invoice.storeId)
+        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
+        
+        let stockItems: { productId: number; quantity: number }[] = [];
+        if (product && product.productType === 'bundle') {
+          const components = await tx
+            .select()
+            .from(productBundleComponents)
+            .where(eq(productBundleComponents.bundleProductId, product.id));
+          for (const comp of components) {
+            stockItems.push({
+              productId: comp.componentProductId,
+              quantity: parseFloat(comp.quantity) * baseDeliveredQty
+            });
+          }
+        } else {
+          stockItems.push({ productId: invItem.productId, quantity: baseDeliveredQty });
+        }
+
+        for (const { productId: stockProductId, quantity: qtyToRestore } of stockItems) {
+          const batches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, stockProductId),
+                eq(productBatches.storeId, invoice.storeId)
+              )
             )
-          )
-          .orderBy(desc(productBatches.purchaseDate));
+            .orderBy(desc(productBatches.purchaseDate));
 
-        let remainingToRestore = baseDeliveredQty;
+          let remainingToRestore = qtyToRestore;
 
-        for (const batch of batches) {
-          if (remainingToRestore <= 0) break;
+          for (const batch of batches) {
+            if (remainingToRestore <= 0) break;
 
-          const totalQty = parseFloat(batch.initialQuantity.toString());
-          const remainingQty = parseFloat(batch.remainingQuantity.toString());
-          
-          // How much can we restore to this batch? Up to its total quantity
-          const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
-          
-          if (canRestore > 0) {
-            // Only restore remainingQuantity, NOT reservedQuantity
-            // Because reservation was already done at payment time
-            await tx
-              .update(productBatches)
-              .set({
-                remainingQuantity: (remainingQty + canRestore).toString(),
-                updatedAt: new Date()
-              })
-              .where(eq(productBatches.id, batch.id));
+            const totalQty = parseFloat(batch.initialQuantity.toString());
+            const remainingQty = parseFloat(batch.remainingQuantity.toString());
+            
+            const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
+            
+            if (canRestore > 0) {
+              await tx
+                .update(productBatches)
+                .set({
+                  remainingQuantity: (remainingQty + canRestore).toString(),
+                  updatedAt: new Date()
+                })
+                .where(eq(productBatches.id, batch.id));
 
-            remainingToRestore -= canRestore;
+              remainingToRestore -= canRestore;
+            }
           }
         }
       }
