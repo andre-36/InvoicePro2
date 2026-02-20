@@ -150,11 +150,10 @@ export function InvoiceItemRow({
     updateItemRef.current(idx, updatedItem);
   };
 
-  // Handle unit selection
+  // Handle unit selection - only update local state; calc effect pushes to parent
   const handleUnitChange = (unitId: string) => {
     const newUnitId = unitId === "base" ? "" : unitId;
     setProductUnitId(newUnitId);
-    const currentProductId = productId && productId !== "0" ? parseInt(productId) : null;
     const selectedProduct = products.find(p => p.id.toString() === productId);
     
     if (unitId && unitId !== "base") {
@@ -169,7 +168,6 @@ export function InvoiceItemRow({
       setPrice(basePrice);
       itemRef.current = { ...itemRef.current, selectedUnit: null };
     }
-    onProductSelectRef.current(index, currentProductId, newUnitId ? parseInt(newUnitId) : null);
   };
 
   // Calculate totals when inputs change and push to parent
