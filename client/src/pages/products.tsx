@@ -720,6 +720,11 @@ export default function ProductsPage() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {product.name}
+                          {product.productType === 'bundle' && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                              BUNDLE
+                            </span>
+                          )}
                           {product.isActive === false && (
                             <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full">
                               Inactive

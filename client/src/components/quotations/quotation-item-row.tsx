@@ -23,6 +23,7 @@ interface Product {
   name: string;
   description: string;
   currentSellingPrice: string;
+  productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
   currentStock?: number;
   reservedQty?: number;
@@ -234,7 +235,14 @@ export function QuotationItemRow({
                       )}
                     />
                     <div className="flex justify-between items-center w-full">
-                      <span>{product.name}</span>
+                      <div className="flex items-center gap-1">
+                        <span>{product.name}</span>
+                        {product.productType === 'bundle' && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                            BUNDLE
+                          </span>
+                        )}
+                      </div>
                       <span className={cn(
                         "text-xs ml-2",
                         (product.availableStock ?? product.currentStock ?? 0) === 0 ? "text-red-500" :
