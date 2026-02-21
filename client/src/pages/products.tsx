@@ -94,9 +94,10 @@ type Product = {
   isLowStock?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
   productType?: 'standard' | 'bundle';
-  unit?: string; // Base unit from database (pcs, kg, meter, etc.)
+  unit?: string;
   categoryId?: number | null;
   category?: Category;
+  isActive?: boolean;
 };
 
 type BundleComponent = {
@@ -146,6 +147,8 @@ type ProductFormValues = z.infer<typeof productSchema>;
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "standard" | "bundle">("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -385,8 +388,16 @@ export default function ProductsPage() {
         const matchesStock = stockFilter === "all" ||
           (stockFilter === "low" && available > 0 && available <= minStock) ||
           (stockFilter === "out" && available <= 0);
+
+        const matchesStatus = statusFilter === "all" ||
+          (statusFilter === "active" && product.isActive !== false) ||
+          (statusFilter === "inactive" && product.isActive === false);
+
+        const matchesType = typeFilter === "all" ||
+          (typeFilter === "standard" && (product.productType || 'standard') === 'standard') ||
+          (typeFilter === "bundle" && product.productType === 'bundle');
           
-        return matchesSearch && matchesStock;
+        return matchesSearch && matchesStock && matchesStatus && matchesType;
       })
     : [];
   
@@ -645,8 +656,8 @@ export default function ProductsPage() {
       
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative w-full md:w-80">
+          <div className="flex flex-col md:flex-row flex-wrap gap-4">
+            <div className="relative w-full md:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Search products..."
@@ -656,13 +667,39 @@ export default function ProductsPage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium whitespace-nowrap">Stock Status:</Label>
-              <Select value={stockFilter} onValueChange={(val: any) => setStockFilter(val)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="All Status" />
+              <Label className="text-sm font-medium whitespace-nowrap">Status:</Label>
+              <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Products</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">Type:</Label>
+              <Select value={typeFilter} onValueChange={(val: any) => setTypeFilter(val)}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="bundle">Bundle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">Stock:</Label>
+              <Select value={stockFilter} onValueChange={(val: any) => setStockFilter(val)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="low" className="text-amber-600 font-medium">Low Stock</SelectItem>
                   <SelectItem value="out" className="text-red-600 font-medium">Out of Stock</SelectItem>
                 </SelectContent>
