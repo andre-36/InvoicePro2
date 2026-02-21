@@ -711,19 +711,6 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium whitespace-nowrap">Name:</Label>
-              <Select value={nameSort} onValueChange={(val: any) => setNameSort(val)}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Default</SelectItem>
-                  <SelectItem value="asc">A → Z</SelectItem>
-                  <SelectItem value="desc">Z → A</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardHeader>
         
@@ -765,7 +752,14 @@ export default function ProductsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[300px]">Name</TableHead>
+                    <TableHead className="w-[300px] cursor-pointer select-none" onClick={() => setNameSort(prev => prev === "none" ? "asc" : prev === "asc" ? "desc" : "none")}>
+                      <div className="flex items-center gap-1">
+                        Name
+                        <ArrowUpDown className={`h-4 w-4 ${nameSort !== "none" ? "text-primary" : "text-muted-foreground/50"}`} />
+                        {nameSort === "asc" && <span className="text-xs text-muted-foreground">A→Z</span>}
+                        {nameSort === "desc" && <span className="text-xs text-muted-foreground">Z→A</span>}
+                      </div>
+                    </TableHead>
                     <TableHead className="w-[150px]">SKU/Code</TableHead>
                     <TableHead className="w-[80px] text-right">Stock</TableHead>
                     <TableHead className="w-[80px] text-right">Reserved</TableHead>
