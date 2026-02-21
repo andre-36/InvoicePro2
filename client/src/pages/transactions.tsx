@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle, Download, Wallet, Lock } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, ArrowUpCircle, ArrowDownCircle, Download, Wallet, Lock, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -60,6 +61,8 @@ const transactionFormSchema = insertTransactionSchema.extend({
 
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
+const PAGE_SIZE = 10;
+
 export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -69,6 +72,11 @@ export default function TransactionsPage() {
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
   const [exportType, setExportType] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -279,10 +287,39 @@ export default function TransactionsPage() {
     }
   };
 
-  // Calculate totals
-  const totalIncome = transactions?.filter(t => t.type === 'income').reduce((sum, t) => sum + parseFloat(t.amount), 0) || 0;
-  const totalExpenses = transactions?.filter(t => t.type === 'expense').reduce((sum, t) => sum + parseFloat(t.amount), 0) || 0;
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+    return transactions.filter(t => {
+      const matchesType = typeFilter === "all" || t.type === typeFilter;
+
+      const matchesSearch = !searchQuery ||
+        (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.referenceNumber || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+      const txDate = t.date ? format(new Date(t.date), 'yyyy-MM-dd') : '';
+      const matchesDateFrom = !dateFrom || txDate >= dateFrom;
+      const matchesDateTo = !dateTo || txDate <= dateTo;
+
+      return matchesType && matchesSearch && matchesDateFrom && matchesDateTo;
+    });
+  }, [transactions, typeFilter, searchQuery, dateFrom, dateTo]);
+
+  const totalCount = filteredTransactions.length;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const paginatedTransactions = totalCount > PAGE_SIZE
+    ? filteredTransactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    : filteredTransactions;
+
+  const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  const totalExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + parseFloat(t.amount), 0);
   const netBalance = totalIncome - totalExpenses;
+
+  useEffect(() => {
+    if (currentPage > 1 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [totalPages, currentPage]);
 
   return (
     <div className="space-y-5">
@@ -343,8 +380,64 @@ export default function TransactionsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Transactions</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between mb-3">
+            <CardTitle>All Transactions</CardTitle>
+            {totalCount > 0 && (
+              <span className="text-sm text-muted-foreground">{totalCount} records</span>
+            )}
+          </div>
+          <div className="flex flex-col md:flex-row flex-wrap gap-3">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search description, category..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">Type:</Label>
+              <Select value={typeFilter} onValueChange={(val: any) => { setTypeFilter(val); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">From:</Label>
+              <Input
+                type="date"
+                className="w-[160px]"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">To:</Label>
+              <Input
+                type="date"
+                className="w-[160px]"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            {(searchQuery || typeFilter !== "all" || dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSearchQuery(""); setTypeFilter("all"); setDateFrom(""); setDateTo(""); setCurrentPage(1); }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -353,108 +446,236 @@ export default function TransactionsPage() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : !transactions || transactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <DollarSign className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
               <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">No transactions</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new transaction.</p>
-              <div className="mt-6">
-                <Button onClick={handleAdd} data-testid="button-add-first-transaction">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Button>
-              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {(searchQuery || typeFilter !== "all" || dateFrom || dateTo)
+                  ? "No transactions match your filter criteria. Try adjusting your filters."
+                  : "Get started by creating a new transaction."}
+              </p>
+              {!(searchQuery || typeFilter !== "all" || dateFrom || dateTo) && (
+                <div className="mt-6">
+                  <Button onClick={handleAdd} data-testid="button-add-first-transaction">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Transaction
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Cash Account</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((transaction) => (
-                    <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
-                      <TableCell className="font-medium">
-                        <div>{format(new Date(transaction.date), 'MMM dd, yyyy')}</div>
-                        {transaction.createdAt && (
-                          <div className="text-xs text-gray-500">{format(new Date(transaction.createdAt), 'HH:mm')}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={transaction.type === 'income' ? 'default' : 'destructive'}
-                          className={transaction.type === 'income' ? 'bg-green-600 hover:bg-green-700' : ''}
-                        >
-                          {transaction.type === 'income' ? (
-                            <ArrowUpCircle className="h-3 w-3 mr-1" />
-                          ) : (
-                            <ArrowDownCircle className="h-3 w-3 mr-1" />
-                          )}
-                          {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
-                      <TableCell>{transaction.category || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Wallet className="h-3 w-3 text-gray-400" />
-                          {getCashAccountName(transaction.accountId)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-gray-500 dark:text-gray-400">{transaction.referenceNumber || '-'}</TableCell>
-                      <TableCell className={`text-right font-semibold ${transaction.type === 'income' ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isLinkedTransaction(transaction) ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="flex justify-end items-center gap-1 text-gray-400">
-                                  <Lock className="h-3.5 w-3.5" />
-                                  <span className="text-xs">{getLinkedSource(transaction)}</span>
+            <div className="space-y-3">
+              {totalCount > PAGE_SIZE ? (
+                <ScrollArea className="h-[480px]">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Cash Account</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedTransactions.map((transaction) => (
+                          <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                            <TableCell className="font-medium">
+                              <div>{format(new Date(transaction.date), 'MMM dd, yyyy')}</div>
+                              {transaction.createdAt && (
+                                <div className="text-xs text-gray-500">{format(new Date(transaction.createdAt), 'HH:mm')}</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={transaction.type === 'income' ? 'default' : 'destructive'}
+                                className={transaction.type === 'income' ? 'bg-green-600 hover:bg-green-700' : ''}
+                              >
+                                {transaction.type === 'income' ? (
+                                  <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                ) : (
+                                  <ArrowDownCircle className="h-3 w-3 mr-1" />
+                                )}
+                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
+                            <TableCell>{transaction.category || '-'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Wallet className="h-3 w-3 text-gray-400" />
+                                {getCashAccountName(transaction.accountId)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-gray-500 dark:text-gray-400">{transaction.referenceNumber || '-'}</TableCell>
+                            <TableCell className={`text-right font-semibold ${transaction.type === 'income' ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                              {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isLinkedTransaction(transaction) ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex justify-end items-center gap-1 text-gray-400">
+                                        <Lock className="h-3.5 w-3.5" />
+                                        <span className="text-xs">{getLinkedSource(transaction)}</span>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Transaksi ini dibuat dari {getLinkedSource(transaction)}.</p>
+                                      <p>Edit/hapus hanya dari dokumen asalnya.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(transaction)}
+                                    data-testid={`button-edit-${transaction.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDeletingTransaction(transaction)}
+                                    data-testid={`button-delete-${transaction.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
                                 </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Transaksi ini dibuat dari {getLinkedSource(transaction)}.</p>
-                                <p>Edit/hapus hanya dari dokumen asalnya.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(transaction)}
-                              data-testid={`button-edit-${transaction.id}`}
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Cash Account</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedTransactions.map((transaction) => (
+                        <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                          <TableCell className="font-medium">
+                            <div>{format(new Date(transaction.date), 'MMM dd, yyyy')}</div>
+                            {transaction.createdAt && (
+                              <div className="text-xs text-gray-500">{format(new Date(transaction.createdAt), 'HH:mm')}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={transaction.type === 'income' ? 'default' : 'destructive'}
+                              className={transaction.type === 'income' ? 'bg-green-600 hover:bg-green-700' : ''}
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingTransaction(transaction)}
-                              data-testid={`button-delete-${transaction.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                              {transaction.type === 'income' ? (
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                              ) : (
+                                <ArrowDownCircle className="h-3 w-3 mr-1" />
+                              )}
+                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
+                          <TableCell>{transaction.category || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Wallet className="h-3 w-3 text-gray-400" />
+                              {getCashAccountName(transaction.accountId)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-gray-500 dark:text-gray-400">{transaction.referenceNumber || '-'}</TableCell>
+                          <TableCell className={`text-right font-semibold ${transaction.type === 'income' ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isLinkedTransaction(transaction) ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex justify-end items-center gap-1 text-gray-400">
+                                      <Lock className="h-3.5 w-3.5" />
+                                      <span className="text-xs">{getLinkedSource(transaction)}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Transaksi ini dibuat dari {getLinkedSource(transaction)}.</p>
+                                    <p>Edit/hapus hanya dari dokumen asalnya.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(transaction)}
+                                  data-testid={`button-edit-${transaction.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeletingTransaction(transaction)}
+                                  data-testid={`button-delete-${transaction.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
