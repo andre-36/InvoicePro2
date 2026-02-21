@@ -149,6 +149,7 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "standard" | "bundle">("all");
+  const [nameSort, setNameSort] = useState<"none" | "asc" | "desc">("none");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -398,6 +399,11 @@ export default function ProductsPage() {
           (typeFilter === "bundle" && product.productType === 'bundle');
           
         return matchesSearch && matchesStock && matchesStatus && matchesType;
+      })
+      .sort((a, b) => {
+        if (nameSort === "asc") return a.name.localeCompare(b.name);
+        if (nameSort === "desc") return b.name.localeCompare(a.name);
+        return 0;
       })
     : [];
   
@@ -702,6 +708,19 @@ export default function ProductsPage() {
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="low" className="text-amber-600 font-medium">Low Stock</SelectItem>
                   <SelectItem value="out" className="text-red-600 font-medium">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">Name:</Label>
+              <Select value={nameSort} onValueChange={(val: any) => setNameSort(val)}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Default</SelectItem>
+                  <SelectItem value="asc">A → Z</SelectItem>
+                  <SelectItem value="desc">Z → A</SelectItem>
                 </SelectContent>
               </Select>
             </div>
