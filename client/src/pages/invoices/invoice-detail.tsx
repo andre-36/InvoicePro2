@@ -448,6 +448,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposit-balance'], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposits'], refetchType: 'all' });
+      }
       toast({
         title: "Success",
         description: "Payment deleted successfully.",
