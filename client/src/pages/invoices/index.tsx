@@ -50,7 +50,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDF } from "@/lib/pdf-generator";
 
-type PaymentStatus = 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+type PaymentStatus = 'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue';
 type DeliveryStatus = 'undelivered' | 'partial_delivered' | 'delivered';
 
 type Invoice = {
@@ -240,6 +240,8 @@ export default function InvoicesPage() {
         return <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
       case 'paid':
         return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+      case 'overpaid':
+        return <Badge className="bg-purple-100 text-purple-800">Overpaid</Badge>;
       case 'overdue':
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
       default:
@@ -449,6 +451,7 @@ export default function InvoicesPage() {
                           <SelectItem value="unpaid">Unpaid</SelectItem>
                           <SelectItem value="partial_paid">Partial Paid</SelectItem>
                           <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="overpaid">Overpaid</SelectItem>
                           <SelectItem value="overdue">Overdue</SelectItem>
                         </SelectContent>
                       </Select>

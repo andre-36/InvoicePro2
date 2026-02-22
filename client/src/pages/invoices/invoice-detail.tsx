@@ -446,6 +446,41 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     }
   });
 
+  // Refund overpayment state
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundForm, setRefundForm] = useState({
+    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+    paymentType: 'Cash',
+    amount: '',
+    notes: '',
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('POST', `/api/invoices/${id}/refund`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
+      if (invoice) {
+        queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
+      }
+      setRefundDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Refund processed successfully. An expense transaction has been created.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to process refund: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Create delivery note mutation
   const createDeliveryNoteMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1122,7 +1157,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   }, 0);
 
   const invoiceTotal = invoice ? parseFloat(invoice.totalAmount) : 0;
-  const canAddPayment = totalPaymentsMade < invoiceTotal || editingPayment;
+  const canAddPayment = true;
 
   const handlePaymentSubmit = () => {
     if (!paymentForm.amount) {
@@ -1674,7 +1709,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             {/* Payment Summary Infographic */}
             {(() => {
               const remaining = invoiceTotal - totalPaymentsMade;
+              const overpayment = totalPaymentsMade - invoiceTotal;
               const paymentProgress = invoiceTotal > 0 ? (totalPaymentsMade / invoiceTotal) * 100 : 0;
+              const isOverpaid = overpayment > 0.001;
               const isFullyPaid = remaining <= 0;
               
               return (
@@ -1689,15 +1726,46 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                       <span className="text-gray-600">Total Paid</span>
                       <span className="font-medium text-green-600">{formatCurrency(totalPaymentsMade)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Remaining</span>
-                      <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {formatCurrency(Math.max(0, remaining))}
-                      </span>
-                    </div>
+                    {isOverpaid ? (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Overpayment</span>
+                        <span className="font-semibold text-purple-600">{formatCurrency(overpayment)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Remaining</span>
+                        <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {formatCurrency(Math.max(0, remaining))}
+                        </span>
+                      </div>
+                    )}
                     <Progress value={Math.min(100, paymentProgress)} className="h-2 mt-2" />
                   </div>
-                  {isFullyPaid ? (
+                  {isOverpaid ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="p-2 bg-purple-100 text-purple-800 rounded text-sm text-center">
+                        <AlertTriangle className="h-4 w-4 inline mr-2" />
+                        Overpaid by {formatCurrency(overpayment)}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-purple-300 text-purple-700 hover:bg-purple-50"
+                        onClick={() => {
+                          setRefundForm({
+                            paymentDate: format(new Date(), 'yyyy-MM-dd'),
+                            paymentType: paymentTypes?.[0]?.name || 'Cash',
+                            amount: overpayment.toFixed(2),
+                            notes: '',
+                          });
+                          setRefundDialogOpen(true);
+                        }}
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Refund Overpayment
+                      </Button>
+                    </div>
+                  ) : isFullyPaid ? (
                     <div className="mt-3 p-2 bg-green-100 text-green-800 rounded text-sm text-center">
                       <CheckCircle className="h-4 w-4 inline mr-2" />
                       Fully Paid
@@ -1760,14 +1828,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {invoicePayments.map((payment: any) => (
-                      <tr key={payment.id}>
+                    {invoicePayments.map((payment: any) => {
+                      const isRefund = parseFloat(payment.amount) < 0;
+                      return (
+                      <tr key={payment.id} className={isRefund ? 'bg-purple-50' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.paymentType}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                          {formatCurrency(parseFloat(payment.amount))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {isRefund ? <span className="text-purple-700">Refund ({payment.paymentType})</span> : payment.paymentType}
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${isRefund ? 'text-purple-700' : 'text-gray-900'}`}>
+                          {isRefund ? `(${formatCurrency(Math.abs(parseFloat(payment.amount)))})` : formatCurrency(parseFloat(payment.amount))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.notes || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
@@ -1791,7 +1863,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1916,6 +1989,88 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     data-testid="button-save-payment"
                   >
                     {editingPayment ? 'Update Payment' : 'Add Payment'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Refund Overpayment Dialog */}
+            <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Refund Overpayment</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+                    <AlertTriangle className="h-4 w-4 inline mr-2" />
+                    This will create an expense transaction to record the refund.
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Date</label>
+                    <Input
+                      type="date"
+                      value={refundForm.paymentDate}
+                      onChange={(e) => setRefundForm({ ...refundForm, paymentDate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                    <Select
+                      value={refundForm.paymentType}
+                      onValueChange={(value) => setRefundForm({ ...refundForm, paymentType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentTypes && paymentTypes.filter(pt => pt.isActive).length > 0 ? (
+                          paymentTypes.filter(pt => pt.isActive).map((pt) => (
+                            <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Amount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={refundForm.amount}
+                      onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <Textarea
+                      value={refundForm.notes}
+                      onChange={(e) => setRefundForm({ ...refundForm, notes: e.target.value })}
+                      rows={2}
+                      placeholder="Optional notes..."
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRefundDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => refundMutation.mutate(refundForm)}
+                    disabled={refundMutation.isPending}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {refundMutation.isPending ? 'Processing...' : 'Process Refund'}
                   </Button>
                 </DialogFooter>
               </DialogContent>

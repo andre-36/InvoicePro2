@@ -2338,6 +2338,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Refund overpayment for an invoice
+  app.post("/api/invoices/:invoiceId/refund", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const { amount, paymentType, notes, paymentDate } = req.body;
+
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Invalid refund amount" });
+      }
+
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const allPayments = await storage.getInvoicePayments(invoiceId);
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      const invoiceTotal = parseFloat(invoice.totalAmount);
+      const overpaymentAmount = totalPaid - invoiceTotal;
+
+      if (overpaymentAmount <= 0) {
+        return res.status(400).json({ error: "Invoice is not overpaid" });
+      }
+
+      const refundAmount = parseFloat(amount);
+      if (refundAmount > overpaymentAmount + 0.01) {
+        return res.status(400).json({ error: `Refund amount cannot exceed overpayment of ${overpaymentAmount.toFixed(2)}` });
+      }
+
+      const refundDate = paymentDate || new Date().toISOString().split('T')[0];
+
+      const refundPayment = await storage.createInvoicePayment({
+        invoiceId,
+        paymentDate: refundDate,
+        paymentType: paymentType || 'Cash',
+        amount: (-refundAmount).toFixed(2),
+        notes: notes || `Refund overpayment`,
+      });
+
+      const store = await storage.getStore(invoice.storeId);
+
+      let clientName = '';
+      if (invoice.clientId) {
+        const client = await storage.getClient(invoice.clientId);
+        clientName = client?.name || '';
+      }
+
+      const pType = await storage.getPaymentTypeByName(invoice.storeId, paymentType || 'Cash');
+
+      const transactionData: any = {
+        storeId: invoice.storeId,
+        type: 'expense' as const,
+        category: 'Refund Overpayment',
+        amount: refundAmount.toFixed(2),
+        date: refundDate,
+        description: `Refund overpayment for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ''} (${paymentType || 'Cash'})`,
+        referenceNumber: `Invoice #${invoice.invoiceNumber}`,
+        invoiceId: invoiceId,
+        invoicePaymentId: refundPayment.id,
+      };
+
+      if (pType?.cashAccountId) {
+        transactionData.accountId = pType.cashAccountId;
+      }
+
+      await storage.createTransaction(transactionData);
+
+      res.status(201).json({ success: true, refundPayment });
+    } catch (error) {
+      console.error("Error processing refund:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Delivery note routes
   app.get("/api/stores/:storeId/delivery-notes", requireAuth, async (req, res) => {
     try {
@@ -4701,6 +4775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'Jatuh Tempo': invoice.dueDate,
             'Client': client?.name || '-',
             'Status Pembayaran': invoice.paymentStatus === 'paid' ? 'Lunas' :
+                                invoice.paymentStatus === 'overpaid' ? 'Lebih Bayar' :
                                 invoice.paymentStatus === 'partial_paid' ? 'Sebagian' :
                                 invoice.paymentStatus === 'overdue' ? 'Jatuh Tempo' : 'Belum Bayar',
             'Kode Produk': product?.sku || '-',

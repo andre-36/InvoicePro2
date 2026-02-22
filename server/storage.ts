@@ -145,7 +145,7 @@ export interface IStorage {
   getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
   getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
     clientName: string | null; 
-    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue';
     deliveryStatus: 'undelivered' | 'partial_delivered' | 'delivered';
   })[]>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
@@ -158,7 +158,7 @@ export interface IStorage {
   updateInvoiceStatus(id: number, status: string): Promise<Invoice>;
   voidInvoice(id: number): Promise<Invoice>;
   deleteInvoice(id: number): Promise<void>;
-  calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overdue'>;
+  calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue'>;
   calculateDeliveryStatus(invoiceId: number): Promise<'undelivered' | 'partial_delivered' | 'delivered'>;
 
   // Invoice payment methods
@@ -2794,7 +2794,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Calculate payment status for an invoice
-  async calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overdue'> {
+  async calculatePaymentStatus(invoiceId: number, totalAmount: string, dueDate: string): Promise<'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue'> {
     const payments = await db
       .select({ amount: invoicePayments.amount })
       .from(invoicePayments)
@@ -2803,7 +2803,11 @@ export class DatabaseStorage implements IStorage {
     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
     const total = parseFloat(totalAmount || '0');
     
-    if (totalPaid >= total) {
+    if (totalPaid > total) {
+      return 'overpaid';
+    }
+    
+    if (totalPaid >= total && totalPaid > 0) {
       return 'paid';
     }
     
@@ -2855,7 +2859,7 @@ export class DatabaseStorage implements IStorage {
   // Get invoices with calculated payment and delivery status
   async getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
     clientName: string | null; 
-    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overdue';
+    paymentStatus: 'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue';
     deliveryStatus: 'undelivered' | 'partial_delivered' | 'delivered';
   })[]> {
     const baseInvoices = await this.getInvoices(storeId);
