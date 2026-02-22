@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt, Wallet, RefreshCw } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt, Wallet, RefreshCw, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientForm } from "@/components/clients/client-form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -93,23 +94,32 @@ export default function ClientDetailPage() {
     queryKey: ['/api/clients', clientId, 'deposits'],
   });
 
+  type CashAccountItem = { id: number; name: string; accountType: string };
+  const { data: cashAccounts } = useQuery<CashAccountItem[]>({
+    queryKey: ['/api/cash-accounts'],
+  });
+
   const { toast } = useToast();
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [refundForm, setRefundForm] = useState({
     amount: '',
     notes: '',
     date: format(new Date(), 'yyyy-MM-dd'),
+    cashAccountId: '',
   });
 
   const refundDepositMutation = useMutation({
-    mutationFn: async (data: { amount: string; notes: string; date: string }) => {
-      return apiRequest('POST', `/api/clients/${clientId}/refund-deposit`, data);
+    mutationFn: async (data: { amount: string; notes: string; date: string; cashAccountId: string }) => {
+      return apiRequest('POST', `/api/clients/${clientId}/refund-deposit`, {
+        ...data,
+        cashAccountId: data.cashAccountId ? parseInt(data.cashAccountId) : undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposit-balance'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposits'], refetchType: 'all' });
       setRefundDialogOpen(false);
-      setRefundForm({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') });
+      setRefundForm({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd'), cashAccountId: '' });
       toast({
         title: "Berhasil",
         description: "Deposit berhasil direfund.",
@@ -248,7 +258,7 @@ export default function ClientDetailPage() {
                 size="sm" 
                 className="mt-2 text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
                 onClick={() => {
-                  setRefundForm({ amount: depositBalance.toString(), notes: '', date: format(new Date(), 'yyyy-MM-dd') });
+                  setRefundForm({ amount: depositBalance.toString(), notes: '', date: format(new Date(), 'yyyy-MM-dd'), cashAccountId: '' });
                   setRefundDialogOpen(true);
                 }}
               >
@@ -597,6 +607,30 @@ export default function ClientDetailPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Akun Kas</Label>
+              <Select
+                value={refundForm.cashAccountId}
+                onValueChange={(value) => setRefundForm({ ...refundForm, cashAccountId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih akun kas" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashAccounts?.map((account) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-3 w-3 text-gray-400" />
+                        {account.name}
+                        <span className="text-xs text-gray-400">
+                          ({account.accountType === 'cash' ? 'Kas' : account.accountType === 'bank_company' ? 'Bank Perusahaan' : account.accountType === 'bank_personal' ? 'Bank Pribadi' : 'Lainnya'})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Tanggal</Label>
               <Input
                 type="date"
@@ -621,7 +655,7 @@ export default function ClientDetailPage() {
             <Button
               variant="destructive"
               onClick={() => refundDepositMutation.mutate(refundForm)}
-              disabled={refundDepositMutation.isPending || !refundForm.amount || parseFloat(refundForm.amount) <= 0}
+              disabled={refundDepositMutation.isPending || !refundForm.amount || parseFloat(refundForm.amount) <= 0 || !refundForm.cashAccountId}
             >
               {refundDepositMutation.isPending ? 'Memproses...' : 'Refund'}
             </Button>
