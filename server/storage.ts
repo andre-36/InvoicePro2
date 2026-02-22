@@ -6,7 +6,7 @@ import {
   transactions, stores, settings, categories, inflowCategories, outflowCategories, importExportLogs, purchaseOrders, purchaseOrderItems, 
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
-  returns, returnItems, creditNoteUsages, stockAdjustments, roles, companySettings,
+  returns, returnItems, creditNoteUsages, stockAdjustments, roles, companySettings, clientDeposits,
 
   type User, type InsertUser, type Store, type InsertStore, type Role, type InsertRole,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -31,7 +31,8 @@ import {
   type Return, type InsertReturn, type ReturnItem, type InsertReturnItem,
   type CreditNoteUsage, type InsertCreditNoteUsage,
   type StockAdjustment, type InsertStockAdjustment,
-  type CompanySettings, type InsertCompanySettings
+  type CompanySettings, type InsertCompanySettings,
+  type ClientDeposit, type InsertClientDeposit
 } from "../shared/schema";
 
 import session from "express-session";
@@ -366,6 +367,12 @@ export interface IStorage {
   createCreditNoteUsage(usage: InsertCreditNoteUsage): Promise<CreditNoteUsage>;
   applyCreditNoteToPayment(returnId: number, invoicePaymentId: number, amount: number): Promise<CreditNoteUsage>;
   convertCreditNoteToRefund(returnId: number, amount: number): Promise<CreditNoteUsage>;
+
+  // Client Deposit methods
+  getClientDeposits(clientId: number): Promise<ClientDeposit[]>;
+  getClientDepositBalance(clientId: number): Promise<number>;
+  createClientDeposit(deposit: InsertClientDeposit): Promise<ClientDeposit>;
+  deleteClientDepositByPaymentId(invoicePaymentId: number): Promise<void>;
 
   // Dashboard metrics
   getDashboardStats(storeId: number): Promise<DashboardStats>;
@@ -6549,6 +6556,35 @@ export class DatabaseStorage implements IStorage {
 
       return usage;
     });
+  }
+
+  async getClientDeposits(clientId: number): Promise<ClientDeposit[]> {
+    return db
+      .select()
+      .from(clientDeposits)
+      .where(eq(clientDeposits.clientId, clientId))
+      .orderBy(desc(clientDeposits.createdAt));
+  }
+
+  async getClientDepositBalance(clientId: number): Promise<number> {
+    const deposits = await db
+      .select({ amount: clientDeposits.amount, type: clientDeposits.type })
+      .from(clientDeposits)
+      .where(eq(clientDeposits.clientId, clientId));
+    
+    return deposits.reduce((balance, d) => {
+      const amt = parseFloat(d.amount || '0');
+      return d.type === 'deposit' ? balance + amt : balance - amt;
+    }, 0);
+  }
+
+  async createClientDeposit(deposit: InsertClientDeposit): Promise<ClientDeposit> {
+    const [created] = await db.insert(clientDeposits).values(deposit).returning();
+    return created;
+  }
+
+  async deleteClientDepositByPaymentId(invoicePaymentId: number): Promise<void> {
+    await db.delete(clientDeposits).where(eq(clientDeposits.invoicePaymentId, invoicePaymentId));
   }
 }
 

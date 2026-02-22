@@ -1204,6 +1204,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id/deposits", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const deposits = await storage.getClientDeposits(clientId);
+      res.json(deposits);
+    } catch (error) {
+      console.error("Error getting client deposits:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/clients/:id/deposit-balance", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const balance = await storage.getClientDepositBalance(clientId);
+      res.json({ balance });
+    } catch (error) {
+      console.error("Error getting client deposit balance:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/clients/:id/invoices", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
@@ -2202,6 +2224,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newPayment.id, 
             parseFloat(validatedData.amount)
           );
+        } else if (validatedData.paymentType === 'Client Deposit') {
+          if (invoice.clientId) {
+            const currentBalance = await storage.getClientDepositBalance(invoice.clientId);
+            const paymentAmount = parseFloat(validatedData.amount);
+            
+            if (paymentAmount > currentBalance + 0.01) {
+              return res.status(400).json({ error: `Insufficient deposit balance. Available: ${currentBalance.toFixed(2)}` });
+            }
+            
+            const newBalance = currentBalance - paymentAmount;
+            
+            await storage.createClientDeposit({
+              clientId: invoice.clientId,
+              storeId: invoice.storeId,
+              type: 'usage',
+              amount: paymentAmount.toFixed(2),
+              balance: newBalance.toFixed(2),
+              invoiceId: invoiceId,
+              invoicePaymentId: newPayment.id,
+              description: `Used for invoice ${invoice.invoiceNumber}`,
+              date: validatedData.paymentDate,
+            });
+          }
         } else {
           // Only create transaction for non-credit-note payments (actual cash receipts)
           // Lookup payment type to get cash account and deduction percentage
@@ -2290,6 +2335,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get the payment details before deleting (to find matching transaction and credit note)
       const payment = await storage.getInvoicePayment(paymentId);
+      
+      // If payment was from client deposit, remove the usage record to restore balance
+      if (payment && payment.paymentType === 'Client Deposit') {
+        await storage.deleteClientDepositByPaymentId(paymentId);
+      }
       
       // If payment was from a credit note, restore the credit note balance
       if (payment && payment.creditNoteId) {
@@ -2408,6 +2458,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({ success: true, refundPayment });
     } catch (error) {
       console.error("Error processing refund:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/deposit", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const { amount, notes, paymentDate } = req.body;
+
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Invalid deposit amount" });
+      }
+
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      if (!invoice.clientId) {
+        return res.status(400).json({ error: "Invoice has no client. Deposit requires a client." });
+      }
+
+      const allPayments = await storage.getInvoicePayments(invoiceId);
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      const invoiceTotal = parseFloat(invoice.totalAmount);
+      const overpaymentAmount = totalPaid - invoiceTotal;
+
+      if (overpaymentAmount <= 0) {
+        return res.status(400).json({ error: "Invoice is not overpaid" });
+      }
+
+      const depositAmount = parseFloat(amount);
+      if (depositAmount > overpaymentAmount + 0.01) {
+        return res.status(400).json({ error: `Deposit amount cannot exceed overpayment of ${overpaymentAmount.toFixed(2)}` });
+      }
+
+      const depositDate = paymentDate || new Date().toISOString().split('T')[0];
+
+      const depositPayment = await storage.createInvoicePayment({
+        invoiceId,
+        paymentDate: depositDate,
+        paymentType: 'Client Deposit',
+        amount: (-depositAmount).toFixed(2),
+        notes: notes || `Overpayment deposited to client balance`,
+      });
+
+      const currentBalance = await storage.getClientDepositBalance(invoice.clientId);
+      const newBalance = currentBalance + depositAmount;
+
+      await storage.createClientDeposit({
+        clientId: invoice.clientId,
+        storeId: invoice.storeId,
+        type: 'deposit',
+        amount: depositAmount.toFixed(2),
+        balance: newBalance.toFixed(2),
+        invoiceId: invoiceId,
+        invoicePaymentId: depositPayment.id,
+        description: `Overpayment from invoice ${invoice.invoiceNumber}`,
+        date: depositDate,
+      });
+
+      res.status(201).json({ success: true, depositPayment });
+    } catch (error) {
+      console.error("Error processing deposit:", error);
       res.status(500).json({ error: "Server error" });
     }
   });

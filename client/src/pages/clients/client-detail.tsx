@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,6 +66,25 @@ export default function ClientDetailPage() {
 
   const { data: clientInvoices, isLoading: invoicesLoading } = useQuery<ClientInvoice[]>({
     queryKey: [`/api/clients/${clientId}/invoices`],
+  });
+
+  const { data: depositBalanceData } = useQuery<{ balance: number }>({
+    queryKey: [`/api/clients/${clientId}/deposit-balance`],
+  });
+  const depositBalance = depositBalanceData?.balance || 0;
+
+  type DepositRecord = {
+    id: number;
+    type: string;
+    amount: string;
+    balance: string;
+    invoiceId: number | null;
+    description: string | null;
+    date: string;
+    createdAt: string;
+  };
+  const { data: depositHistory, isLoading: depositsLoading } = useQuery<DepositRecord[]>({
+    queryKey: [`/api/clients/${clientId}/deposits`],
   });
 
   const getStatusBadge = (status: string) => {
@@ -142,7 +161,7 @@ export default function ClientDetailPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-4">
         <Card className="border-gray-200 dark:border-gray-700">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
@@ -167,6 +186,21 @@ export default function ClientDetailPage() {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {stats?.unpaidInvoicesCount === 0 ? 'All paid' : 'Pending payment'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-gray-200 dark:border-gray-700">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Deposit Balance</h3>
+              <Wallet className={`h-5 w-5 ${depositBalance > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+            </div>
+            <div className={`text-2xl font-bold ${depositBalance > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+              Rp {depositBalance.toLocaleString('id-ID')}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {depositBalance > 0 ? 'Available for payments' : 'No deposit'}
             </p>
           </CardContent>
         </Card>
@@ -440,6 +474,52 @@ export default function ClientDetailPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Deposit History */}
+      {depositHistory && depositHistory.length > 0 && (
+        <Card className="border-gray-200 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+              <Wallet className="h-5 w-5" />
+              Deposit History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border max-h-[400px] overflow-y-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10">
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {depositHistory.map((deposit) => (
+                    <TableRow key={deposit.id}>
+                      <TableCell>{format(new Date(deposit.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>
+                        <Badge variant={deposit.type === 'deposit' ? 'default' : 'secondary'}>
+                          {deposit.type === 'deposit' ? 'Deposit' : 'Used'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{deposit.description || '-'}</TableCell>
+                      <TableCell className={`text-right font-medium ${deposit.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
+                        {deposit.type === 'deposit' ? '+' : '-'}Rp {Number(deposit.amount).toLocaleString('id-ID')}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        Rp {Number(deposit.balance).toLocaleString('id-ID')}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

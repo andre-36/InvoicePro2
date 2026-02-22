@@ -99,6 +99,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     staleTime: 0, // Always refetch to get latest credit notes
   });
 
+  const { data: clientDepositData } = useQuery<{ balance: number }>({
+    queryKey: [`/api/clients/${clientId}/deposit-balance`],
+    enabled: !!clientId && clientId !== 0,
+  });
+  const clientDepositBalance = clientDepositData?.balance || 0;
+
   // Fetch delivery notes for this invoice
   const { data: deliveryNotes } = useQuery<DeliveryNote[]>({
     queryKey: ['/api/invoices', id, 'delivery-notes'],
@@ -362,6 +368,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deposit-balance`], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deposits`], refetchType: 'all' });
+      }
       setPaymentDialogOpen(false);
       setPaymentForm({
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
@@ -370,7 +380,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         notes: '',
         creditNoteId: null,
       });
-      // Refetch credit notes to update balances
       refetchCreditNotes();
       toast({
         title: "Success",
@@ -448,6 +457,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   // Refund overpayment state
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundAction, setRefundAction] = useState<'refund' | 'deposit'>('refund');
   const [refundForm, setRefundForm] = useState({
     paymentDate: format(new Date(), 'yyyy-MM-dd'),
     paymentType: 'Cash',
@@ -457,7 +467,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   const refundMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', `/api/invoices/${id}/refund`, data);
+      const endpoint = refundAction === 'deposit' 
+        ? `/api/invoices/${id}/deposit` 
+        : `/api/invoices/${id}/refund`;
+      return apiRequest('POST', endpoint, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
@@ -466,16 +479,21 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
+      if (invoice?.clientId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/clients/${invoice.clientId}/deposits`], refetchType: 'all' });
+      }
       setRefundDialogOpen(false);
       toast({
         title: "Success",
-        description: "Refund processed successfully. An expense transaction has been created.",
+        description: refundAction === 'deposit' 
+          ? "Overpayment deposited to client balance successfully."
+          : "Refund processed successfully. An expense transaction has been created.",
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Failed to process refund: ${error.message}`,
+        description: `Failed to process: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -1829,17 +1847,23 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {invoicePayments.map((payment: any) => {
-                      const isRefund = parseFloat(payment.amount) < 0;
+                      const isNegative = parseFloat(payment.amount) < 0;
+                      const isDeposit = isNegative && payment.paymentType === 'Client Deposit';
+                      const isRefund = isNegative && !isDeposit;
+                      const rowClass = isDeposit ? 'bg-blue-50' : isRefund ? 'bg-purple-50' : '';
+                      const textClass = isDeposit ? 'text-blue-700' : isRefund ? 'text-purple-700' : 'text-gray-900';
                       return (
-                      <tr key={payment.id} className={isRefund ? 'bg-purple-50' : ''}>
+                      <tr key={payment.id} className={rowClass}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {isRefund ? <span className="text-purple-700">Refund ({payment.paymentType})</span> : payment.paymentType}
+                          {isDeposit ? <span className="text-blue-700">Deposited to Balance</span> 
+                            : isRefund ? <span className="text-purple-700">Refund ({payment.paymentType})</span> 
+                            : payment.paymentType}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${isRefund ? 'text-purple-700' : 'text-gray-900'}`}>
-                          {isRefund ? `(${formatCurrency(Math.abs(parseFloat(payment.amount)))})` : formatCurrency(parseFloat(payment.amount))}
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${textClass}`}>
+                          {isNegative ? `(${formatCurrency(Math.abs(parseFloat(payment.amount)))})` : formatCurrency(parseFloat(payment.amount))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.notes || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
@@ -1912,9 +1936,17 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         {clientCreditNotes.length > 0 && (
                           <SelectItem value="Credit Note">Credit Note</SelectItem>
                         )}
+                        {clientDepositBalance > 0 && (
+                          <SelectItem value="Client Deposit">Client Deposit (Bal: {formatCurrency(clientDepositBalance)})</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
+                  {paymentForm.paymentType === 'Client Deposit' && (
+                    <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                      Available deposit balance: <span className="font-semibold">{formatCurrency(clientDepositBalance)}</span>
+                    </div>
+                  )}
                   {paymentForm.paymentType === 'Credit Note' && clientCreditNotes.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Credit Note</label>
@@ -1998,46 +2030,86 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Refund Overpayment</DialogTitle>
+                  <DialogTitle>Handle Overpayment</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Action</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRefundAction('refund')}
+                        className={`p-3 rounded-lg border-2 text-left transition-all ${
+                          refundAction === 'refund' 
+                            ? 'border-purple-500 bg-purple-50 text-purple-800' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="font-medium text-sm">Refund</div>
+                        <div className="text-xs text-gray-500 mt-0.5">Return money to customer</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRefundAction('deposit')}
+                        disabled={!invoice?.clientId}
+                        className={`p-3 rounded-lg border-2 text-left transition-all ${
+                          refundAction === 'deposit' 
+                            ? 'border-blue-500 bg-blue-50 text-blue-800' 
+                            : !invoice?.clientId 
+                              ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                              : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="font-medium text-sm">Deposit</div>
+                        <div className="text-xs text-gray-500 mt-0.5">Save as client balance</div>
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`p-3 rounded-lg text-sm ${
+                    refundAction === 'deposit' 
+                      ? 'bg-blue-50 text-blue-800' 
+                      : 'bg-purple-50 text-purple-800'
+                  }`}>
                     <AlertTriangle className="h-4 w-4 inline mr-2" />
-                    This will create an expense transaction to record the refund.
+                    {refundAction === 'deposit'
+                      ? 'This will save the overpayment as client deposit balance for future invoices.'
+                      : 'This will create an expense transaction to record the refund.'}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                     <Input
                       type="date"
                       value={refundForm.paymentDate}
                       onChange={(e) => setRefundForm({ ...refundForm, paymentDate: e.target.value })}
                     />
                   </div>
+                  {refundAction === 'refund' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                      <Select
+                        value={refundForm.paymentType}
+                        onValueChange={(value) => setRefundForm({ ...refundForm, paymentType: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentTypes && paymentTypes.filter(pt => pt.isActive).length > 0 ? (
+                            paymentTypes.filter(pt => pt.isActive).map((pt) => (
+                              <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                            ))
+                          ) : (
+                            <>
+                              <SelectItem value="Cash">Cash</SelectItem>
+                              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                    <Select
-                      value={refundForm.paymentType}
-                      onValueChange={(value) => setRefundForm({ ...refundForm, paymentType: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentTypes && paymentTypes.filter(pt => pt.isActive).length > 0 ? (
-                          paymentTypes.filter(pt => pt.isActive).map((pt) => (
-                            <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="Cash">Cash</SelectItem>
-                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Amount</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                     <Input
                       type="number"
                       step="0.01"
@@ -2068,9 +2140,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                     type="button"
                     onClick={() => refundMutation.mutate(refundForm)}
                     disabled={refundMutation.isPending}
-                    className="bg-purple-600 hover:bg-purple-700"
+                    className={refundAction === 'deposit' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}
                   >
-                    {refundMutation.isPending ? 'Processing...' : 'Process Refund'}
+                    {refundMutation.isPending ? 'Processing...' : refundAction === 'deposit' ? 'Deposit to Balance' : 'Process Refund'}
                   </Button>
                 </DialogFooter>
               </DialogContent>

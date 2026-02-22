@@ -854,6 +854,26 @@ export const creditNoteUsages = pgTable("credit_note_usages", {
   };
 });
 
+// Client Deposits table (tracking overpayment deposits for future use)
+export const clientDeposits = pgTable("client_deposits", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // 'deposit' or 'usage'
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  balance: numeric("balance", { precision: 15, scale: 2 }).notNull(),
+  invoiceId: integer("invoice_id").references(() => invoices.id),
+  invoicePaymentId: integer("invoice_payment_id").references(() => invoicePayments.id),
+  description: text("description"),
+  date: date("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    clientIdIdx: index("client_deposits_client_id_idx").on(table.clientId),
+    storeIdIdx: index("client_deposits_store_id_idx").on(table.storeId)
+  };
+});
+
 // Define available permissions for role-based access control
 export const AVAILABLE_PERMISSIONS = [
   'products.view',
@@ -982,6 +1002,7 @@ export const insertCreditNoteUsageSchema = createInsertSchema(creditNoteUsages).
 export const insertGoodsReceiptSchema = createInsertSchema(goodsReceipts).omit({ id: true, receiptNumber: true, createdAt: true, updatedAt: true });
 export const insertGoodsReceiptItemSchema = createInsertSchema(goodsReceiptItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertGoodsReceiptPaymentSchema = createInsertSchema(goodsReceiptPayments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertClientDepositSchema = createInsertSchema(clientDeposits).omit({ id: true, createdAt: true });
 
 // Define types for TypeScript
 export type User = typeof users.$inferSelect;
@@ -1098,6 +1119,9 @@ export type InsertGoodsReceiptItem = z.infer<typeof insertGoodsReceiptItemSchema
 export type GoodsReceiptPayment = typeof goodsReceiptPayments.$inferSelect;
 export type InsertGoodsReceiptPayment = z.infer<typeof insertGoodsReceiptPaymentSchema>;
 
+export type ClientDeposit = typeof clientDeposits.$inferSelect;
+export type InsertClientDeposit = z.infer<typeof insertClientDepositSchema>;
+
 // Custom relation types
 export type ProductWithBatches = Product & { batches: ProductBatch[] };
 export type ProductWithDetails = Product & { 
@@ -1159,7 +1183,14 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
 export const clientsRelations = relations(clients, ({ one, many }) => ({
   store: one(stores, { fields: [clients.storeId], references: [stores.id] }),
   invoices: many(invoices),
-  quotations: many(quotations)
+  quotations: many(quotations),
+  deposits: many(clientDeposits)
+}));
+
+export const clientDepositsRelations = relations(clientDeposits, ({ one }) => ({
+  client: one(clients, { fields: [clientDeposits.clientId], references: [clients.id] }),
+  store: one(stores, { fields: [clientDeposits.storeId], references: [stores.id] }),
+  invoice: one(invoices, { fields: [clientDeposits.invoiceId], references: [invoices.id] })
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
