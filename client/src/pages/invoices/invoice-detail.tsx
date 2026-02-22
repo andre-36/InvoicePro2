@@ -388,9 +388,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       });
     },
     onError: (error) => {
+      let errorMsg = error.message;
+      try {
+        const jsonPart = errorMsg.substring(errorMsg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) errorMsg = parsed.error;
+      } catch {}
       toast({
-        title: "Error",
-        description: `Failed to add payment: ${error.message}`,
+        title: "Pembayaran Gagal",
+        description: errorMsg,
         variant: "destructive",
       });
     }

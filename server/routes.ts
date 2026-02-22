@@ -2182,6 +2182,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle creditNoteId from request body (not in schema validation)
       const creditNoteId = req.body.creditNoteId ? parseInt(req.body.creditNoteId) : null;
       
+      // Get the invoice first for validation
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Pre-validate Client Deposit balance BEFORE creating payment
+      if (validatedData.paymentType === 'Client Deposit') {
+        if (!invoice.clientId) {
+          return res.status(400).json({ error: "Cannot use deposit for invoice without a client" });
+        }
+        const currentBalance = await storage.getClientDepositBalance(invoice.clientId);
+        const paymentAmount = parseFloat(validatedData.amount);
+        if (paymentAmount > currentBalance + 0.01) {
+          const formattedBalance = new Intl.NumberFormat('id-ID').format(currentBalance);
+          const formattedAmount = new Intl.NumberFormat('id-ID').format(paymentAmount);
+          return res.status(400).json({ 
+            error: `Saldo deposit tidak cukup. Jumlah pembayaran Rp ${formattedAmount} melebihi saldo deposit yang tersedia Rp ${formattedBalance}.` 
+          });
+        }
+      }
+
       // Ensure the invoiceId in the URL matches the one in the body
       const paymentData: any = {
         ...validatedData,
@@ -2195,10 +2217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const newPayment = await storage.createInvoicePayment(paymentData);
       
-      // Get the invoice to check if it's fully paid and get store/user info
-      const invoice = await storage.getInvoice(invoiceId);
-      if (invoice) {
-        // Get all payments for this invoice including the new one
+      // Check if invoice is fully paid and get store/user info
+      {
         const allPayments = await storage.getInvoicePayments(invoiceId);
         const totalPayments = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
         const invoiceTotal = parseFloat(invoice.totalAmount);
@@ -2207,12 +2227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (totalPayments >= invoiceTotal && invoice.status !== 'paid') {
           await storage.updateInvoice(invoiceId, { status: 'paid' });
           
-          // For self_pickup invoices, deduct stock immediately (no delivery note needed)
-          // For delivery invoices, only reserve stock (will be deducted when delivery note is delivered)
           if (invoice.deliveryType === 'self_pickup') {
             await storage.deductStockForSelfPickup(invoiceId);
           } else {
-            // Reserve stock for this invoice (prevents overselling)
             await storage.reserveStockForInvoice(invoiceId);
           }
         }
@@ -2225,18 +2242,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parseFloat(validatedData.amount)
           );
         } else if (validatedData.paymentType === 'Client Deposit') {
-          if (invoice.clientId) {
-            const currentBalance = await storage.getClientDepositBalance(invoice.clientId);
+          try {
+            const currentBalance = await storage.getClientDepositBalance(invoice.clientId!);
             const paymentAmount = parseFloat(validatedData.amount);
-            
-            if (paymentAmount > currentBalance + 0.01) {
-              return res.status(400).json({ error: `Insufficient deposit balance. Available: ${currentBalance.toFixed(2)}` });
-            }
-            
             const newBalance = currentBalance - paymentAmount;
             
             await storage.createClientDeposit({
-              clientId: invoice.clientId,
+              clientId: invoice.clientId!,
               storeId: invoice.storeId,
               type: 'usage',
               amount: paymentAmount.toFixed(2),
@@ -2246,6 +2258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               description: `Used for invoice ${invoice.invoiceNumber}`,
               date: validatedData.paymentDate,
             });
+          } catch (depositError) {
+            await storage.deleteInvoicePayment(newPayment.id);
+            throw depositError;
           }
         } else {
           // Only create transaction for non-credit-note payments (actual cash receipts)
