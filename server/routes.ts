@@ -1226,6 +1226,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/clients/:id/refund-deposit", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const { amount, notes, date, paymentType, cashAccountId } = req.body;
+
+      const refundAmount = parseFloat(amount);
+      if (!refundAmount || refundAmount <= 0) {
+        return res.status(400).json({ error: "Jumlah refund harus lebih dari 0" });
+      }
+
+      const currentBalance = await storage.getClientDepositBalance(clientId);
+      if (refundAmount > currentBalance + 0.01) {
+        const formattedBalance = new Intl.NumberFormat('id-ID').format(currentBalance);
+        return res.status(400).json({ 
+          error: `Jumlah refund melebihi saldo deposit yang tersedia Rp ${formattedBalance}` 
+        });
+      }
+
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const refundDate = date || new Date().toISOString().split('T')[0];
+      const newBalance = currentBalance - refundAmount;
+
+      const depositRecord = await storage.createClientDeposit({
+        clientId,
+        storeId: client.storeId,
+        type: 'refund',
+        amount: refundAmount.toFixed(2),
+        balance: newBalance.toFixed(2),
+        description: notes || `Deposit balance refunded to client`,
+        date: refundDate,
+      });
+
+      const transactionData: any = {
+        storeId: client.storeId,
+        type: 'expense' as const,
+        category: 'Refund Deposit',
+        amount: refundAmount.toFixed(2),
+        date: refundDate,
+        description: `Refund deposit balance - ${client.name}`,
+        referenceNumber: `Deposit Refund #${depositRecord.id}`,
+      };
+
+      if (cashAccountId) {
+        transactionData.accountId = cashAccountId;
+      }
+
+      await storage.createTransaction(transactionData);
+
+      res.status(201).json({ success: true, deposit: depositRecord, newBalance });
+    } catch (error) {
+      console.error("Error refunding deposit:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/clients/:id/invoices", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);

@@ -1,14 +1,19 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt, Wallet } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Calendar, AlertCircle, ShoppingCart, Edit, TrendingUp, Receipt, Wallet, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ClientForm } from "@/components/clients/client-form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -86,6 +91,43 @@ export default function ClientDetailPage() {
   };
   const { data: depositHistory, isLoading: depositsLoading } = useQuery<DepositRecord[]>({
     queryKey: ['/api/clients', clientId, 'deposits'],
+  });
+
+  const { toast } = useToast();
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundForm, setRefundForm] = useState({
+    amount: '',
+    notes: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+  });
+
+  const refundDepositMutation = useMutation({
+    mutationFn: async (data: { amount: string; notes: string; date: string }) => {
+      return apiRequest('POST', `/api/clients/${clientId}/refund-deposit`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposit-balance'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposits'], refetchType: 'all' });
+      setRefundDialogOpen(false);
+      setRefundForm({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') });
+      toast({
+        title: "Berhasil",
+        description: "Deposit berhasil direfund.",
+      });
+    },
+    onError: (error) => {
+      let errorMsg = error.message;
+      try {
+        const jsonPart = errorMsg.substring(errorMsg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) errorMsg = parsed.error;
+      } catch {}
+      toast({
+        title: "Refund Gagal",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    }
   });
 
   const getStatusBadge = (status: string) => {
@@ -200,9 +242,22 @@ export default function ClientDetailPage() {
             <div className={`text-2xl font-bold ${depositBalance > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
               Rp {depositBalance.toLocaleString('id-ID')}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {depositBalance > 0 ? 'Available for payments' : 'No deposit'}
-            </p>
+            {depositBalance > 0 ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2 text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => {
+                  setRefundForm({ amount: depositBalance.toString(), notes: '', date: format(new Date(), 'yyyy-MM-dd') });
+                  setRefundDialogOpen(true);
+                }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Refund Deposit
+              </Button>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No deposit</p>
+            )}
           </CardContent>
         </Card>
 
@@ -502,8 +557,8 @@ export default function ClientDetailPage() {
                     <TableRow key={deposit.id}>
                       <TableCell>{format(new Date(deposit.date), 'MMM d, yyyy')}</TableCell>
                       <TableCell>
-                        <Badge variant={deposit.type === 'deposit' ? 'default' : 'secondary'}>
-                          {deposit.type === 'deposit' ? 'Deposit' : 'Used'}
+                        <Badge variant={deposit.type === 'deposit' ? 'default' : deposit.type === 'refund' ? 'destructive' : 'secondary'}>
+                          {deposit.type === 'deposit' ? 'Deposit' : deposit.type === 'refund' ? 'Refund' : 'Used'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">{deposit.description || '-'}</TableCell>
@@ -521,6 +576,58 @@ export default function ClientDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Refund Deposit Dialog */}
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Refund Deposit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+              Saldo deposit tersedia: <span className="font-semibold">Rp {depositBalance.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Jumlah Refund</Label>
+              <Input
+                type="number"
+                value={refundForm.amount}
+                onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                placeholder="Masukkan jumlah refund"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tanggal</Label>
+              <Input
+                type="date"
+                value={refundForm.date}
+                onChange={(e) => setRefundForm({ ...refundForm, date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Catatan (opsional)</Label>
+              <Textarea
+                value={refundForm.notes}
+                onChange={(e) => setRefundForm({ ...refundForm, notes: e.target.value })}
+                placeholder="Catatan untuk refund ini"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => refundDepositMutation.mutate(refundForm)}
+              disabled={refundDepositMutation.isPending || !refundForm.amount || parseFloat(refundForm.amount) <= 0}
+            >
+              {refundDepositMutation.isPending ? 'Memproses...' : 'Refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
