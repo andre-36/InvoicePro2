@@ -69,7 +69,8 @@ export default function ClientDetailPage() {
   });
 
   const { data: depositBalanceData } = useQuery<{ balance: number }>({
-    queryKey: [`/api/clients/${clientId}/deposit-balance`],
+    queryKey: ['/api/clients', clientId, 'deposit-balance'],
+    staleTime: 0,
   });
   const depositBalance = depositBalanceData?.balance || 0;
 
@@ -84,7 +85,7 @@ export default function ClientDetailPage() {
     createdAt: string;
   };
   const { data: depositHistory, isLoading: depositsLoading } = useQuery<DepositRecord[]>({
-    queryKey: [`/api/clients/${clientId}/deposits`],
+    queryKey: ['/api/clients', clientId, 'deposits'],
   });
 
   const getStatusBadge = (status: string) => {

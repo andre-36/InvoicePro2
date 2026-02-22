@@ -100,8 +100,9 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   });
 
   const { data: clientDepositData } = useQuery<{ balance: number }>({
-    queryKey: [`/api/clients/${clientId}/deposit-balance`],
+    queryKey: ['/api/clients', clientId, 'deposit-balance'],
     enabled: !!clientId && clientId !== 0,
+    staleTime: 0,
   });
   const clientDepositBalance = clientDepositData?.balance || 0;
 
@@ -369,8 +370,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
       if (clientId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deposit-balance`], refetchType: 'all' });
-        queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deposits`], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposit-balance'], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'deposits'], refetchType: 'all' });
       }
       setPaymentDialogOpen(false);
       setPaymentForm({
@@ -480,7 +481,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
       if (invoice?.clientId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/clients/${invoice.clientId}/deposits`], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', invoice.clientId, 'deposit-balance'], refetchType: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['/api/clients', invoice.clientId, 'deposits'], refetchType: 'all' });
       }
       setRefundDialogOpen(false);
       toast({
