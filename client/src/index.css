@@ -282,7 +282,32 @@
   .print-header-center {
     text-align: center;
     padding: 0;
-    transform: translateX(-2cm);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .print-company-row1 {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .print-company-row2 {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 10pt;
+  }
+
+  .print-company-separator {
+    color: #999;
+    font-weight: normal;
   }
 
   .print-header-right {
@@ -349,7 +374,6 @@
   .print-company-name {
     font-size: 15pt;
     font-weight: bold;
-    margin-bottom: 2px;
     letter-spacing: 0.3pt;
     white-space: nowrap;
   }
@@ -357,13 +381,12 @@
   .print-company-tagline {
     font-size: 13pt;
     font-weight: bold;
-    margin-bottom: 3px;
     white-space: nowrap;
   }
 
   .print-company-address {
-    font-size: 11pt;
-    line-height: 1.25;
+    font-size: 10pt;
+    white-space: nowrap;
   }
 
   /* Document type and details */
