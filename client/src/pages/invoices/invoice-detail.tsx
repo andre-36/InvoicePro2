@@ -1025,6 +1025,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               flex-direction: column;
               justify-content: center;
               gap: 2px;
+              margin-left: -1.5cm;
             }
             .print-company-row2 {
               display: flex;
