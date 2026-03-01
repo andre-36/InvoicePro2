@@ -1021,7 +1021,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             .print-header-center {
               text-align: center;
               flex: 1;
-              transform: translateX(-2cm);
             }
             .print-company-name {
               font-size: 15pt;
