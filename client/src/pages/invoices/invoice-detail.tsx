@@ -844,13 +844,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           </div>
           
           <div class="print-header-center">
-            <div class="print-company-row1">
-              <span class="print-company-name">${currentUser?.companyName || 'YOUR COMPANY NAME'}</span>
-              ${currentUser?.companyTagline ? `<span class="print-company-separator">|</span><span class="print-company-tagline">${currentUser.companyTagline}</span>` : ''}
-            </div>
+            <div class="print-company-name">${currentUser?.companyName || 'YOUR COMPANY NAME'}</div>
+            ${currentUser?.companyTagline ? `<div class="print-company-tagline">${currentUser.companyTagline}</div>` : ''}
             <div class="print-company-row2">
               <span class="print-company-address">${currentUser?.companyAddress || 'Your Company Address'}</span>
-              ${currentUser?.companyPhone ? `<span class="print-company-separator">|</span><span>Phone: ${currentUser.companyPhone}</span>` : ''}
+              ${currentUser?.companyPhone ? `<span class="print-company-separator">&nbsp;|&nbsp;</span><span>Phone: ${currentUser.companyPhone}</span>` : ''}
             </div>
           </div>
           
@@ -1028,26 +1026,22 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               justify-content: center;
               gap: 2px;
             }
-            .print-company-row1 {
-              display: flex;
-              justify-content: center;
-              align-items: baseline;
-              gap: 6px;
-            }
             .print-company-row2 {
               display: flex;
               justify-content: center;
               align-items: baseline;
-              gap: 6px;
+              gap: 4px;
               font-size: 10pt;
             }
             .print-company-name {
               font-size: 15pt;
               font-weight: bold;
+              margin-bottom: 1px;
             }
             .print-company-tagline {
               font-size: 13pt;
               font-weight: bold;
+              margin-bottom: 2px;
             }
             .print-company-address {
               font-size: 10pt;
@@ -1353,26 +1347,21 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               
               {/* Center column: Company Info */}
               <div className="print-header-center">
-                <div className="print-company-row1">
-                  <span className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</span>
-                  {currentUser?.companyTagline && (
-                    <>
-                      <span className="print-company-separator">|</span>
-                      <span className="print-company-tagline">{currentUser.companyTagline}</span>
-                    </>
-                  )}
-                </div>
+                <div className="print-company-name">{currentUser?.companyName || "YOUR COMPANY NAME"}</div>
+                {currentUser?.companyTagline && (
+                  <div className="print-company-tagline">{currentUser.companyTagline}</div>
+                )}
                 <div className="print-company-row2">
                   <span className="print-company-address">{currentUser?.companyAddress || "Your Company Address"}</span>
                   {currentUser?.companyPhone && (
                     <>
-                      <span className="print-company-separator">|</span>
+                      <span className="print-company-separator">&nbsp;|&nbsp;</span>
                       <span>Phone: {currentUser.companyPhone}</span>
                     </>
                   )}
                   {currentUser?.companyEmail && (
                     <>
-                      <span className="print-company-separator">|</span>
+                      <span className="print-company-separator">&nbsp;|&nbsp;</span>
                       <span>Email: {currentUser.companyEmail}</span>
                     </>
                   )}

@@ -288,14 +288,6 @@
     gap: 2px;
   }
 
-  .print-company-row1 {
-    display: flex;
-    justify-content: center;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
   .print-company-row2 {
     display: flex;
     justify-content: center;
@@ -376,12 +368,14 @@
     font-weight: bold;
     letter-spacing: 0.3pt;
     white-space: nowrap;
+    margin-bottom: 1px;
   }
 
   .print-company-tagline {
     font-size: 13pt;
     font-weight: bold;
     white-space: nowrap;
+    margin-bottom: 2px;
   }
 
   .print-company-address {
