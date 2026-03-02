@@ -848,7 +848,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             ${currentUser?.companyTagline ? `<div class="print-company-tagline">${currentUser.companyTagline}</div>` : ''}
             <div class="print-company-row2">
               <span class="print-company-address">${currentUser?.companyAddress || 'Your Company Address'}</span>
-              ${currentUser?.companyPhone ? `<span class="print-company-separator">&nbsp;|&nbsp;</span><span>Phone: ${currentUser.companyPhone}</span>` : ''}
+              ${currentUser?.companyPhone ? `<span>Phone: ${currentUser.companyPhone}</span>` : ''}
             </div>
           </div>
           
@@ -1355,16 +1355,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 <div className="print-company-row2">
                   <span className="print-company-address">{currentUser?.companyAddress || "Your Company Address"}</span>
                   {currentUser?.companyPhone && (
-                    <>
-                      <span className="print-company-separator">&nbsp;|&nbsp;</span>
-                      <span>Phone: {currentUser.companyPhone}</span>
-                    </>
+                    <span>Phone: {currentUser.companyPhone}</span>
                   )}
                   {currentUser?.companyEmail && (
-                    <>
-                      <span className="print-company-separator">&nbsp;|&nbsp;</span>
-                      <span>Email: {currentUser.companyEmail}</span>
-                    </>
+                    <span>Email: {currentUser.companyEmail}</span>
                   )}
                 </div>
               </div>
@@ -1457,10 +1451,12 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 </div>
                 
                 <div className="print-footer-right">
-                  <div className="print-total-row">
-                    <span className="print-total-label">Subtotal</span>
-                    <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
-                  </div>
+                  {(parseFloat(invoice.discount || '0') > 0 || parseFloat((invoice as any).shipping || '0') > 0) && (
+                    <div className="print-total-row">
+                      <span className="print-total-label">Subtotal</span>
+                      <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
+                    </div>
+                  )}
                   {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
                     <div className="print-total-row">
                       <span className="print-total-label">Discount</span>
