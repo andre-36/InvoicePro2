@@ -103,7 +103,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Purchase Order - ${purchaseOrder.purchaseOrderNumber}</title>
+        <title></title>
         <style>
           @page {
             size: A4 portrait;
