@@ -6443,8 +6443,8 @@ export class DatabaseStorage implements IStorage {
         const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, id));
         await this.createBatchesForReturn(tx, updated, items);
 
-        // If this is an immediate refund (not credit note), create expense transaction
-        if (existingReturn.returnType === 'immediate_refund') {
+        // If this is a refund (not credit note), create expense transaction
+        if (existingReturn.returnType === 'refund' || existingReturn.returnType === 'immediate_refund') {
           await tx.insert(transactions).values({
             storeId: existingReturn.storeId,
             type: 'expense',
@@ -6552,6 +6552,19 @@ export class DatabaseStorage implements IStorage {
       const [updated] = await tx.select().from(returns).where(eq(returns.id, returnId));
       if (updated && parseFloat(updated.usedAmount || '0') >= parseFloat(updated.totalAmount || '0')) {
         await tx.update(returns).set({ status: 'completed', updatedAt: new Date() }).where(eq(returns.id, returnId));
+      }
+
+      // Record expense transaction for cash refund
+      const [returnRecord] = await tx.select().from(returns).where(eq(returns.id, returnId));
+      if (returnRecord) {
+        await tx.insert(transactions).values({
+          storeId: returnRecord.storeId,
+          type: 'expense',
+          amount: amount.toString(),
+          description: `Refund Credit Note ${returnRecord.returnNumber}`,
+          date: new Date().toISOString().split('T')[0],
+          returnId: returnRecord.id
+        });
       }
 
       return usage;
