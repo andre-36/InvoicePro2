@@ -68,23 +68,29 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
     );
   }
 
+  // Detect if data spans multiple years to decide label format
+  const parsedDates = data.dates.map(dateStr => {
+    if (dateStr.includes('-')) {
+      const d = parse(dateStr, 'yyyy-MM-dd', new Date());
+      return isValid(d) ? d : null;
+    } else if (dateStr.includes('/')) {
+      const d = parse(dateStr, 'dd/MM', new Date());
+      return isValid(d) ? d : null;
+    }
+    return null;
+  });
+
+  const years = new Set(parsedDates.filter(Boolean).map(d => d!.getFullYear()));
+  const isMultiYear = years.size > 1;
+
   const chartData = data.dates.map((dateStr, i) => {
     let formattedDate = dateStr;
-    
-    // Try to parse different possible date formats from API
-    // 1. YYYY-MM-DD
-    // 2. DD/MM
-    
-    if (dateStr.includes('-')) {
-      const parsedDate = parse(dateStr, 'yyyy-MM-dd', new Date());
-      if (isValid(parsedDate)) {
-        formattedDate = format(parsedDate, 'dd MMM yyyy');
-      }
-    } else if (dateStr.includes('/')) {
-      const parsedDate = parse(dateStr, 'dd/MM', new Date());
-      if (isValid(parsedDate)) {
-        formattedDate = format(parsedDate, 'dd MMM');
-      }
+    const parsed = parsedDates[i];
+
+    if (parsed) {
+      formattedDate = isMultiYear
+        ? format(parsed, 'dd MMM yy')
+        : format(parsed, 'dd MMM');
     }
 
     return {
@@ -126,19 +132,22 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis 
                 tickFormatter={(value) => {
-                  // Format large numbers with abbreviations for chart readability
+                  if (value === 0) return '0';
                   if (value >= 1000000000) {
-                    return `Rp ${(value / 1000000000).toFixed(1)}M`;
+                    const v = value / 1000000000;
+                    return `${Number.isInteger(v) ? v : v.toFixed(1)}M`;
                   } else if (value >= 1000000) {
-                    return `Rp ${(value / 1000000).toFixed(1)}Jt`;
+                    const v = value / 1000000;
+                    return `${Number.isInteger(v) ? v : v.toFixed(1)}Jt`;
                   } else if (value >= 1000) {
-                    return `Rp ${(value / 1000).toFixed(0)}K`;
+                    const v = value / 1000;
+                    return `${Number.isInteger(v) ? v : v.toFixed(1)}K`;
                   }
-                  return formatCurrency(value);
+                  return `${value}`;
                 }}
                 tickLine={false}
                 axisLine={false}
-                width={70}
+                width={80}
               />
               <Tooltip 
                 formatter={(value) => [formatCurrency(typeof value === 'number' ? value : 0), '']}

@@ -5402,11 +5402,12 @@ export class DatabaseStorage implements IStorage {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    // Format dates for display
+    // Format dates for display as full ISO date so frontend can show year info
     const dateLabels = dateList.map(date => {
-      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      return `${day}/${month}`;
+      const day = date.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
     });
 
     // Format dates as strings for PostgreSQL
