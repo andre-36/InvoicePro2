@@ -805,6 +805,14 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
   // Submit the form
   const onSubmit = (values: InvoiceFormValues) => {
+    if (!values.invoice.clientId || values.invoice.clientId === 0) {
+      toast({
+        title: "Client belum dipilih",
+        description: "Pilih client terlebih dahulu sebelum menyimpan invoice.",
+        variant: "destructive",
+      });
+      return;
+    }
     mutation.mutate(values);
   };
 
