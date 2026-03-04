@@ -571,7 +571,6 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">Tax</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -582,9 +581,6 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right" data-testid={`text-unit-price-${index}`}>
                         {formatCurrency(parseFloat(item.unitPrice))}
-                      </TableCell>
-                      <TableCell className="text-right" data-testid={`text-tax-${index}`}>
-                        {formatCurrency(parseFloat(item.taxAmount || '0'))}
                       </TableCell>
                       <TableCell className="text-right font-medium" data-testid={`text-total-${index}`}>
                         {formatCurrency(parseFloat(item.totalAmount))}

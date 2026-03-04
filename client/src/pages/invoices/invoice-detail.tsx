@@ -1683,9 +1683,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         Unit Price
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tax
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total
                       </th>
                     </tr>
@@ -1701,9 +1698,6 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                           {formatCurrency(item.unitPrice)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {parseFloat(item.taxRate || '0') > 0 ? `${item.taxRate}%` : '—'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                           {formatCurrency(item.totalAmount)}

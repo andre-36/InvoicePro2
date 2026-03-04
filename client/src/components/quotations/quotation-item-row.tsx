@@ -301,7 +301,7 @@ export function QuotationItemRow({
       </div>
 
       {/* Unit Selection */}
-      <div className="col-span-6 md:col-span-2">
+      <div className="col-span-6 md:col-span-1">
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Unit
         </label>
@@ -374,7 +374,7 @@ export function QuotationItemRow({
       </div>
 
       {/* Total */}
-      <div className="col-span-6 md:col-span-1">
+      <div className="col-span-6 md:col-span-2">
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Total
         </label>

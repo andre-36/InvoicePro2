@@ -389,6 +389,14 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   };
 
   const onSubmit = (values: QuotationFormValues) => {
+    if (!values.quotation.clientId || values.quotation.clientId === 0) {
+      toast({
+        title: "Client belum dipilih",
+        description: "Pilih client terlebih dahulu sebelum menyimpan quotation.",
+        variant: "destructive",
+      });
+      return;
+    }
     mutation.mutate(values);
   };
 
