@@ -108,7 +108,9 @@ export function DateRangePicker({
             {date?.from ? (
               date.to ? (
                 <span>
-                  {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
+                  {date.from.getFullYear() !== date.to.getFullYear()
+                    ? format(date.from, "MMM dd, yyyy")
+                    : format(date.from, "MMM dd")} - {format(date.to, "MMM dd, yyyy")}
                 </span>
               ) : (
                 <span>{format(date.from, "MMM dd, yyyy")}</span>
