@@ -1029,9 +1029,10 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             }
             .print-company-row2 {
               display: flex;
+              flex-direction: column;
               justify-content: center;
-              align-items: baseline;
-              gap: 4px;
+              align-items: center;
+              gap: 2px;
               font-size: 10pt;
             }
             .print-company-name {
@@ -1040,12 +1041,14 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               margin-bottom: 1px;
             }
             .print-company-tagline {
-              font-size: 13pt;
+              font-size: 11pt;
               font-weight: bold;
+              white-space: nowrap;
               margin-bottom: 2px;
             }
             .print-company-address {
               font-size: 10pt;
+              white-space: nowrap;
             }
             .print-company-separator {
               color: #999;
