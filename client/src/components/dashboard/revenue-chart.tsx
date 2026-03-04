@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
@@ -68,11 +69,15 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
     );
   }
 
-  const chartData = data.dates.map((date, i) => ({
-    name: date,
-    income: data.revenue[i],
-    expenses: data.expenses[i],
-  }));
+  const chartData = data.dates.map((date, i) => {
+    const [year, month, day] = date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    return {
+      name: format(dateObj, 'dd MMM yyyy'),
+      income: data.revenue[i],
+      expenses: data.expenses[i],
+    };
+  });
 
   return (
     <Card className="lg:col-span-2">
