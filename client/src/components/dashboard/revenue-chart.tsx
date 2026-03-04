@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
@@ -10,7 +10,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -69,11 +68,27 @@ export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
     );
   }
 
-  const chartData = data.dates.map((date, i) => {
-    const [year, month, day] = date.split('-').map(Number);
-    const dateObj = new Date(year, month - 1, day);
+  const chartData = data.dates.map((dateStr, i) => {
+    let formattedDate = dateStr;
+    
+    // Try to parse different possible date formats from API
+    // 1. YYYY-MM-DD
+    // 2. DD/MM
+    
+    if (dateStr.includes('-')) {
+      const parsedDate = parse(dateStr, 'yyyy-MM-dd', new Date());
+      if (isValid(parsedDate)) {
+        formattedDate = format(parsedDate, 'dd MMM yyyy');
+      }
+    } else if (dateStr.includes('/')) {
+      const parsedDate = parse(dateStr, 'dd/MM', new Date());
+      if (isValid(parsedDate)) {
+        formattedDate = format(parsedDate, 'dd MMM');
+      }
+    }
+
     return {
-      name: format(dateObj, 'dd MMM yyyy'),
+      name: formattedDate,
       income: data.revenue[i],
       expenses: data.expenses[i],
     };
