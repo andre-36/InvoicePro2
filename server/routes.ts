@@ -3954,6 +3954,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/invoices/:id/returns", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const returns = await storage.getReturnsByInvoiceId(invoiceId);
+      res.json(returns);
+    } catch (error) {
+      console.error("Error getting returns for invoice:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get("/api/clients/:clientId/credit-notes", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.clientId);

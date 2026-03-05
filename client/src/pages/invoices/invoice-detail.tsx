@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { Edit, Ban, FileDown, Send, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign } from "lucide-react";
+import { Edit, Ban, FileDown, Send, X, AlertTriangle, ArrowLeft, Plus, Trash2, Printer, Truck, Package, Pencil, CheckCircle, DollarSign, ExternalLink, RotateCcw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -117,6 +117,11 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     fullyDelivered: boolean;
   }>({
     queryKey: ['/api/invoices', id, 'delivery-status'],
+  });
+
+  // Fetch returns related to this invoice
+  const { data: relatedReturns = [] } = useQuery<any[]>({
+    queryKey: ['/api/invoices', id, 'returns'],
   });
 
   // State for delivery note dialog
@@ -1588,13 +1593,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       <Card>
         <Tabs defaultValue="details" className="w-full">
           <div className="border-b px-6 pt-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="details">Invoice Details</TabsTrigger>
               <TabsTrigger value="payments">
                 Payments {invoicePayments.length > 0 && `(${invoicePayments.length})`}
               </TabsTrigger>
               <TabsTrigger value="delivery">
                 Delivery {(deliveryNotes?.length || 0) > 0 && `(${deliveryNotes?.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="returns">
+                Retur {relatedReturns.length > 0 && `(${relatedReturns.length})`}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -2553,6 +2561,89 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          {/* Retur Tab */}
+          <TabsContent value="returns" className="m-0 p-6">
+            {relatedReturns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500">
+                <RotateCcw className="h-10 w-10 mb-3 text-gray-300" />
+                <p className="font-medium">Tidak ada retur untuk invoice ini.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {relatedReturns.map((ret: any) => {
+                  const remainingBalance = Number(ret.totalAmount) - Number(ret.usedAmount || 0);
+                  const isCreditNote = ret.returnType === 'credit_note';
+                  return (
+                    <Card key={ret.id} className="border">
+                      <CardHeader className="pb-3">
+                        <div className="flex flex-wrap items-center gap-2 justify-between">
+                          <div className="flex items-center gap-2">
+                            <Link href={`/returns/${ret.id}`}>
+                              <span className="font-semibold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer">
+                                {ret.returnNumber}
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </span>
+                            </Link>
+                            <Badge variant={isCreditNote ? "secondary" : "outline"}>
+                              {isCreditNote ? "Credit Note" : "Refund"}
+                            </Badge>
+                            <Badge variant={
+                              ret.status === 'completed' ? 'default' :
+                              ret.status === 'cancelled' ? 'destructive' : 'secondary'
+                            }>
+                              {ret.status === 'completed' ? 'Selesai' :
+                               ret.status === 'cancelled' ? 'Dibatalkan' : 'Pending'}
+                            </Badge>
+                          </div>
+                          <span className="text-sm text-gray-500">{formatDate(ret.returnDate)}</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-gray-500">
+                              <th className="text-left py-2 pr-4 font-medium">Produk</th>
+                              <th className="text-right py-2 pr-4 font-medium">Qty</th>
+                              <th className="text-right py-2 pr-4 font-medium">Harga</th>
+                              <th className="text-right py-2 pr-4 font-medium">Subtotal</th>
+                              <th className="text-left py-2 font-medium">Alasan</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ret.items.map((item: any) => (
+                              <tr key={item.id} className="border-b last:border-0">
+                                <td className="py-2 pr-4">{item.productName}</td>
+                                <td className="py-2 pr-4 text-right">{formatQuantity(item.quantity)}</td>
+                                <td className="py-2 pr-4 text-right">{formatCurrency(item.unitPrice)}</td>
+                                <td className="py-2 pr-4 text-right">{formatCurrency(Number(item.quantity) * Number(item.unitPrice))}</td>
+                                <td className="py-2 text-gray-500">{item.reason || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </CardContent>
+                      <CardFooter className="border-t pt-3 flex flex-wrap gap-4 justify-between items-center">
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          {isCreditNote && (
+                            <span className={remainingBalance > 0 ? "text-green-700 font-medium" : "text-gray-400"}>
+                              Sisa Saldo Credit Note: {formatCurrency(remainingBalance)}
+                            </span>
+                          )}
+                          {ret.notes && (
+                            <span className="text-gray-500">Catatan: {ret.notes}</span>
+                          )}
+                        </div>
+                        <div className="text-sm font-semibold">
+                          Total: {formatCurrency(ret.totalAmount)}
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </Card>

@@ -6286,6 +6286,32 @@ export class DatabaseStorage implements IStorage {
     return { return: returnData, items, usages, invoice, client };
   }
 
+  async getReturnsByInvoiceId(invoiceId: number): Promise<(Return & { items: (ReturnItem & { productName: string })[] })[]> {
+    const returnsList = await db
+      .select()
+      .from(returns)
+      .where(eq(returns.invoiceId, invoiceId))
+      .orderBy(desc(returns.returnDate));
+
+    const result = await Promise.all(returnsList.map(async (ret) => {
+      const rawItems = await db
+        .select()
+        .from(returnItems)
+        .innerJoin(invoiceItems, eq(returnItems.invoiceItemId, invoiceItems.id))
+        .innerJoin(products, eq(invoiceItems.productId, products.id))
+        .where(eq(returnItems.returnId, ret.id));
+
+      const items = rawItems.map(row => ({
+        ...row.return_items,
+        productName: row.products.name,
+      }));
+
+      return { ...ret, items };
+    }));
+
+    return result;
+  }
+
   async getReturns(storeId: number): Promise<Return[]> {
     return db.select().from(returns).where(eq(returns.storeId, storeId)).orderBy(desc(returns.returnDate));
   }
