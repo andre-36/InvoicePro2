@@ -1663,6 +1663,19 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         <span className="text-sm">{invoice.createdByName}</span>
                       </div>
                     )}
+                    {invoice.createdAt && (
+                      <div className="flex justify-between md:justify-end md:flex-col">
+                        <span className="text-sm font-medium text-gray-500 md:mb-1">Dibuat:</span>
+                        <span className="text-sm">{format(new Date(invoice.createdAt), 'dd MMM yyyy, HH:mm')}</span>
+                      </div>
+                    )}
+                    {invoice.updatedAt && invoice.createdAt &&
+                      Math.abs(new Date(invoice.updatedAt).getTime() - new Date(invoice.createdAt).getTime()) > 60000 && (
+                      <div className="flex justify-between md:justify-end md:flex-col">
+                        <span className="text-sm font-medium text-gray-500 md:mb-1">Terakhir diubah:</span>
+                        <span className="text-sm">{format(new Date(invoice.updatedAt), 'dd MMM yyyy, HH:mm')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

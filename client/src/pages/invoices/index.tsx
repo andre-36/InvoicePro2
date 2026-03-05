@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, ArrowDown, ArrowUp, MoreHorizontal, FileDown, Eye, FilePenLine, Ban, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, ArrowDown, ArrowUp, MoreHorizontal, FileDown, Eye, FilePenLine, Ban, Download, FileSpreadsheet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -77,6 +77,8 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatusFilter>("all");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatusFilter>("all");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
   const [showVoided, setShowVoided] = useState(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -222,8 +224,10 @@ export default function InvoicesPage() {
           
           const matchesPaymentStatus = paymentStatusFilter === 'all' || invoice.paymentStatus === paymentStatusFilter;
           const matchesDeliveryStatus = deliveryStatusFilter === 'all' || invoice.deliveryStatus === deliveryStatusFilter;
+          const matchesDateStart = !filterStartDate || invoice.issueDate >= filterStartDate;
+          const matchesDateEnd = !filterEndDate || invoice.issueDate <= filterEndDate;
           
-          return matchesSearch && matchesPaymentStatus && matchesDeliveryStatus;
+          return matchesSearch && matchesPaymentStatus && matchesDeliveryStatus && matchesDateStart && matchesDateEnd;
         })
         .sort((a, b) => {
           const comparison = a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true });
@@ -373,8 +377,36 @@ export default function InvoicesPage() {
               />
             </div>
             
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 text-sm text-gray-600">
+                <span className="whitespace-nowrap">Dari:</span>
+                <Input
+                  type="date"
+                  className="h-8 w-36 text-sm"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1 text-sm text-gray-600">
+                <span className="whitespace-nowrap">s/d:</span>
+                <Input
+                  type="date"
+                  className="h-8 w-36 text-sm"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                />
+              </div>
+              {(filterStartDate || filterEndDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-gray-500"
+                  onClick={() => { setFilterStartDate(""); setFilterEndDate(""); }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <label className="flex items-center gap-2 text-sm text-gray-600 ml-1">
                 <input 
                   type="checkbox" 
                   checked={showVoided}
@@ -403,11 +435,11 @@ export default function InvoicesPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-1">No invoices found</h3>
               <p className="text-sm text-gray-500 mb-4 max-w-md">
-                {searchQuery || paymentStatusFilter !== 'all' || deliveryStatusFilter !== 'all'
+                {searchQuery || paymentStatusFilter !== 'all' || deliveryStatusFilter !== 'all' || filterStartDate || filterEndDate
                   ? "Try adjusting your search or filter to find what you're looking for."
                   : "You haven't created any invoices yet. Get started by creating your first invoice."}
               </p>
-              {!searchQuery && paymentStatusFilter === 'all' && deliveryStatusFilter === 'all' && (
+              {!searchQuery && paymentStatusFilter === 'all' && deliveryStatusFilter === 'all' && !filterStartDate && !filterEndDate && (
                 <Link href="/invoices/create">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
