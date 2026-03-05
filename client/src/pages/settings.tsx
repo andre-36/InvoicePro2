@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText, Wallet, ArrowLeftRight, Users, Star } from "lucide-react";
+import { Settings, User, Building, CreditCard, Upload, Save, Check, Database, Download, FolderPlus, FolderEdit, FolderMinus, FolderOpen, Plus, Edit, Trash2, FileText, Wallet, ArrowLeftRight, Users, Star, RotateCcw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -374,6 +374,7 @@ export default function SettingsPage() {
   const [cashAccountDialogOpen, setCashAccountDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [deletingTransfer, setDeletingTransfer] = useState<AccountTransfer | null>(null);
+  const [returnWindowDays, setReturnWindowDays] = useState<string>("30");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
@@ -421,6 +422,18 @@ export default function SettingsPage() {
   const { data: accountTransfers, isLoading: transfersLoading } = useQuery<AccountTransfer[]>({
     queryKey: ['/api/account-transfers'],
   });
+
+  // Fetch store settings (key-value)
+  const { data: storeSettings } = useQuery<Record<string, string>>({
+    queryKey: ['/api/stores/1/settings'],
+  });
+
+  // Initialize returnWindowDays from store settings
+  useEffect(() => {
+    if (storeSettings && storeSettings['return_window_days'] !== undefined) {
+      setReturnWindowDays(storeSettings['return_window_days']);
+    }
+  }, [storeSettings]);
 
   // Fetch global company settings (for login page branding)
   const { data: globalCompanySettings } = useQuery<{ companyName: string; logoUrl: string | null }>({
@@ -1366,6 +1379,23 @@ export default function SettingsPage() {
     }
   });
 
+  const saveReturnWindowMutation = useMutation({
+    mutationFn: async (days: string) => {
+      const response = await apiRequest('POST', '/api/stores/1/settings', {
+        key: 'return_window_days',
+        value: days
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Pengaturan berhasil disimpan", description: "Batas hari retur telah diperbarui." });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/settings'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
+    }
+  });
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type === 'application/json') {
@@ -1449,6 +1479,10 @@ export default function SettingsPage() {
             <TabsTrigger value="roles" className="gap-2">
               <Users className="h-4 w-4" />
               <span>Role</span>
+            </TabsTrigger>
+            <TabsTrigger value="returns" className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              <span>Retur</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -2567,6 +2601,43 @@ export default function SettingsPage() {
 
         <TabsContent value="roles" className="space-y-6">
           <RoleManagement />
+        </TabsContent>
+
+        <TabsContent value="returns" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5" />
+                Pengaturan Retur
+              </CardTitle>
+              <CardDescription>
+                Konfigurasi aturan retur barang
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2 max-w-xs">
+                <Label htmlFor="returnWindowDays">Batas Hari Retur</Label>
+                <Input
+                  id="returnWindowDays"
+                  type="number"
+                  min={0}
+                  value={returnWindowDays}
+                  onChange={(e) => setReturnWindowDays(e.target.value)}
+                  placeholder="30"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Berapa hari setelah tanggal bayar terakhir invoice masih bisa diretur. Isi <strong>0</strong> untuk tanpa batasan waktu. Default: 30 hari.
+                </p>
+              </div>
+              <Button
+                onClick={() => saveReturnWindowMutation.mutate(returnWindowDays)}
+                disabled={saveReturnWindowMutation.isPending}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Simpan
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
 
       </Tabs>

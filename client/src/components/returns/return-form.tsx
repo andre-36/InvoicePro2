@@ -35,10 +35,11 @@ type ReturnItemData = {
   productId: number;
   description: string;
   originalQty: number;
+  deliveredQty: number;
   quantity: number;
-  invoicePrice: number;     // Harga saat di invoice
-  currentPrice: number;     // Harga produk sekarang
-  returnValue: number;      // Nilai retur (dapat diubah)
+  invoicePrice: number;
+  currentPrice: number;
+  returnValue: number;
   subtotal: number;
   reason: string;
   selected: boolean;
@@ -88,6 +89,12 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
     staleTime: Infinity
   });
 
+  const { data: deliveredQuantities } = useQuery<{ invoiceItemId: number; deliveredQty: number }[]>({
+    queryKey: ['/api/invoices', selectedInvoiceId, 'delivered-quantities'],
+    enabled: !!selectedInvoiceId,
+    staleTime: 0
+  });
+
   const { data: products } = useQuery<Product[]>({
     queryKey: ['/api/products'],
     staleTime: Infinity
@@ -106,12 +113,14 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
 
   useEffect(() => {
     if (invoiceWithItems?.items && products) {
+      const deliveredMap = new Map<number, number>(
+        (deliveredQuantities || []).map(d => [d.invoiceItemId, d.deliveredQty])
+      );
       const items = invoiceWithItems.items.map(item => {
         const invoicePrice = Number(item.unitPrice);
         const productId = item.productId;
         const product = products.find(p => p.id === productId);
         const currentPrice = product ? Number(product.sellingPrice || product.price || 0) : invoicePrice;
-        // Default return value: lowest of invoice price and current price
         const returnValue = Math.min(invoicePrice, currentPrice);
         
         return {
@@ -119,6 +128,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
           productId: productId,
           description: item.description,
           originalQty: Number(item.quantity),
+          deliveredQty: deliveredMap.get(item.id) ?? 0,
           quantity: 0,
           invoicePrice,
           currentPrice,
@@ -130,7 +140,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
       });
       setReturnItems(items);
     }
-  }, [invoiceWithItems, products]);
+  }, [invoiceWithItems, products, deliveredQuantities]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -349,8 +359,9 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                           <TableRow>
                             <TableHead className="w-[50px]"></TableHead>
                             <TableHead>Produk</TableHead>
-                            <TableHead className="text-right w-[80px]">Qty</TableHead>
-                            <TableHead className="text-right w-[90px]">Qty Retur</TableHead>
+                            <TableHead className="text-right w-[70px]">Qty</TableHead>
+                            <TableHead className="text-right w-[80px]">Qty Kirim</TableHead>
+                            <TableHead className="w-[130px]">Qty Retur</TableHead>
                             <TableHead className="text-right w-[100px]">Hrg Invoice</TableHead>
                             <TableHead className="text-right w-[100px]">Hrg Skrg</TableHead>
                             <TableHead className="text-right w-[110px]">Nilai Retur</TableHead>
@@ -359,7 +370,10 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {returnItems.map((item, index) => (
+                          {returnItems.map((item, index) => {
+                            const qtyToStock = Math.min(item.quantity, item.deliveredQty);
+                            const showStockBadge = item.selected && item.quantity > 0;
+                            return (
                             <TableRow key={item.invoiceItemId}>
                               <TableCell>
                                 <Checkbox 
@@ -369,17 +383,35 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                               </TableCell>
                               <TableCell className="max-w-[180px] truncate" title={item.description}>{item.description}</TableCell>
                               <TableCell className="text-right">{item.originalQty}</TableCell>
+                              <TableCell className="text-right text-gray-500 text-sm">{item.deliveredQty}</TableCell>
                               <TableCell>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  max={item.originalQty}
-                                  step="any"
-                                  value={item.quantity || ''}
-                                  onChange={(e) => handleItemQuantityChange(index, e.target.value)}
-                                  className="w-16 text-right"
-                                  disabled={!item.selected}
-                                />
+                                <div className="space-y-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={item.originalQty}
+                                    step="any"
+                                    value={item.quantity || ''}
+                                    onChange={(e) => handleItemQuantityChange(index, e.target.value)}
+                                    className="w-16 text-right"
+                                    disabled={!item.selected}
+                                  />
+                                  {showStockBadge && (
+                                    <div className={`text-xs px-1 py-0.5 rounded inline-block ${
+                                      item.deliveredQty === 0
+                                        ? 'bg-red-100 text-red-700'
+                                        : qtyToStock < item.quantity
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {item.deliveredQty === 0
+                                        ? 'Belum terkirim'
+                                        : qtyToStock < item.quantity
+                                        ? `${qtyToStock} ke stok`
+                                        : 'Semua ke stok'}
+                                    </div>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.invoicePrice)}</TableCell>
                               <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.currentPrice)}</TableCell>
@@ -405,7 +437,8 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                                 />
                               </TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     )}

@@ -1912,6 +1912,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/invoices/:id/delivered-quantities", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const quantities = await storage.getDeliveredQuantitiesForInvoice(invoiceId);
+      res.json(quantities);
+    } catch (error) {
+      console.error("Error getting delivered quantities:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // General invoices endpoint
   app.get("/api/invoices", requireAuth, async (req, res) => {
     try {

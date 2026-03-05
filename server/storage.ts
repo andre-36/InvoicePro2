@@ -153,6 +153,7 @@ export interface IStorage {
   getRecentInvoices(storeId: number, limit: number): Promise<Invoice[]>;
   getOpenInvoices(storeId: number): Promise<Invoice[]>;
   getReturnableInvoices(storeId: number): Promise<(Invoice & { clientName: string | null; lastPaymentDate: Date | null })[]>;
+  getDeliveredQuantitiesForInvoice(invoiceId: number): Promise<{ invoiceItemId: number; deliveredQty: number }[]>;
   createInvoice(invoice: InsertInvoice, items: Array<InsertInvoiceItem & { productId: number, quantity: number | string }>): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice>;
   updateInvoiceWithItems(id: number, invoiceData: Partial<InsertInvoice>, items: Array<InsertInvoiceItem & { id?: number; productId: number; quantity: number | string }>): Promise<Invoice>;
@@ -1793,11 +1794,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReturnableInvoices(storeId: number): Promise<(Invoice & { clientName: string | null; lastPaymentDate: Date | null })[]> {
-    // Get paid invoices where the last payment was within 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    // First, get all paid invoices with their last payment date
+    // Read return window from settings, default to 30 days
+    const windowSetting = await this.getSetting(storeId, 'return_window_days');
+    const windowDays = windowSetting ? parseInt(windowSetting.value) : 30;
+
+    // Get all paid invoices with their last payment date
     const results = await db
       .select({
         invoice: invoices,
@@ -1813,16 +1814,40 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(invoices.id));
-    
-    // Filter to only include invoices with last payment within 7 days
+
+    // Filter by window — if windowDays = 0, no time restriction
     return results.filter(row => {
+      if (windowDays === 0) return true;
       if (!row.lastPaymentDate) return false;
-      const paymentDate = new Date(row.lastPaymentDate);
-      return paymentDate >= sevenDaysAgo;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - windowDays);
+      return new Date(row.lastPaymentDate) >= cutoff;
     }).map(row => ({
       ...row.invoice,
       clientName: row.clientName,
       lastPaymentDate: row.lastPaymentDate
+    }));
+  }
+
+  async getDeliveredQuantitiesForInvoice(invoiceId: number): Promise<{ invoiceItemId: number; deliveredQty: number }[]> {
+    const rows = await db
+      .select({
+        invoiceItemId: deliveryNoteItems.invoiceItemId,
+        total: sql<string>`SUM(${deliveryNoteItems.deliveredQuantity})`
+      })
+      .from(deliveryNoteItems)
+      .innerJoin(deliveryNotes, eq(deliveryNoteItems.deliveryNoteId, deliveryNotes.id))
+      .where(
+        and(
+          eq(deliveryNotes.invoiceId, invoiceId),
+          eq(deliveryNotes.status, 'delivered')
+        )
+      )
+      .groupBy(deliveryNoteItems.invoiceItemId);
+
+    return rows.map(r => ({
+      invoiceItemId: r.invoiceItemId,
+      deliveredQty: parseFloat(r.total || '0')
     }));
   }
 
@@ -6327,16 +6352,44 @@ export class DatabaseStorage implements IStorage {
     const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, returnRecord.invoiceId));
     if (!invoice) return;
 
+    // Get delivered quantities per invoiceItem for this invoice (only from delivered delivery notes)
+    const deliveredRows = await tx
+      .select({
+        invoiceItemId: deliveryNoteItems.invoiceItemId,
+        total: sql<string>`SUM(${deliveryNoteItems.deliveredQuantity})`
+      })
+      .from(deliveryNoteItems)
+      .innerJoin(deliveryNotes, eq(deliveryNoteItems.deliveryNoteId, deliveryNotes.id))
+      .where(
+        and(
+          eq(deliveryNotes.invoiceId, returnRecord.invoiceId),
+          eq(deliveryNotes.status, 'delivered')
+        )
+      )
+      .groupBy(deliveryNoteItems.invoiceItemId);
+
+    const deliveredQtyMap = new Map<number, number>(
+      deliveredRows.map((r: any) => [r.invoiceItemId, parseFloat(r.total || '0')])
+    );
+
     for (const item of items) {
       // Get the invoice item to get product info
       const [invoiceItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, item.invoiceItemId));
       if (!invoiceItem) continue;
 
-      // Calculate the base quantity being returned
-      let baseReturnedQty = parseFloat(item.quantity.toString());
+      // How many units of this item have actually left the warehouse
+      const deliveredQty = deliveredQtyMap.get(item.invoiceItemId) ?? 0;
+      const returnQty = parseFloat(item.quantity.toString());
+
+      // Only the portion that was actually shipped goes back to stock
+      const qtyToStock = Math.min(returnQty, deliveredQty);
+      if (qtyToStock <= 0) continue; // Nothing to put back in stock
+
+      // Convert to base unit if a unit conversion ratio exists
+      let baseQtyToStock = qtyToStock;
       if (invoiceItem.baseQuantity && invoiceItem.quantity) {
         const ratio = parseFloat(invoiceItem.baseQuantity.toString()) / parseFloat(invoiceItem.quantity.toString());
-        baseReturnedQty = parseFloat(item.quantity.toString()) * ratio;
+        baseQtyToStock = qtyToStock * ratio;
       }
 
       // Get the unit cost from invoice item's unitCost or calculate from available data
@@ -6362,13 +6415,13 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Create a new batch for the returned items
+      // Create a new batch only for the delivered portion being returned
       const batchReference = `RTN-${returnRecord.returnNumber}`;
       await tx.insert(productBatches).values({
         productId: invoiceItem.productId,
         storeId: invoice.storeId,
-        quantity: baseReturnedQty.toString(),
-        remainingQuantity: baseReturnedQty.toString(),
+        quantity: baseQtyToStock.toString(),
+        remainingQuantity: baseQtyToStock.toString(),
         reservedQuantity: '0',
         cost: returnCost.toString(),
         baseCost: returnCost.toString(),
