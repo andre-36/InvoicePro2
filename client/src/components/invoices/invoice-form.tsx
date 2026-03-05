@@ -102,6 +102,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   // Start with empty array for edit mode (items will be loaded from API)
   // Start with default item for new invoice mode
   const [items, setItems] = useState<InvoiceItem[]>(invoiceId ? [] : [defaultItem]);
+  const [itemPriceValidity, setItemPriceValidity] = useState<Record<number, boolean>>({});
 
   // Payment dialog state
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -207,6 +208,8 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
   });
+  const canOverrideLowestPrice = currentUser?.role === 'owner' ||
+    (currentUser?.permissions?.includes('invoices.override_lowest_price') ?? false);
 
   // Mutation for creating a payment
   const createPaymentMutation = useMutation({
@@ -809,6 +812,16 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
       toast({
         title: "Client belum dipilih",
         description: "Pilih client terlebih dahulu sebelum menyimpan invoice.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Block submit if any item has invalid price (below lowest price without permission)
+    const hasInvalidPrice = Object.values(itemPriceValidity).some(v => v === false);
+    if (hasInvalidPrice) {
+      toast({
+        title: "Harga tidak valid",
+        description: "Satu atau lebih item memiliki harga di bawah minimum dan Anda tidak memiliki izin untuk menetapkan harga tersebut.",
         variant: "destructive",
       });
       return;
@@ -1416,6 +1429,10 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
                           removeItem={removeItem}
                           onProductSelect={handleProductSelect}
                           disabled={!!hasActiveDeliveryNotes}
+                          canOverrideLowestPrice={canOverrideLowestPrice}
+                          onPriceValidationChange={(idx, isValid) => {
+                            setItemPriceValidity(prev => ({ ...prev, [idx]: isValid }));
+                          }}
                         />
                       ))}
                       {/* Add row button inside the table */}

@@ -766,8 +766,8 @@ export default function ProductsPage() {
                     <TableHead className="w-[90px] text-right">Available</TableHead>
                     <TableHead className="w-[60px] text-right">PO</TableHead>
                     <TableHead>Price</TableHead>
-                    <TableHead>Cost Price</TableHead>
-                    <TableHead>Lowest Price</TableHead>
+                    {hasPermission('products.view_cost') && <TableHead>Cost Price</TableHead>}
+                    {hasPermission('products.view_lowest_price') && <TableHead>Lowest Price</TableHead>}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -856,8 +856,8 @@ export default function ProductsPage() {
                         )}
                       </TableCell>
                       <TableCell>{formatCurrency(product.currentSellingPrice || "0")}</TableCell>
-                      <TableCell>{product.costPrice ? formatCurrency(product.costPrice) : "—"}</TableCell>
-                      <TableCell>{product.lowestPrice ? formatCurrency(product.lowestPrice) : "—"}</TableCell>
+                      {hasPermission('products.view_cost') && <TableCell>{product.costPrice ? formatCurrency(product.costPrice) : "—"}</TableCell>}
+                      {hasPermission('products.view_lowest_price') && <TableCell>{product.lowestPrice ? formatCurrency(product.lowestPrice) : "—"}</TableCell>}
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1055,57 +1055,60 @@ export default function ProductsPage() {
                   {/* Hide cost price for bundles - it's calculated from components */}
                   {productType !== "bundle" && (
                     <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="costPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Cost Price</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <span className="text-gray-500 sm:text-sm">Rp</span>
+                      {hasPermission('products.view_cost') ? (
+                        <FormField
+                          control={form.control}
+                          name="costPrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Cost Price</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span className="text-gray-500 sm:text-sm">Rp</span>
+                                  </div>
+                                  <Input 
+                                    placeholder="0" 
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                    {...field} 
+                                  />
                                 </div>
-                                <Input 
-                                  placeholder="0" 
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                  {...field} 
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    
-                      <FormField
-                        control={form.control}
-                        name="lowestPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Lowest Price</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <span className="text-gray-500 sm:text-sm">Rp</span>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : <div />}
+                      {hasPermission('products.view_lowest_price') ? (
+                        <FormField
+                          control={form.control}
+                          name="lowestPrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Lowest Price</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span className="text-gray-500 sm:text-sm">Rp</span>
+                                  </div>
+                                  <Input 
+                                    placeholder="0" 
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                    {...field} 
+                                  />
                                 </div>
-                                <Input 
-                                  placeholder="0" 
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  className="pl-8 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                  {...field} 
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : <div />}
                     </div>
                   )}
                   

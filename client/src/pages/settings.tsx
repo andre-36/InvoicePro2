@@ -375,6 +375,8 @@ export default function SettingsPage() {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [deletingTransfer, setDeletingTransfer] = useState<AccountTransfer | null>(null);
   const [returnWindowDays, setReturnWindowDays] = useState<string>("30");
+  const [requirePaymentBeforePrint, setRequirePaymentBeforePrint] = useState<boolean>(false);
+  const [lockPaidInvoices, setLockPaidInvoices] = useState<boolean>(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasInitialized = useRef(false);
@@ -428,10 +430,14 @@ export default function SettingsPage() {
     queryKey: ['/api/stores/1/settings'],
   });
 
-  // Initialize returnWindowDays from store settings
+  // Initialize returnWindowDays and business rules from store settings
   useEffect(() => {
-    if (storeSettings && storeSettings['return_window_days'] !== undefined) {
-      setReturnWindowDays(storeSettings['return_window_days']);
+    if (storeSettings) {
+      if (storeSettings['return_window_days'] !== undefined) {
+        setReturnWindowDays(storeSettings['return_window_days']);
+      }
+      setRequirePaymentBeforePrint(storeSettings['require_payment_before_delivery_print'] === 'true');
+      setLockPaidInvoices(storeSettings['lock_paid_invoices'] === 'true');
     }
   }, [storeSettings]);
 
@@ -1389,6 +1395,19 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       toast({ title: "Pengaturan berhasil disimpan", description: "Batas hari retur telah diperbarui." });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/settings'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const saveBusinessRuleMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      const response = await apiRequest('POST', '/api/stores/1/settings', { key, value });
+      return response.json();
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/settings'] });
     },
     onError: (error: any) => {
@@ -2636,6 +2655,50 @@ export default function SettingsPage() {
                 <Save className="h-4 w-4 mr-2" />
                 Simpan
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Aturan Bisnis
+              </CardTitle>
+              <CardDescription>
+                Aturan operasional yang dapat dinyalakan atau dimatikan sesuai kebutuhan bisnis
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-start justify-between gap-4 py-3 border-b">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Wajib Bayar Sebelum Print Surat Jalan</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Surat jalan hanya bisa diprint setelah invoice memiliki setidaknya satu pembayaran. Berguna untuk memastikan customer membayar sebelum barang disiapkan.
+                  </p>
+                </div>
+                <Switch
+                  checked={requirePaymentBeforePrint}
+                  onCheckedChange={(checked) => {
+                    setRequirePaymentBeforePrint(checked);
+                    saveBusinessRuleMutation.mutate({ key: 'require_payment_before_delivery_print', value: checked ? 'true' : 'false' });
+                  }}
+                />
+              </div>
+              <div className="flex items-start justify-between gap-4 py-3">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Kunci Invoice Setelah Paid</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Invoice tidak dapat diedit setelah status pembayaran menjadi Paid. Owner tetap dapat mengedit. Berguna untuk menjaga integritas data keuangan.
+                  </p>
+                </div>
+                <Switch
+                  checked={lockPaidInvoices}
+                  onCheckedChange={(checked) => {
+                    setLockPaidInvoices(checked);
+                    saveBusinessRuleMutation.mutate({ key: 'lock_paid_invoices', value: checked ? 'true' : 'false' });
+                  }}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

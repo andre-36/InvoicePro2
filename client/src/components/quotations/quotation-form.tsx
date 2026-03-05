@@ -388,11 +388,24 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     form.setValue('quotation.totalAmount', Math.max(0, total).toString());
   };
 
+  const canOverrideLowestPrice = currentUser?.role === 'owner' ||
+    (currentUser?.permissions?.includes('invoices.override_lowest_price') ?? false);
+  const [itemPriceValidity, setItemPriceValidity] = useState<Record<number, boolean>>({});
+
   const onSubmit = (values: QuotationFormValues) => {
     if (!values.quotation.clientId || values.quotation.clientId === 0) {
       toast({
         title: "Client belum dipilih",
         description: "Pilih client terlebih dahulu sebelum menyimpan quotation.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const hasInvalidPrice = Object.values(itemPriceValidity).some(v => v === false);
+    if (hasInvalidPrice) {
+      toast({
+        title: "Harga tidak valid",
+        description: "Satu atau lebih item memiliki harga di bawah minimum dan Anda tidak memiliki izin untuk menetapkan harga tersebut.",
         variant: "destructive",
       });
       return;
@@ -652,6 +665,10 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                     onUpdate={updateItem}
                     onRemove={() => removeItem(index)}
                     canRemove={items.length > 1}
+                    canOverrideLowestPrice={canOverrideLowestPrice}
+                    onPriceValidationChange={(idx, isValid) => {
+                      setItemPriceValidity(prev => ({ ...prev, [idx]: isValid }));
+                    }}
                   />
                 ))}
                 {/* Add Item button at the bottom */}

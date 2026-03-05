@@ -23,6 +23,7 @@ interface Product {
   name: string;
   description: string;
   currentSellingPrice: string;
+  lowestPrice?: string | null;
   productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
   currentStock?: number;
@@ -52,6 +53,8 @@ interface InvoiceItemRowProps {
   removeItem: (index: number) => void;
   onProductSelect: (index: number, productId: number | null, productUnitId?: number | null) => void;
   disabled?: boolean;
+  canOverrideLowestPrice?: boolean;
+  onPriceValidationChange?: (index: number, isValid: boolean) => void;
 }
 
 export function InvoiceItemRow({ 
@@ -61,7 +64,9 @@ export function InvoiceItemRow({
   updateItem, 
   removeItem,
   onProductSelect,
-  disabled = false
+  disabled = false,
+  canOverrideLowestPrice = true,
+  onPriceValidationChange
 }: InvoiceItemRowProps) {
   const [description, setDescription] = useState(item.description || "");
   const [quantity, setQuantity] = useState(item.quantity || "1");
@@ -72,6 +77,7 @@ export function InvoiceItemRow({
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [lowestPrice, setLowestPrice] = useState<number | null>(null);
   const commandRef = useRef<HTMLDivElement>(null);
 
   const itemRef = useRef(item);
@@ -132,11 +138,26 @@ export function InvoiceItemRow({
         .then(res => res.ok ? res.json() : [])
         .then(units => setProductUnits(units || []))
         .catch(() => setProductUnits([]));
+      // Also sync lowestPrice when product changes externally
+      const prod = products.find(p => p.id.toString() === productId);
+      if (prod) {
+        setLowestPrice(prod.lowestPrice ? parseFloat(prod.lowestPrice) : null);
+      }
     } else {
       setProductUnits([]);
       setProductUnitId("");
+      setLowestPrice(null);
     }
-  }, [productId]);
+  }, [productId, products]);
+
+  // Notify parent whether price passes lowest price validation
+  useEffect(() => {
+    if (!onPriceValidationChange) return;
+    const priceNum = parseFloat(price) || 0;
+    const isBelowLowest = lowestPrice !== null && priceNum > 0 && priceNum < lowestPrice;
+    const isInvalid = isBelowLowest && !canOverrideLowestPrice;
+    onPriceValidationChange(index, !isInvalid);
+  }, [price, lowestPrice, canOverrideLowestPrice, index, onPriceValidationChange]);
 
   // Define onUpdate to be used within handleProductChange for direct state updates
   const onUpdate = (idx: number, updatedItem: InvoiceItem) => {
@@ -230,6 +251,10 @@ export function InvoiceItemRow({
         const subtotal = qty * price;
         const tax = subtotal * (taxRate / 100);
         const total = subtotal + tax;
+
+        // Track lowest price for this product
+        const lp = selectedProduct.lowestPrice ? parseFloat(selectedProduct.lowestPrice) : null;
+        setLowestPrice(lp);
 
         const updatedItem = {
           productId: selectedProduct.id,
@@ -433,20 +458,44 @@ export function InvoiceItemRow({
 
       {/* Price */}
       <td>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-            <span className="text-gray-500 sm:text-xs">Rp</span>
-          </div>
-          <Input
-            type="number"
-            min="0.00"
-            step="0.01"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="excel-cell-input-right pl-5 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-            disabled={disabled}
-          />
-        </div>
+        {(() => {
+          const priceNum = parseFloat(price) || 0;
+          const isBelowLowest = lowestPrice !== null && priceNum > 0 && priceNum < lowestPrice;
+          const isBlocking = isBelowLowest && !canOverrideLowestPrice;
+          const isWarning = isBelowLowest && canOverrideLowestPrice;
+          return (
+            <div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-xs">Rp</span>
+                </div>
+                <Input
+                  type="number"
+                  min="0.00"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className={cn(
+                    "excel-cell-input-right pl-5 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]",
+                    isBlocking && "border-red-500 focus-visible:ring-red-500",
+                    isWarning && "border-yellow-400 focus-visible:ring-yellow-400"
+                  )}
+                  disabled={disabled}
+                />
+              </div>
+              {isBlocking && (
+                <p className="text-red-600 text-[10px] leading-tight mt-0.5 whitespace-nowrap">
+                  Min: {formatCurrency(lowestPrice!.toString())}. Tidak ada izin.
+                </p>
+              )}
+              {isWarning && (
+                <p className="text-yellow-600 text-[10px] leading-tight mt-0.5 whitespace-nowrap">
+                  Di bawah min: {formatCurrency(lowestPrice!.toString())}
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </td>
 
       {/* Total (subtotal) */}

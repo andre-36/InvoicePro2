@@ -2005,6 +2005,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
+      const requestUser = req.user as any;
+
+      // Check lock_paid_invoices setting
+      if (requestUser?.role !== 'owner') {
+        const lockSetting = await storage.getSetting(1, 'lock_paid_invoices');
+        if (lockSetting === 'true') {
+          const existingInvoice = await storage.getInvoice(invoiceId);
+          if (existingInvoice && existingInvoice.paymentStatus === 'paid') {
+            return res.status(403).json({ error: "Invoice tidak dapat diedit karena sudah berstatus Paid" });
+          }
+        }
+      }
       
       // Handle both nested { invoice: {...}, items: [...] } and flat structure
       const items = req.body.items;
@@ -2241,7 +2253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices/:invoiceId/payments", requireAuth, async (req, res) => {
+  app.post("/api/invoices/:invoiceId/payments", requireAuth, requirePermission('payments.manage'), async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId);
       
@@ -2397,7 +2409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, async (req, res) => {
+  app.put("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, requirePermission('payments.manage'), async (req, res) => {
     try {
       const paymentId = parseInt(req.params.paymentId);
       
@@ -2413,7 +2425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, async (req, res) => {
+  app.delete("/api/invoices/:invoiceId/payments/:paymentId", requireAuth, requirePermission('payments.manage'), async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.invoiceId);
       const paymentId = parseInt(req.params.paymentId);
@@ -3216,7 +3228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-adjustments", requireAuth, requirePermission('products.stock_adjust'), async (req, res) => {
+  app.post("/api/stock-adjustments", requireAuth, requirePermission('products.adjust_stock'), async (req, res) => {
     try {
       const validatedData = validateRequestBody(insertStockAdjustmentSchema, req, res);
       if (!validatedData) return;
@@ -3976,7 +3988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stores/:storeId/returns", requireAuth, async (req, res) => {
+  app.post("/api/stores/:storeId/returns", requireAuth, requirePermission('returns.create'), async (req, res) => {
     try {
       const storeId = parseInt(req.params.storeId);
       const schema = z.object({

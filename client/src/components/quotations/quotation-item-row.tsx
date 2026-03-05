@@ -23,6 +23,7 @@ interface Product {
   name: string;
   description: string;
   currentSellingPrice: string;
+  lowestPrice?: string | null;
   productType?: 'standard' | 'bundle';
   unit?: string; // Base unit from database (pcs, kg, meter, etc.)
   currentStock?: number;
@@ -50,6 +51,8 @@ interface QuotationItemRowProps {
   onUpdate: (index: number, item: QuotationItem) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
+  canOverrideLowestPrice?: boolean;
+  onPriceValidationChange?: (index: number, isValid: boolean) => void;
 }
 
 export function QuotationItemRow({ 
@@ -58,7 +61,9 @@ export function QuotationItemRow({
   products, 
   onUpdate, 
   onRemove,
-  canRemove 
+  canRemove,
+  canOverrideLowestPrice = true,
+  onPriceValidationChange
 }: QuotationItemRowProps) {
   const [description, setDescription] = useState(item.description || "");
   const [quantity, setQuantity] = useState(item.quantity || "1");
@@ -68,6 +73,7 @@ export function QuotationItemRow({
   const [productUnitId, setProductUnitId] = useState<string>(item.productUnitId?.toString() || "");
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
   const [open, setOpen] = useState(false);
+  const [lowestPrice, setLowestPrice] = useState<number | null>(null);
 
   const itemRef = useRef(item);
   const onUpdateRef = useRef(onUpdate);
@@ -116,18 +122,32 @@ export function QuotationItemRow({
     setProductUnitId(item.productUnitId?.toString() || "");
   }, [item.id, item.description, item.quantity, item.unitPrice, item.taxRate, item.productId, item.productUnitId]);
 
-  // Fetch product units when product changes
+  // Fetch product units when product changes and sync lowestPrice
   useEffect(() => {
     if (productId && productId !== "0") {
       fetch(`/api/products/${productId}/units`, { credentials: 'include' })
         .then(res => res.ok ? res.json() : [])
         .then(units => setProductUnits(units || []))
         .catch(() => setProductUnits([]));
+      const prod = products.find(p => p.id.toString() === productId);
+      if (prod) {
+        setLowestPrice(prod.lowestPrice ? parseFloat(prod.lowestPrice) : null);
+      }
     } else {
       setProductUnits([]);
       setProductUnitId("");
+      setLowestPrice(null);
     }
-  }, [productId]);
+  }, [productId, products]);
+
+  // Notify parent whether price passes lowest price validation
+  useEffect(() => {
+    if (!onPriceValidationChange) return;
+    const priceNum = parseFloat(unitPrice) || 0;
+    const isBelowLowest = lowestPrice !== null && priceNum > 0 && priceNum < lowestPrice;
+    const isInvalid = isBelowLowest && !canOverrideLowestPrice;
+    onPriceValidationChange(index, !isInvalid);
+  }, [unitPrice, lowestPrice, canOverrideLowestPrice, index, onPriceValidationChange]);
 
   // Handle unit selection
   const handleUnitChange = (unitId: string) => {
@@ -185,11 +205,13 @@ export function QuotationItemRow({
       if (selectedProduct) {
         setDescription(selectedProduct.name);
         setUnitPrice(selectedProduct.currentSellingPrice || "0");
+        setLowestPrice(selectedProduct.lowestPrice ? parseFloat(selectedProduct.lowestPrice) : null);
       }
     } else {
       // Reset description when switching to manual entry
       setDescription("");
       setUnitPrice("0");
+      setLowestPrice(null);
     }
   };
 
@@ -361,16 +383,40 @@ export function QuotationItemRow({
         <label className="text-sm font-medium text-gray-700 mb-1 block">
           Unit Price
         </label>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="0.00"
-          value={unitPrice}
-          onChange={(e) => setUnitPrice(e.target.value)}
-          className="w-full"
-          data-testid={`input-unit-price-${index}`}
-        />
+        {(() => {
+          const priceNum = parseFloat(unitPrice) || 0;
+          const isBelowLowest = lowestPrice !== null && priceNum > 0 && priceNum < lowestPrice;
+          const isBlocking = isBelowLowest && !canOverrideLowestPrice;
+          const isWarning = isBelowLowest && canOverrideLowestPrice;
+          return (
+            <>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                className={cn(
+                  "w-full",
+                  isBlocking && "border-red-500 focus-visible:ring-red-500",
+                  isWarning && "border-yellow-400 focus-visible:ring-yellow-400"
+                )}
+                data-testid={`input-unit-price-${index}`}
+              />
+              {isBlocking && (
+                <p className="text-red-600 text-xs mt-1">
+                  Min: {formatCurrency(lowestPrice!.toString())}. Tidak ada izin.
+                </p>
+              )}
+              {isWarning && (
+                <p className="text-yellow-600 text-xs mt-1">
+                  Di bawah min: {formatCurrency(lowestPrice!.toString())}
+                </p>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Total */}

@@ -81,6 +81,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     invoiceNotes?: string;
     deliveryNoteNotes?: string;
     defaultNotes?: string;
+    role?: string;
+    permissions?: string[];
   }>({
     queryKey: ['/api/user'],
   });
@@ -123,6 +125,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const { data: relatedReturns = [] } = useQuery<any[]>({
     queryKey: ['/api/invoices', id, 'returns'],
   });
+
+  // Business rule settings
+  const { data: storeSettings } = useQuery<Record<string, string>>({
+    queryKey: ['/api/stores/1/settings'],
+  });
+  const requirePaymentBeforePrint = storeSettings?.require_payment_before_delivery_print === 'true';
+  const lockPaidInvoices = storeSettings?.lock_paid_invoices === 'true';
+
+  // Permission helpers
+  const isOwner = currentUser?.role === 'owner';
+  const canManagePayments = isOwner || (currentUser?.permissions?.includes('payments.manage') ?? false);
+  const canPrintDelivery = isOwner || (currentUser?.permissions?.includes('delivery_notes.print') ?? false);
 
   // State for delivery note dialog
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
@@ -756,6 +770,15 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   };
 
   const handlePrintDeliveryNote = async (deliveryNote: DeliveryNote) => {
+    // Check payment requirement before printing
+    if (requirePaymentBeforePrint && invoicePayments.length === 0) {
+      toast({
+        title: "Tidak dapat mencetak",
+        description: "Harus ada setidaknya satu pembayaran sebelum mencetak surat jalan.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const response = await fetch(`/api/delivery-notes/${deliveryNote.id}`, {
         credentials: 'include'
@@ -1308,7 +1331,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     );
   }
 
-  const isEditable = invoice.status !== 'paid' && invoice.status !== 'void';
+  const isLockedByPaymentRule = lockPaidInvoices && invoice.paymentStatus === 'paid' && !isOwner;
+  const isEditable = invoice.status !== 'void' && !isLockedByPaymentRule;
 
   // Helper to get running item number across pages
   const getRunningItemNumber = (pageIndex: number, itemIndex: number): number => {
@@ -1847,6 +1871,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
               <div>
                 <h3 className="text-lg font-medium">Payment Records</h3>
               </div>
+              {canManagePayments && (
               <Button
                 size="sm"
                 onClick={handleAddPayment}
@@ -1857,6 +1882,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Payment
               </Button>
+              )}
             </div>
 
             {invoicePayments.length === 0 ? (
@@ -1907,24 +1933,28 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.notes || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditPayment(payment)}
-                            className="mr-1"
-                            data-testid={`button-edit-payment-${payment.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeletePayment(payment.id)}
-                            className="text-red-600 hover:text-red-700"
-                            data-testid={`button-delete-payment-${payment.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canManagePayments && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditPayment(payment)}
+                                className="mr-1"
+                                data-testid={`button-edit-payment-${payment.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePayment(payment.id)}
+                                className="text-red-600 hover:text-red-700"
+                                data-testid={`button-delete-payment-${payment.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </td>
                       </tr>
                       );
@@ -2283,14 +2313,16 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
+                              {canPrintDelivery && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handlePrintDeliveryNote(dn)}
-                                title="Print Delivery Note"
+                                title={requirePaymentBeforePrint && invoicePayments.length === 0 ? "Harus ada pembayaran sebelum print surat jalan" : "Print Delivery Note"}
                               >
                                 <Printer className="h-4 w-4" />
                               </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
