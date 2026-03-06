@@ -45,7 +45,13 @@ export default function DeliveryNotesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
+  const { data: currentUser } = useQuery<{ id: number; role: string; permissions: string[] }>({
+    queryKey: ['/api/user'],
+  });
+  const isOwner = currentUser?.role === 'owner';
+  const canUpdateStatus = isOwner || (currentUser?.permissions?.includes('delivery_notes.update_status') ?? false);
+
   const { data: deliveryNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
     queryKey: ['/api/stores/1/delivery-notes', statusFilter !== 'all' ? statusFilter : undefined],
     queryFn: async () => {
@@ -64,6 +70,8 @@ export default function DeliveryNotesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
       toast({
         title: "Status diperbarui",
         description: "Status surat jalan berhasil diperbarui.",
@@ -88,6 +96,8 @@ export default function DeliveryNotesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
       toast({
         title: "Status dikembalikan",
         description: "Surat jalan dikembalikan ke pending, alokasi stok di-reverse.",
@@ -175,7 +185,7 @@ export default function DeliveryNotesPage() {
           <p className="text-muted-foreground">Kelola dan lacak status pengiriman</p>
         </div>
         <div className="flex gap-2">
-          {selectedIds.size > 0 && (
+          {selectedIds.size > 0 && canUpdateStatus && (
             <Button onClick={handleBatchMarkAsDelivered} variant="default">
               <CheckCircle className="h-4 w-4 mr-2" />
               Tandai {selectedIds.size} Selesai
@@ -332,13 +342,13 @@ export default function DeliveryNotesPage() {
                             <Eye className="h-4 w-4 mr-2" />
                             Lihat Invoice
                           </DropdownMenuItem>
-                          {note.status === 'pending' && (
+                          {note.status === 'pending' && canUpdateStatus && (
                             <DropdownMenuItem onClick={() => handleMarkAsDelivered(note.id)}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Tandai Selesai
                             </DropdownMenuItem>
                           )}
-                          {note.status === 'delivered' && (
+                          {note.status === 'delivered' && canUpdateStatus && (
                             <DropdownMenuItem onClick={() => handleRevertToPending(note.id)}>
                               <Clock className="h-4 w-4 mr-2" />
                               Kembalikan ke Pending

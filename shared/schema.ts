@@ -907,6 +907,7 @@ export const AVAILABLE_PERMISSIONS = [
   'delivery_notes.edit',
   'delivery_notes.delete',
   'delivery_notes.print',
+  'delivery_notes.update_status',
   'returns.view',
   'returns.create',
   'returns.edit',

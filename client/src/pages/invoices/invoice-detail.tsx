@@ -137,6 +137,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   const isOwner = currentUser?.role === 'owner';
   const canManagePayments = isOwner || (currentUser?.permissions?.includes('payments.manage') ?? false);
   const canPrintDelivery = isOwner || (currentUser?.permissions?.includes('delivery_notes.print') ?? false);
+  const canUpdateDeliveryStatus = isOwner || (currentUser?.permissions?.includes('delivery_notes.update_status') ?? false);
 
   // State for delivery note dialog
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
@@ -581,6 +582,31 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       toast({
         title: "Error",
         description: `Failed to delete delivery note: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const markDeliveredMutation = useMutation({
+    mutationFn: async (deliveryNoteId: number) => {
+      return apiRequest('PATCH', `/api/delivery-notes/${deliveryNoteId}/status`, { status: 'delivered' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      toast({
+        title: "Status diperbarui",
+        description: "Surat jalan berhasil ditandai sebagai Delivered.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Gagal mengubah status: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -2313,6 +2339,18 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center">
+                              {dn.status === 'pending' && canUpdateDeliveryStatus && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => markDeliveredMutation.mutate(dn.id)}
+                                  disabled={markDeliveredMutation.isPending}
+                                  title="Tandai Delivered"
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"

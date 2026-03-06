@@ -95,6 +95,7 @@ const PERMISSION_GROUPS = {
     { id: "delivery_notes.create", label: "Buat Surat Jalan" },
     { id: "delivery_notes.edit", label: "Edit Surat Jalan" },
     { id: "delivery_notes.delete", label: "Hapus Surat Jalan" },
+    { id: "delivery_notes.update_status", label: "Ubah Status Surat Jalan" },
   ],
   "Retur": [
     { id: "returns.view", label: "Lihat Retur" },

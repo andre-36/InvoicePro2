@@ -2657,7 +2657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/delivery-notes/:id/status", requireAuth, async (req, res) => {
+  app.patch("/api/delivery-notes/:id/status", requireAuth, requirePermission('delivery_notes.update_status'), async (req, res) => {
     try {
       const deliveryNoteId = parseInt(req.params.id);
       const { status } = req.body;
@@ -2689,7 +2689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/delivery-notes/:id/revert-to-pending", requireAuth, async (req, res) => {
+  app.put("/api/delivery-notes/:id/revert-to-pending", requireAuth, requirePermission('delivery_notes.update_status'), async (req, res) => {
     try {
       const deliveryNoteId = parseInt(req.params.id);
       const updatedDeliveryNote = await storage.revertDeliveryNoteToPending(deliveryNoteId);
