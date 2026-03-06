@@ -266,20 +266,28 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
   // Void invoice mutation (replaces delete - invoices should never be deleted, only voided)
   const voidMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', `/api/invoices/${id}/void`, undefined);
+      const res = await fetch(`/api/invoices/${id}/void`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || body.error || 'Gagal void invoice');
+      }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       toast({
-        title: "Invoice voided",
-        description: "The invoice has been voided successfully.",
+        title: "Invoice di-void",
+        description: "Invoice berhasil di-void.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: `Failed to void invoice: ${error.message}`,
+        title: "Tidak dapat void invoice",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -1578,7 +1586,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
             </Link>
           )}
           
-          {invoice.status !== 'void' && (
+          {invoice.status !== 'void' && isOwner && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -1594,17 +1602,17 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Void Invoice</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to void invoice {invoice.invoiceNumber}? This will make the invoice inactive and prevent any further edits. The invoice will remain visible for record-keeping purposes.
+                    Apakah Anda yakin ingin void invoice {invoice.invoiceNumber}? Invoice akan dinonaktifkan dan tidak bisa diedit lagi. Invoice tetap tersimpan untuk keperluan pencatatan. Pastikan semua payment dan surat jalan sudah dihapus terlebih dahulu.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>Batal</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => voidMutation.mutate()}
                     className="bg-red-600 hover:bg-red-700"
                     data-testid="button-confirm-void"
                   >
-                    Void Invoice
+                    Ya, Void Invoice
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

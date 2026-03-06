@@ -2223,7 +2223,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invoice.isVoided) {
         return res.status(400).json({ error: "Invoice is already voided" });
       }
-      
+
+      // Block void if there are existing payments
+      const payments = await storage.getInvoicePayments(invoiceId);
+      if (payments.length > 0) {
+        return res.status(400).json({
+          error: "Tidak dapat void invoice",
+          message: `Invoice masih memiliki ${payments.length} pembayaran. Hapus semua pembayaran terlebih dahulu sebelum melakukan void.`
+        });
+      }
+
+      // Block void if there are existing delivery notes
+      const dns = await storage.getDeliveryNotesByInvoice(invoiceId);
+      if (dns.length > 0) {
+        return res.status(400).json({
+          error: "Tidak dapat void invoice",
+          message: `Invoice masih memiliki ${dns.length} surat jalan. Hapus semua surat jalan terlebih dahulu sebelum melakukan void.`
+        });
+      }
+
+      // Release any reserved stock before voiding
+      await storage.releaseStockReservationForInvoice(invoiceId);
+
       const updatedInvoice = await storage.voidInvoice(invoiceId);
       res.json(updatedInvoice);
     } catch (error) {

@@ -3090,6 +3090,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDeliveryNote(id: number): Promise<void> {
+    const [deliveryNote] = await db.select().from(deliveryNotes).where(eq(deliveryNotes.id, id));
+    if (!deliveryNote) {
+      throw new Error(`Delivery note with ID ${id} not found`);
+    }
+
+    // If already delivered: reverse the stock allocation first (restore remainingQuantity to batches)
+    // This runs in its own transaction inside reverseDeliveryNoteStock
+    if (deliveryNote.status === 'delivered') {
+      await this.reverseDeliveryNoteStock(id);
+    }
+
+    // Delete items and the delivery note record
+    await db.delete(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, id));
     await db.delete(deliveryNotes).where(eq(deliveryNotes.id, id));
   }
 
