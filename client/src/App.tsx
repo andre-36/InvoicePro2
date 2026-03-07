@@ -31,7 +31,6 @@ import SuppliersPage from "@/pages/suppliers";
 import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
-import PrintSettingsPage from "@/pages/print-settings";
 import PaymentMethodsPage from "@/pages/payment-methods";
 import PaymentTypesPage from "@/pages/payment-types";
 import PaymentTermsPage from "@/pages/payment-terms";
@@ -304,7 +303,6 @@ function App() {
                   </ProtectedRoute>
                 </Route>
                 <Route path="/activity-log" component={ActivityLogPage} />
-                <Route path="/print-settings" component={PrintSettingsPage} />
                 <Route path="/payment-methods" component={PaymentMethodsPage} />
                 <Route path="/payment-types" component={PaymentTypesPage} />
                 <Route path="/payment-terms" component={PaymentTermsPage} />

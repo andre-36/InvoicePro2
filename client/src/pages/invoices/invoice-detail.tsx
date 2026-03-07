@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generatePDF } from "@/lib/pdf-generator";
 import { logPrint } from "@/lib/activity-log";
 import { formatDate, formatCurrency, formatCurrencyAccounting, formatQuantity } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote, Return } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PaymentType, DeliveryNote, Return } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useStore } from '@/lib/store-context';
@@ -68,10 +68,6 @@ export default function InvoiceDetailPage({
     queryKey: ['/api/invoices', id, 'payments'],
   });
 
-  // Fetch print settings
-  const { data: printSettings } = useQuery<PrintSettings>({
-    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
-  });
 
   // Fetch current user for company information
   const { data: currentUser } = useQuery<{
@@ -833,7 +829,7 @@ export default function InvoiceDetailPage({
       printFrame.style.left = '-9999px';
       document.body.appendChild(printFrame);
 
-      const accentColor = printSettings?.accentColor || '#000';
+      const accentColor = '#000';
       const items = dnData.items || [];
       
       // Pagination constants for 24cm x 14cm paper
@@ -1401,13 +1397,13 @@ export default function InvoiceDetailPage({
                   {currentUser?.logoUrl ? (
                     <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                   ) : (
-                    <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                    <div className="print-logo-circle" style={{ borderColor: '#000' }}>
                       {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                     </div>
                   )}
                 </div>
                 <div className="print-bill-to">
-                  <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
+                  <div className="print-bill-to-label" style={{ borderColor: '#000' }}>Bill To</div>
                   <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
                   {client && (
                     <div className="print-bill-to-details">
@@ -1437,7 +1433,7 @@ export default function InvoiceDetailPage({
               
               {/* Right column: Document Details */}
               <div className="print-header-right">
-                <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>INVOICE</div>
+                <div className="print-doc-type" style={{ borderColor: '#000' }}>INVOICE</div>
                 <div className="print-doc-details">
                   <div className="print-doc-row">
                     <span className="print-doc-label">No.</span>
@@ -1529,7 +1525,7 @@ export default function InvoiceDetailPage({
                       <span className="print-total-value">{formatCurrencyAccounting(invoice.subtotal)}</span>
                     </div>
                   )}
-                  {printSettings?.showDiscount !== false && parseFloat(invoice.discount || '0') > 0 && (
+                  {parseFloat(invoice.discount || '0') > 0 && (
                     <div className="print-total-row">
                       <span className="print-total-label">Discount</span>
                       <span className="print-total-value">-{formatCurrencyAccounting(invoice.discount || '0')}</span>
@@ -1541,7 +1537,7 @@ export default function InvoiceDetailPage({
                       <span className="print-total-value">{formatCurrencyAccounting((invoice as any).shipping)}</span>
                     </div>
                   )}
-                  <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+                  <div className="print-total-row print-total-final" style={{ backgroundColor: '#e8e8e8' }}>
                     <span className="print-total-label">TOTAL</span>
                     <span className="print-total-value">{formatCurrencyAccounting(invoice.totalAmount)}</span>
                   </div>

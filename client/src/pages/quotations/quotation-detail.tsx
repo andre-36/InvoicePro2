@@ -33,7 +33,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PrintSettings } from "@shared/schema";
 import { useStore } from '@/lib/store-context';
 
 interface QuotationDetailPageProps {
@@ -95,10 +94,6 @@ export default function QuotationDetailPage({
     queryKey: ['/api/quotations', id],
   });
 
-  // Fetch print settings
-  const { data: printSettings } = useQuery<PrintSettings>({
-    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
-  });
 
   // Fetch current user for company information
   const { data: currentUser } = useQuery<{
@@ -289,13 +284,13 @@ export default function QuotationDetailPage({
                 {currentUser?.logoUrl ? (
                   <img src={currentUser.logoUrl} alt="Company Logo" className="print-logo-image" />
                 ) : (
-                  <div className="print-logo-circle" style={{ borderColor: printSettings?.accentColor || '#000' }}>
+                  <div className="print-logo-circle" style={{ borderColor: '#000' }}>
                     {currentUser?.companyName?.substring(0, 2).toUpperCase() || 'CO'}
                   </div>
                 )}
               </div>
               <div className="print-bill-to">
-                <div className="print-bill-to-label" style={{ borderColor: printSettings?.accentColor || '#000' }}>Bill To</div>
+                <div className="print-bill-to-label" style={{ borderColor: '#000' }}>Bill To</div>
                 <div className="print-bill-to-name">{client?.name || 'N/A'}</div>
                 {client && (
                   <div className="print-bill-to-details">
@@ -331,7 +326,7 @@ export default function QuotationDetailPage({
             
             {/* Right column: Document Details */}
             <div className="print-header-right">
-              <div className="print-doc-type" style={{ borderColor: printSettings?.accentColor || '#000' }}>QUOTATION</div>
+              <div className="print-doc-type" style={{ borderColor: '#000' }}>QUOTATION</div>
               <div className="print-doc-details">
                 <div className="print-doc-row">
                   <span className="print-doc-label">No.</span>
@@ -410,13 +405,13 @@ export default function QuotationDetailPage({
                 <span className="print-total-label">Subtotal</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
               </div>
-              {printSettings?.showDiscount !== false && parseFloat(quotation.discount || '0') > 0 && (
+              {parseFloat(quotation.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
                   <span className="print-total-value">-{formatCurrency(parseFloat(quotation.discount))}</span>
                 </div>
               )}
-              <div className="print-total-row print-total-final" style={{ backgroundColor: printSettings?.accentColor ? `${printSettings.accentColor}15` : '#e8e8e8' }}>
+              <div className="print-total-row print-total-final" style={{ backgroundColor: '#e8e8e8' }}>
                 <span className="print-total-label">TOTAL</span>
                 <span className="print-total-value">{formatCurrency(parseFloat(quotation.totalAmount))}</span>
               </div>
