@@ -236,6 +236,7 @@ type PaymentTerm = {
 };
 
 function AutoTransactionSettings() {
+  const { currentStoreId } = useStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
