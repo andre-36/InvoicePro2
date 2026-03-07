@@ -31,9 +31,6 @@ import SuppliersPage from "@/pages/suppliers";
 import TransactionsPage from "@/pages/transactions";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
-import PaymentMethodsPage from "@/pages/payment-methods";
-import PaymentTypesPage from "@/pages/payment-types";
-import PaymentTermsPage from "@/pages/payment-terms";
 import DeliveryNotesPage from "@/pages/delivery-notes";
 import DeliveryPlanningPage from "@/pages/delivery-notes/planning";
 import ReturnsPage from "@/pages/returns";
@@ -303,9 +300,6 @@ function App() {
                   </ProtectedRoute>
                 </Route>
                 <Route path="/activity-log" component={ActivityLogPage} />
-                <Route path="/payment-methods" component={PaymentMethodsPage} />
-                <Route path="/payment-types" component={PaymentTypesPage} />
-                <Route path="/payment-terms" component={PaymentTermsPage} />
                 <Route component={NotFound} />
               </Switch>
             </main>
