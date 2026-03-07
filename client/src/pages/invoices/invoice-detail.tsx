@@ -1628,16 +1628,13 @@ export default function InvoiceDetailPage({
               <AlertDialog open={showEditWarning} onOpenChange={setShowEditWarning}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Invoice Sudah Memiliki Surat Jalan</AlertDialogTitle>
+                    <AlertDialogTitle>Invoice Tidak Dapat Diedit</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Invoice ini sudah memiliki surat jalan aktif. <strong>Data item tidak dapat diubah.</strong> Anda masih bisa mengubah informasi header seperti tanggal, catatan, dan alamat pengiriman. Lanjutkan edit?
+                      Invoice ini sudah memiliki surat jalan aktif. Hapus atau batalkan semua surat jalan terlebih dahulu sebelum mengedit invoice ini.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => navigate(`/invoices/${id}/edit`)}>
-                      Lanjut Edit
-                    </AlertDialogAction>
+                    <AlertDialogCancel>Tutup</AlertDialogCancel>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
