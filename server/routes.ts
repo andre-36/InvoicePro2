@@ -6086,7 +6086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Error handling middleware
   // Activity Log endpoints
-  app.get("/api/activity-logs", requireOwner, async (req, res) => {
+  app.get("/api/activity-logs", requirePermission('activity_log.view'), async (req, res) => {
     try {
       const { storeId, userId, action, entity, dateFrom, dateTo, page, limit } = req.query;
       const result = await storage.getActivityLogs({

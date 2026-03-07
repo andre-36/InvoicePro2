@@ -470,7 +470,7 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
                 </Link>
               )}
 
-              {isOwner && (
+              {hasPermission('activity_log.view') && (
                 <Link
                   href="/activity-log"
                   className={cn(

@@ -129,6 +129,9 @@ const PERMISSION_GROUPS = {
     { id: "settings.edit", label: "Edit Pengaturan" },
     { id: "settings.users", label: "Kelola User" },
   ],
+  "Activity Log": [
+    { id: "activity_log.view", label: "Lihat Activity Log" },
+  ],
 };
 
 export function UserManagement() {

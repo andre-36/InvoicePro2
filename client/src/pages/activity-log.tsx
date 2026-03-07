@@ -122,13 +122,14 @@ export default function ActivityLogPage() {
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
-    enabled: currentUser?.role === 'owner',
+    enabled: !!(currentUser && (currentUser.role === 'owner' || currentUser.permissions?.includes('activity_log.view'))),
   });
 
-  if (currentUser && currentUser.role !== 'owner') {
+  const canView = currentUser?.role === 'owner' || currentUser?.permissions?.includes('activity_log.view');
+  if (currentUser && !canView) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Hanya owner yang dapat mengakses halaman ini.</p>
+        <p className="text-muted-foreground">Anda tidak memiliki izin untuk mengakses halaman ini.</p>
       </div>
     );
   }

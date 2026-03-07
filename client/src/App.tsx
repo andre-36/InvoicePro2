@@ -108,6 +108,23 @@ function App() {
     checkAuthAndSetup();
   }, []);
 
+  // Polling: re-fetch current user every 60s to pick up permission changes made by owner
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/auth/user', { credentials: 'include' });
+        if (res.ok) {
+          const userData = await res.json();
+          setUser(userData);
+        } else if (res.status === 401) {
+          setUser(null);
+        }
+      } catch { /* ignore network errors */ }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
     queryClient.invalidateQueries({ queryKey: ['/api/user'] });
