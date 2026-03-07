@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { UploadResult } from "@uppy/core";
 import { useStore } from '@/lib/store-context';
+import type { PrintSettings } from "@shared/schema";
 
 // Profile settings schema
 const profileSchema = z.object({
@@ -60,6 +61,14 @@ const companySchema = z.object({
   deliveryNoteNotes: z.string().optional(),
   defaultNotes: z.string().optional(),
 });
+
+// Notes settings schema (per branch)
+const notesSchema = z.object({
+  quotationNotes: z.string().optional(),
+  invoiceNotes: z.string().optional(),
+  deliveryNoteNotes: z.string().optional(),
+});
+type NotesFormValues = z.infer<typeof notesSchema>;
 
 // Payment settings schema
 const paymentSchema = z.object({
@@ -434,6 +443,11 @@ export default function SettingsPage() {
     queryKey: [`/api/stores/${currentStoreId}/settings`],
   });
 
+  // Fetch store-specific print settings (for per-branch document notes)
+  const { data: storePrintSettings } = useQuery<PrintSettings>({
+    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
+  });
+
   // Initialize returnWindowDays and business rules from store settings
   useEffect(() => {
     if (storeSettings) {
@@ -482,6 +496,26 @@ export default function SettingsPage() {
       logoUrl: "",
     }
   });
+
+  // Notes form setup (per branch)
+  const notesForm = useForm<NotesFormValues>({
+    resolver: zodResolver(notesSchema),
+    defaultValues: {
+      quotationNotes: "",
+      invoiceNotes: "",
+      deliveryNoteNotes: "",
+    }
+  });
+
+  useEffect(() => {
+    if (storePrintSettings) {
+      notesForm.reset({
+        quotationNotes: storePrintSettings.quotationNotes || "",
+        invoiceNotes: storePrintSettings.invoiceNotes || "",
+        deliveryNoteNotes: storePrintSettings.deliveryNoteNotes || "",
+      });
+    }
+  }, [storePrintSettings, currentStoreId]);
 
   // Payment form setup
   const paymentForm = useForm<PaymentFormValues>({
@@ -624,6 +658,27 @@ export default function SettingsPage() {
       toast({
         title: "Error",
         description: `Failed to update company details: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update document notes mutation (per branch)
+  const notesMutation = useMutation({
+    mutationFn: async (data: NotesFormValues) => {
+      return apiRequest('PUT', `/api/stores/${currentStoreId}/print-settings`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/print-settings`] });
+      toast({
+        title: "Notes saved",
+        description: "Document notes updated for this branch.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to save notes: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -1124,6 +1179,10 @@ export default function SettingsPage() {
 
   const onCompanySubmit = (data: CompanyFormValues) => {
     companyMutation.mutate(data);
+  };
+
+  const onNotesSubmit = (data: NotesFormValues) => {
+    notesMutation.mutate(data);
   };
 
   const onPaymentSubmit = (data: PaymentFormValues) => {
@@ -1916,17 +1975,17 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-6">
-          <Form {...companyForm}>
-            <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="space-y-6">
+          <Form {...notesForm}>
+            <form onSubmit={notesForm.handleSubmit(onNotesSubmit)} className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Document Notes</CardTitle>
-                  <CardDescription>Configure default notes for your business documents</CardDescription>
+                  <CardDescription>Configure default notes for this branch. Each branch can have different notes.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
-                      control={companyForm.control}
+                      control={notesForm.control}
                       name="quotationNotes"
                       render={({ field }) => (
                         <FormItem>
@@ -1945,7 +2004,7 @@ export default function SettingsPage() {
                     />
 
                     <FormField
-                      control={companyForm.control}
+                      control={notesForm.control}
                       name="invoiceNotes"
                       render={({ field }) => (
                         <FormItem>
@@ -1964,7 +2023,7 @@ export default function SettingsPage() {
                     />
 
                     <FormField
-                      control={companyForm.control}
+                      control={notesForm.control}
                       name="deliveryNoteNotes"
                       render={({ field }) => (
                         <FormItem>
@@ -1984,9 +2043,9 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end border-t p-6">
-                  <Button type="submit" disabled={companyMutation.isPending || !companyForm.formState.isDirty} className="gap-2">
+                  <Button type="submit" disabled={notesMutation.isPending || !notesForm.formState.isDirty} className="gap-2">
                     <Save className="h-4 w-4" />
-                    <span>{companyMutation.isPending ? "Saving..." : "Save Notes"}</span>
+                    <span>{notesMutation.isPending ? "Saving..." : "Save Notes"}</span>
                   </Button>
                 </CardFooter>
               </Card>

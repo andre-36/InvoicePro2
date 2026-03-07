@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generatePDF } from "@/lib/pdf-generator";
 import { logPrint } from "@/lib/activity-log";
 import { formatDate, formatCurrency, formatCurrencyAccounting, formatQuantity } from "@/lib/utils";
-import type { Invoice, InvoiceItem, Client, PaymentType, DeliveryNote, Return } from "@shared/schema";
+import type { Invoice, InvoiceItem, Client, PaymentType, DeliveryNote, Return, PrintSettings } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useStore } from '@/lib/store-context';
@@ -68,6 +68,10 @@ export default function InvoiceDetailPage({
     queryKey: ['/api/invoices', id, 'payments'],
   });
 
+  // Fetch store-specific print settings (for document notes)
+  const { data: storePrintSettings } = useQuery<PrintSettings>({
+    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
+  });
 
   // Fetch current user for company information
   const { data: currentUser } = useQuery<{
@@ -360,7 +364,7 @@ export default function InvoiceDetailPage({
           price: item.unitPrice
         })) as any,
         client: client as any,
-        defaultNotes: currentUser?.invoiceNotes || currentUser?.defaultNotes
+        defaultNotes: storePrintSettings?.invoiceNotes || storePrintSettings?.defaultNotes
       });
       
       toast({
@@ -974,10 +978,10 @@ export default function InvoiceDetailPage({
       // Generate footer HTML
       const generateFooter = () => `
         <div class="print-footer">
-          ${deliveryNote.notes || currentUser?.deliveryNoteNotes ? `
+          ${deliveryNote.notes || storePrintSettings?.deliveryNoteNotes ? `
             <div class="print-notes-label">Catatan:</div>
             <div class="print-notes-text">
-              ${currentUser?.deliveryNoteNotes ? `<div>${currentUser.deliveryNoteNotes}</div>` : ''}
+              ${storePrintSettings?.deliveryNoteNotes ? `<div>${storePrintSettings.deliveryNoteNotes}</div>` : ''}
               ${deliveryNote.notes ? `<div>${deliveryNote.notes}</div>` : ''}
             </div>
           ` : ''}
@@ -1506,13 +1510,13 @@ export default function InvoiceDetailPage({
                 <div className="print-footer-left">
                   <div className="print-notes-label">Notes / Terms & Conditions:</div>
                   <div className="print-notes-text">
-                    {(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
-                      <div>{currentUser?.invoiceNotes || currentUser?.defaultNotes}</div>
+                    {(storePrintSettings?.invoiceNotes || storePrintSettings?.defaultNotes) && (
+                      <div>{storePrintSettings?.invoiceNotes || storePrintSettings?.defaultNotes}</div>
                     )}
                     {invoice.notes && (
-                      <div style={{ marginTop: (currentUser?.invoiceNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{invoice.notes}</div>
+                      <div style={{ marginTop: (storePrintSettings?.invoiceNotes || storePrintSettings?.defaultNotes) ? '8px' : '0' }}>{invoice.notes}</div>
                     )}
-                    {!invoice.notes && !(currentUser?.invoiceNotes || currentUser?.defaultNotes) && (
+                    {!invoice.notes && !(storePrintSettings?.invoiceNotes || storePrintSettings?.defaultNotes) && (
                       <div>Items checked and verified upon delivery. Items cannot be returned.</div>
                     )}
                   </div>

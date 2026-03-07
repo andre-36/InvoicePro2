@@ -34,6 +34,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from '@/lib/store-context';
+import type { PrintSettings } from "@shared/schema";
 
 interface QuotationDetailPageProps {
   id: number;
@@ -94,6 +95,10 @@ export default function QuotationDetailPage({
     queryKey: ['/api/quotations', id],
   });
 
+  // Fetch store-specific print settings (for document notes)
+  const { data: storePrintSettings } = useQuery<PrintSettings>({
+    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
+  });
 
   // Fetch current user for company information
   const { data: currentUser } = useQuery<{
@@ -388,13 +393,13 @@ export default function QuotationDetailPage({
             <div className="print-footer-left">
               <div className="print-notes-label">Notes / Terms & Conditions:</div>
               <div className="print-notes-text">
-                {(currentUser?.quotationNotes || currentUser?.defaultNotes) && (
-                  <div>{currentUser?.quotationNotes || currentUser?.defaultNotes}</div>
+                {(storePrintSettings?.quotationNotes || storePrintSettings?.defaultNotes) && (
+                  <div>{storePrintSettings?.quotationNotes || storePrintSettings?.defaultNotes}</div>
                 )}
                 {quotation.notes && (
-                  <div style={{ marginTop: (currentUser?.quotationNotes || currentUser?.defaultNotes) ? '8px' : '0' }}>{quotation.notes}</div>
+                  <div style={{ marginTop: (storePrintSettings?.quotationNotes || storePrintSettings?.defaultNotes) ? '8px' : '0' }}>{quotation.notes}</div>
                 )}
-                {!quotation.notes && !(currentUser?.quotationNotes || currentUser?.defaultNotes) && (
+                {!quotation.notes && !(storePrintSettings?.quotationNotes || storePrintSettings?.defaultNotes) && (
                   <div>Items checked and verified upon delivery. Items cannot be returned.</div>
                 )}
               </div>
