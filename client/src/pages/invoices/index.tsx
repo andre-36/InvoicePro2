@@ -49,6 +49,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generatePDF } from "@/lib/pdf-generator";
+import { useStore } from "@/lib/store-context";
 
 type PaymentStatus = 'unpaid' | 'partial_paid' | 'paid' | 'overpaid' | 'overdue';
 type DeliveryStatus = 'undelivered' | 'partial_delivered' | 'delivered';
@@ -73,6 +74,7 @@ type DeliveryStatusFilter = 'all' | DeliveryStatus;
 type SortDirection = 'asc' | 'desc';
 
 export default function InvoicesPage() {
+  const { currentStoreId } = useStore();
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatusFilter>("all");
@@ -90,7 +92,7 @@ export default function InvoicesPage() {
   const queryClient = useQueryClient();
   
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    queryKey: ['/api/invoices'],
+    queryKey: [`/api/stores/${currentStoreId}/invoices`],
   });
 
   // Fetch current user for default notes
@@ -107,7 +109,7 @@ export default function InvoicesPage() {
       return apiRequest('POST', `/api/invoices/${id}/void`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       toast({
         title: "Invoice dibatalkan",
         description: "Invoice telah di-void.",
@@ -165,7 +167,7 @@ export default function InvoicesPage() {
       setIsExporting(true);
       
       const params = new URLSearchParams();
-      params.append('storeId', '1');
+      params.append('storeId', String(currentStoreId));
       if (exportStartDate) params.append('startDate', exportStartDate);
       if (exportEndDate) params.append('endDate', exportEndDate);
       if (exportPaymentStatus) params.append('paymentStatus', exportPaymentStatus);

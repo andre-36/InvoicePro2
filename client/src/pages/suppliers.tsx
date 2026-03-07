@@ -50,7 +50,7 @@ export default function SuppliersPage() {
   const queryClient = useQueryClient();
   
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
-    queryKey: ['/api/suppliers'],
+    queryKey: [`/api/stores/${currentStoreId}/suppliers`],
   });
 
   const { data: nextNumberData } = useQuery<{ supplierNumber: string }>({
@@ -82,7 +82,7 @@ export default function SuppliersPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/suppliers`] });
       setIsDialogOpen(false);
       setEditingSupplier(null);
       form.reset();
@@ -107,7 +107,7 @@ export default function SuppliersPage() {
       return apiRequest('DELETE', `/api/suppliers/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/suppliers`] });
       setDeletingSupplier(null);
       toast({
         title: "Supplier deleted",

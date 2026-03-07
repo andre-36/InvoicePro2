@@ -74,7 +74,7 @@ export default function ClientsPage() {
   const queryClient = useQueryClient();
   
   const { data: clients, isLoading } = useQuery<Client[]>({
-    queryKey: ['/api/clients'],
+    queryKey: [`/api/stores/${currentStoreId}/clients`],
   });
 
   const toggleSort = (field: 'clientNumber' | 'name' | 'lastPurchase') => {
@@ -98,7 +98,7 @@ export default function ClientsPage() {
       return apiRequest('DELETE', `/api/clients/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/clients`] });
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
@@ -159,7 +159,7 @@ export default function ClientsPage() {
       return await response.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/clients`] });
       toast({
         title: "Import completed",
         description: result.message,
