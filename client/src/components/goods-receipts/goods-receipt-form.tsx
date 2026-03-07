@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
+import { useStore } from "@/lib/store-context";
 import { insertGoodsReceiptSchema } from "@shared/schema";
 import type { GoodsReceiptPayment, PurchaseOrder, Product, Supplier, CashAccount } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,7 @@ interface GoodsReceiptFormProps {
 }
 
 export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goodsReceiptId ? 'edit' : 'create' }: GoodsReceiptFormProps) {
+  const { currentStoreId } = useStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -163,7 +165,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
   const form = useForm({
     resolver: zodResolver(extendedGoodsReceiptSchema),
     defaultValues: {
-      storeId: 1,
+      storeId: currentStoreId,
       supplierId: null as number | null,
       supplierName: "",
       supplierEmail: "",
@@ -195,7 +197,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ['/api/stores/1/cash-accounts'],
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
   });
 
   const hasExistingId = !!goodsReceiptId;

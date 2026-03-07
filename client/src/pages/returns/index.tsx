@@ -29,6 +29,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Return, Invoice, Client } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 type ReturnWithDetails = Return & { 
   invoice: Invoice;
@@ -40,6 +41,8 @@ type ReturnTypeFilter = 'all' | 'credit_note' | 'refund';
 type SortDirection = 'asc' | 'desc';
 
 export default function ReturnsPage() {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReturnStatus>("all");
@@ -53,7 +56,7 @@ export default function ReturnsPage() {
   const queryClient = useQueryClient();
   
   const { data: returns, isLoading } = useQuery<ReturnWithDetails[]>({
-    queryKey: ['/api/stores/1/returns'],
+    queryKey: [`/api/stores/${currentStoreId}/returns`],
     staleTime: Infinity
   });
 
@@ -62,7 +65,7 @@ export default function ReturnsPage() {
       return apiRequest('PATCH', `/api/returns/${id}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       toast({
         title: "Status diperbarui",
         description: "Status retur berhasil diperbarui.",
@@ -90,7 +93,7 @@ export default function ReturnsPage() {
       return apiRequest('DELETE', `/api/returns/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       setDeleteDialogOpen(false);
       setSelectedReturn(null);
       toast({
@@ -112,7 +115,7 @@ export default function ReturnsPage() {
       return apiRequest('PUT', `/api/returns/${id}`, { notes });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       setEditDialogOpen(false);
       setSelectedReturn(null);
       toast({

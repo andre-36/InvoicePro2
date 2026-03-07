@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Package } from "lucide-react";
 import { Link } from "wouter";
 
+import { useStore } from "@/lib/store-context";
+
 type LowStockProduct = {
   id: number;
   name: string;
@@ -13,8 +15,9 @@ type LowStockProduct = {
 };
 
 export function LowStockProducts() {
+  const { currentStoreId } = useStore();
   const { data: products, isLoading } = useQuery<LowStockProduct[]>({
-    queryKey: ['/api/stores/1/products/lowstock'],
+    queryKey: [`/api/stores/${currentStoreId}/products/lowstock`],
   });
 
   if (isLoading) {

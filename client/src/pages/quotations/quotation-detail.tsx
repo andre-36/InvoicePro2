@@ -34,6 +34,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PrintSettings } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 interface QuotationDetailPageProps {
   id: number;
@@ -80,7 +81,10 @@ type QuotationWithItems = {
   };
 };
 
-export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
+export default function QuotationDetailPage({
+ id }: QuotationDetailPageProps) {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -93,7 +97,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
 
   // Fetch print settings
   const { data: printSettings } = useQuery<PrintSettings>({
-    queryKey: ['/api/stores/1/print-settings'],
+    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
   });
 
   // Fetch current user for company information
@@ -118,7 +122,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       return apiRequest('DELETE', `/api/quotations/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       toast({
         title: "Quotation deleted",
         description: "The quotation has been deleted successfully.",
@@ -139,7 +143,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
       return apiRequest('POST', `/api/quotations/${id}/convert`, {}) as Promise<unknown> as Promise<{ id: number }>;
     },
     onSuccess: (invoice) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       toast({
         title: "Quotation converted",
@@ -164,7 +168,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/quotations', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
     },
   });
 
@@ -177,7 +181,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/quotations', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       setRejectDialogOpen(false);
       setRejectionReason("");
       toast({

@@ -23,6 +23,8 @@ Key entities include Users (for authentication and access control), Stores (for 
 ### Key Design Patterns
 The architecture emphasizes shared TypeScript types and Zod schemas between frontend and backend for consistency. It incorporates database transactions for data integrity, query optimization with proper indexing, and end-to-end type safety. A reusable component architecture ensures consistent UI design.
 
+**Multi-Branch (Multi-Store) Architecture**: A React Context (`StoreContext` at `client/src/lib/store-context.tsx`) provides `currentStoreId` globally. Staff users are automatically locked to their assigned store on login. Owner users can switch branches via a sidebar dropdown. All pages, components, forms, and API calls dynamically use `currentStoreId` — no hardcoded store IDs remain in the frontend codebase.
+
 ### Security Features
 Security measures include SHA-256 password hashing, secure session management, comprehensive input validation using Zod schemas, and proper CORS protection.
 

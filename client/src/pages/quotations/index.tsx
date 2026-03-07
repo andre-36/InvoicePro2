@@ -38,6 +38,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useStore } from '@/lib/store-context';
 
 type Quotation = {
   id: number;
@@ -55,6 +56,8 @@ type QuotationStatus = 'all' | 'draft' | 'sent' | 'converted' | 'rejected' | 'ex
 type SortDirection = 'asc' | 'desc' | null;
 
 export default function QuotationsPage() {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QuotationStatus>("all");
@@ -63,7 +66,7 @@ export default function QuotationsPage() {
   const queryClient = useQueryClient();
   
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
-    queryKey: ['/api/stores/1/quotations'],
+    queryKey: [`/api/stores/${currentStoreId}/quotations`],
   });
 
   // Delete quotation mutation
@@ -72,7 +75,7 @@ export default function QuotationsPage() {
       return apiRequest('DELETE', `/api/quotations/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       toast({
         title: "Quotation deleted",
         description: "The quotation has been deleted successfully.",
@@ -93,7 +96,7 @@ export default function QuotationsPage() {
       return apiRequest('POST', `/api/quotations/${id}/convert`, {});
     },
     onSuccess: (invoice) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       toast({
         title: "Quotation converted",

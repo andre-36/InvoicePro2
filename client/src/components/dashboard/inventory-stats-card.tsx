@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Package, Boxes, TrendingUp } from "lucide-react";
 
+import { useStore } from "@/lib/store-context";
+
 type InventoryValueStats = {
   totalItems: number;
   totalValue: number;
@@ -12,8 +14,9 @@ type InventoryValueStats = {
 };
 
 export function InventoryStatsCard() {
+  const { currentStoreId } = useStore();
   const { data, isLoading } = useQuery<InventoryValueStats>({
-    queryKey: ['/api/stores/1/dashboard/inventory/value'],
+    queryKey: [`/api/stores/${currentStoreId}/dashboard/inventory/value`],
   });
 
   if (isLoading) {

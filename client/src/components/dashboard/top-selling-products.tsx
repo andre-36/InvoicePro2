@@ -4,6 +4,8 @@ import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, Award } from "lucide-react";
 import { Link } from "wouter";
 
+import { useStore } from "@/lib/store-context";
+
 type ProductPerformance = {
   id: number;
   name: string;
@@ -15,8 +17,9 @@ type ProductPerformance = {
 };
 
 export function TopSellingProducts() {
+  const { currentStoreId } = useStore();
   const { data, isLoading } = useQuery<ProductPerformance[]>({
-    queryKey: ['/api/stores/1/dashboard/products/performance'],
+    queryKey: [`/api/stores/${currentStoreId}/dashboard/products/performance`],
   });
 
   if (isLoading) {

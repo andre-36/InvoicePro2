@@ -28,6 +28,7 @@ import { formatDate } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DeliveryNote, Invoice, Client } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 type DeliveryNoteWithDetails = DeliveryNote & { 
   invoice: Invoice & { client: Client | null };
@@ -38,6 +39,8 @@ type DeliveryStatus = 'all' | 'pending' | 'delivered' | 'cancelled';
 type SortDirection = 'asc' | 'desc';
 
 export default function DeliveryNotesPage() {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus>("all");
@@ -53,11 +56,11 @@ export default function DeliveryNotesPage() {
   const canUpdateStatus = isOwner || (currentUser?.permissions?.includes('delivery_notes.update_status') ?? false);
 
   const { data: deliveryNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
-    queryKey: ['/api/stores/1/delivery-notes', statusFilter !== 'all' ? statusFilter : undefined],
+    queryKey: [`/api/stores/${currentStoreId}/delivery-notes`, statusFilter !== 'all' ? statusFilter : undefined],
     queryFn: async () => {
       const url = statusFilter !== 'all' 
-        ? `/api/stores/1/delivery-notes?status=${statusFilter}`
-        : '/api/stores/1/delivery-notes';
+        ? `/api/stores/${currentStoreId}/delivery-notes?status=${statusFilter}`
+        : `/api/stores/${currentStoreId}/delivery-notes`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch delivery notes');
       return res.json();
@@ -69,9 +72,9 @@ export default function DeliveryNotesPage() {
       return apiRequest('PATCH', `/api/delivery-notes/${id}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
         title: "Status diperbarui",
         description: "Status surat jalan berhasil diperbarui.",
@@ -95,9 +98,9 @@ export default function DeliveryNotesPage() {
       return apiRequest('PUT', `/api/delivery-notes/${id}/revert-to-pending`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
         title: "Status dikembalikan",
         description: "Surat jalan dikembalikan ke pending, alokasi stok di-reverse.",

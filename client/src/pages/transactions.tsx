@@ -52,6 +52,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useStore } from '@/lib/store-context';
 
 const transactionFormSchema = insertTransactionSchema.extend({
   date: z.string().min(1, "Date is required"),
@@ -64,6 +65,8 @@ type TransactionFormData = z.infer<typeof transactionFormSchema>;
 const PAGE_SIZE = 10;
 
 export default function TransactionsPage() {
+  const { currentStoreId } = useStore();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
@@ -81,25 +84,25 @@ export default function TransactionsPage() {
   const queryClient = useQueryClient();
   
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
-    queryKey: ['/api/stores/1/transactions'],
+    queryKey: [`/api/stores/${currentStoreId}/transactions`],
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ['/api/stores/1/cash-accounts'],
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
   });
 
   const { data: inflowCategories } = useQuery<InflowCategory[]>({
-    queryKey: ['/api/stores/1/inflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/inflow-categories`],
   });
 
   const { data: outflowCategories } = useQuery<OutflowCategory[]>({
-    queryKey: ['/api/stores/1/outflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/outflow-categories`],
   });
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
-      storeId: 1,
+      storeId: currentStoreId,
       type: "income",
       date: format(new Date(), 'yyyy-MM-dd'),
       amount: "",
@@ -128,11 +131,11 @@ export default function TransactionsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/transactions`] });
       setIsDialogOpen(false);
       setEditingTransaction(null);
       form.reset({
-        storeId: 1,
+        storeId: currentStoreId,
         type: "income",
         date: format(new Date(), 'yyyy-MM-dd'),
         amount: "",
@@ -162,7 +165,7 @@ export default function TransactionsPage() {
       return apiRequest('DELETE', `/api/transactions/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/transactions`] });
       setDeletingTransaction(null);
       toast({
         title: "Transaction deleted",
@@ -196,7 +199,7 @@ export default function TransactionsPage() {
   const handleAdd = () => {
     setEditingTransaction(null);
     form.reset({
-      storeId: 1,
+      storeId: currentStoreId,
       type: "income",
       date: format(new Date(), 'yyyy-MM-dd'),
       amount: "",

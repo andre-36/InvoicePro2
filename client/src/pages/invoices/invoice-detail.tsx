@@ -20,6 +20,7 @@ import { formatDate, formatCurrency, formatCurrencyAccounting, formatQuantity } 
 import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote, Return } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useStore } from '@/lib/store-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,10 @@ interface InvoiceDetailResponse {
   client?: Client;
 }
 
-export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
+export default function InvoiceDetailPage({
+ id }: InvoiceDetailProps) {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -66,7 +70,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   // Fetch print settings
   const { data: printSettings } = useQuery<PrintSettings>({
-    queryKey: ['/api/stores/1/print-settings'],
+    queryKey: [`/api/stores/${currentStoreId}/print-settings`],
   });
 
   // Fetch current user for company information
@@ -90,7 +94,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   // Fetch payment types from settings
   const { data: paymentTypes } = useQuery<PaymentType[]>({
-    queryKey: ['/api/stores/1/payment-types'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-types`],
   });
 
   // Fetch client credit notes for payment options
@@ -129,7 +133,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
 
   // Business rule settings
   const { data: storeSettings } = useQuery<Record<string, string>>({
-    queryKey: ['/api/stores/1/settings'],
+    queryKey: [`/api/stores/${currentStoreId}/settings`],
   });
   const requirePaymentBeforePrint = storeSettings?.require_payment_before_delivery_print === 'true';
   const lockPaidInvoices = storeSettings?.lock_paid_invoices === 'true';
@@ -326,7 +330,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
         title: "Tipe pengiriman diperbarui",
         description: "Tipe pengiriman invoice berhasil diubah.",
@@ -548,7 +552,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       setDeliveryDialogOpen(false);
       resetDeliveryForm();
       toast({
@@ -573,7 +577,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       toast({
         title: "Success",
         description: "Delivery note deleted successfully.",
@@ -597,8 +601,8 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
         title: "Status diperbarui",
         description: "Surat jalan berhasil ditandai sebagai Delivered.",
@@ -621,7 +625,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       setEditDeliveryDialogOpen(false);
       setEditingDeliveryNote(null);
       toast({
@@ -646,7 +650,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/delivery-notes'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
     },
     onError: (error) => {
       toast({

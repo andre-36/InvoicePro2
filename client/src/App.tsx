@@ -46,6 +46,7 @@ import SetupPage from "@/pages/setup";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
+import { StoreProvider } from "@/lib/store-context";
 
 type User = {
   id: number;
@@ -64,7 +65,6 @@ function App() {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
-  const [currentStoreId, setCurrentStoreId] = useState<number>(1);
 
   useEffect(() => {
     async function checkAuthAndSetup() {
@@ -179,14 +179,13 @@ function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="aluminum-manager-theme">
       <QueryClientProvider client={queryClient}>
+        <StoreProvider user={user}>
         <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
           <Sidebar 
             user={user} 
             open={sidebarOpen} 
             onToggle={toggleSidebar}
             mobileView={isMobile}
-            currentStoreId={user?.role === 'staff' && user?.storeId ? user.storeId : currentStoreId}
-            onStoreChange={setCurrentStoreId}
           />
 
           <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
@@ -315,6 +314,7 @@ function App() {
           </div>
         </div>
         <Toaster />
+        </StoreProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -71,6 +71,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
+import { useStore } from '@/lib/store-context';
 
 type Category = {
   id: number;
@@ -145,6 +146,8 @@ const productSchema = z.object({
 type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductsPage() {
+  const { currentStoreId } = useStore();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
@@ -163,7 +166,7 @@ export default function ProductsPage() {
   const queryClient = useQueryClient();
   
   const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/stores/1/products/stock'],
+    queryKey: [`/api/stores/${currentStoreId}/products/stock`],
   });
   
   const { data: categories } = useQuery<Category[]>({
@@ -192,7 +195,7 @@ export default function ProductsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       setIsDialogOpen(false);
       setEditingProduct(null);
@@ -218,7 +221,7 @@ export default function ProductsPage() {
       return apiRequest('DELETE', `/api/products/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       toast({
         title: "Product deleted",
@@ -280,7 +283,7 @@ export default function ProductsPage() {
       return response.json();
     },
     onSuccess: (result: { message?: string }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       toast({
         title: "Import completed",
@@ -562,7 +565,7 @@ export default function ProductsPage() {
         );
       }
       
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       setIsDialogOpen(false);
       setEditingProduct(null);
@@ -1476,7 +1479,7 @@ export default function ProductsPage() {
         open={isStockAdjustmentOpen}
         onOpenChange={setIsStockAdjustmentOpen}
         product={stockAdjustmentProduct}
-        storeId={1}
+        storeId={currentStoreId}
       />
     </div>
   );

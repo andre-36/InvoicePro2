@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { UploadResult } from "@uppy/core";
+import { useStore } from '@/lib/store-context';
 
 // Profile settings schema
 const profileSchema = z.object({
@@ -239,15 +240,15 @@ function AutoTransactionSettings() {
   const queryClient = useQueryClient();
 
   const { data: store } = useQuery<Store>({
-    queryKey: ['/api/stores/1'],
+    queryKey: [`/api/stores/${currentStoreId}`],
   });
 
   const { data: inflowCategories } = useQuery<InflowCategory[]>({
-    queryKey: ['/api/stores/1/inflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/inflow-categories`],
   });
 
   const { data: outflowCategories } = useQuery<OutflowCategory[]>({
-    queryKey: ['/api/stores/1/outflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/outflow-categories`],
   });
 
   const [invoicePaymentCategoryId, setInvoicePaymentCategoryId] = useState<number | null>(null);
@@ -264,11 +265,11 @@ function AutoTransactionSettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await apiRequest('PUT', '/api/stores/1', {
+      await apiRequest('PUT', `/api/stores/${currentStoreId}`, {
         invoicePaymentCategoryId,
         goodsReceiptPaymentCategoryId
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}`] });
       toast({
         title: "Berhasil",
         description: "Pengaturan auto transaction berhasil disimpan",
@@ -352,6 +353,8 @@ function AutoTransactionSettings() {
 }
 
 export default function SettingsPage() {
+  const { currentStoreId } = useStore();
+
   const [activeTab, setActiveTab] = useState("company");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
@@ -388,16 +391,16 @@ export default function SettingsPage() {
 
   // Fetch store data for defaults
   const { data: storeData } = useQuery<Store>({
-    queryKey: ['/api/stores/1'],
+    queryKey: [`/api/stores/${currentStoreId}`],
   });
 
   // Fetch payment types and terms
   const { data: paymentTypes } = useQuery<PaymentType[]>({
-    queryKey: ['/api/stores/1/payment-types'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-types`],
   });
 
   const { data: paymentTerms } = useQuery<PaymentTerm[]>({
-    queryKey: ['/api/stores/1/payment-terms'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-terms`],
   });
 
   // Fetch categories
@@ -407,12 +410,12 @@ export default function SettingsPage() {
 
   // Fetch inflow categories
   const { data: inflowCategories, isLoading: inflowCategoriesLoading } = useQuery<InflowCategory[]>({
-    queryKey: ['/api/stores/1/inflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/inflow-categories`],
   });
 
   // Fetch outflow categories
   const { data: outflowCategories, isLoading: outflowCategoriesLoading } = useQuery<OutflowCategory[]>({
-    queryKey: ['/api/stores/1/outflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/outflow-categories`],
   });
 
   // Fetch cash accounts
@@ -427,7 +430,7 @@ export default function SettingsPage() {
 
   // Fetch store settings (key-value)
   const { data: storeSettings } = useQuery<Record<string, string>>({
-    queryKey: ['/api/stores/1/settings'],
+    queryKey: [`/api/stores/${currentStoreId}/settings`],
   });
 
   // Initialize returnWindowDays and business rules from store settings
@@ -511,7 +514,7 @@ export default function SettingsPage() {
       cashAccountId: null,
       deductionPercentage: null,
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
@@ -523,7 +526,7 @@ export default function SettingsPage() {
       days: 0,
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
@@ -541,7 +544,7 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       description: "",
-      storeId: 1,
+      storeId: currentStoreId,
       isActive: true,
     }
   });
@@ -551,7 +554,7 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       description: "",
-      storeId: 1,
+      storeId: currentStoreId,
       isActive: true,
     }
   });
@@ -565,7 +568,7 @@ export default function SettingsPage() {
       initialBalance: "0",
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
@@ -579,7 +582,7 @@ export default function SettingsPage() {
       date: new Date().toISOString().split('T')[0],
       notes: "",
       reference: "",
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
@@ -673,7 +676,7 @@ export default function SettingsPage() {
       return apiRequest('POST', '/api/payment-types', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type created successfully" });
       setIsTypeDialogOpen(false);
       typeForm.reset();
@@ -688,7 +691,7 @@ export default function SettingsPage() {
       return apiRequest('PUT', `/api/payment-types/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type updated successfully" });
       setIsTypeDialogOpen(false);
       setEditingTypeId(null);
@@ -704,7 +707,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/payment-types/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type deleted successfully" });
       setSelectedTypeId(null);
     },
@@ -719,7 +722,7 @@ export default function SettingsPage() {
       return apiRequest('POST', '/api/payment-terms', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term created successfully" });
       setIsTermDialogOpen(false);
       termForm.reset();
@@ -734,7 +737,7 @@ export default function SettingsPage() {
       return apiRequest('PUT', `/api/payment-terms/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term updated successfully" });
       setIsTermDialogOpen(false);
       setEditingTermId(null);
@@ -750,7 +753,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/payment-terms/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term deleted successfully" });
       setSelectedTermId(null);
     },
@@ -762,10 +765,10 @@ export default function SettingsPage() {
   // Set default payment type/term mutations
   const setDefaultPaymentTypeMutation = useMutation({
     mutationFn: async (paymentTypeId: number | null) => {
-      return apiRequest('PUT', '/api/stores/1', { defaultPaymentTypeId: paymentTypeId });
+      return apiRequest('PUT', `/api/stores/${currentStoreId}`, { defaultPaymentTypeId: paymentTypeId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}`] });
       toast({ title: "Success", description: "Default payment type updated" });
     },
     onError: () => {
@@ -775,10 +778,10 @@ export default function SettingsPage() {
 
   const setDefaultPaymentTermMutation = useMutation({
     mutationFn: async (paymentTermId: number | null) => {
-      return apiRequest('PUT', '/api/stores/1', { defaultPaymentTermId: paymentTermId });
+      return apiRequest('PUT', `/api/stores/${currentStoreId}`, { defaultPaymentTermId: paymentTermId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}`] });
       toast({ title: "Success", description: "Default payment term updated" });
     },
     onError: () => {
@@ -847,7 +850,7 @@ export default function SettingsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/inflow-categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/inflow-categories`] });
       setIsInflowCategoryDialogOpen(false);
       setEditingInflowCategory(null);
       inflowCategoryForm.reset();
@@ -872,7 +875,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/inflow-categories/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/inflow-categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/inflow-categories`] });
       setDeletingInflowCategory(null);
       toast({
         title: "Inflow category deleted",
@@ -898,7 +901,7 @@ export default function SettingsPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/outflow-categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/outflow-categories`] });
       setIsOutflowCategoryDialogOpen(false);
       setEditingOutflowCategory(null);
       outflowCategoryForm.reset();
@@ -923,7 +926,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/outflow-categories/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/outflow-categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/outflow-categories`] });
       setDeletingOutflowCategory(null);
       toast({
         title: "Outflow category deleted",
@@ -1139,7 +1142,7 @@ export default function SettingsPage() {
       cashAccountId: null,
       deductionPercentage: null,
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     });
     setIsTypeDialogOpen(true);
   };
@@ -1263,7 +1266,7 @@ export default function SettingsPage() {
     inflowCategoryForm.reset({
       name: "",
       description: "",
-      storeId: 1,
+      storeId: currentStoreId,
       isActive: true,
     });
     setIsInflowCategoryDialogOpen(true);
@@ -1299,7 +1302,7 @@ export default function SettingsPage() {
     outflowCategoryForm.reset({
       name: "",
       description: "",
-      storeId: 1,
+      storeId: currentStoreId,
       isActive: true,
     });
     setIsOutflowCategoryDialogOpen(true);
@@ -1321,7 +1324,7 @@ export default function SettingsPage() {
   // Export backup mutation
   const exportMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/backup/export?storeId=1', {
+      const response = await fetch(`/api/backup/export?storeId=${currentStoreId}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -1365,7 +1368,7 @@ export default function SettingsPage() {
 
       const response = await apiRequest('POST', '/api/backup/import', {
         data: backupData.data,
-        storeId: 1
+        storeId: currentStoreId
       });
       return response.json() as Promise<{ message: string }>;
     },
@@ -1387,7 +1390,7 @@ export default function SettingsPage() {
 
   const saveReturnWindowMutation = useMutation({
     mutationFn: async (days: string) => {
-      const response = await apiRequest('POST', '/api/stores/1/settings', {
+      const response = await apiRequest('POST', `/api/stores/${currentStoreId}/settings`, {
         key: 'return_window_days',
         value: days
       });
@@ -1395,7 +1398,7 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       toast({ title: "Pengaturan berhasil disimpan", description: "Batas hari retur telah diperbarui." });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/settings'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/settings`] });
     },
     onError: (error: any) => {
       toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
@@ -1404,11 +1407,11 @@ export default function SettingsPage() {
 
   const saveBusinessRuleMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const response = await apiRequest('POST', '/api/stores/1/settings', { key, value });
+      const response = await apiRequest('POST', `/api/stores/${currentStoreId}/settings`, { key, value });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/settings'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/settings`] });
     },
     onError: (error: any) => {
       toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
@@ -2175,7 +2178,7 @@ export default function SettingsPage() {
                     date: new Date().toISOString().split('T')[0],
                     notes: "",
                     reference: "",
-                    storeId: 1
+                    storeId: currentStoreId
                   });
                   setTransferDialogOpen(true);
                 }} variant="outline" className="gap-2">
@@ -2189,7 +2192,7 @@ export default function SettingsPage() {
                     initialBalance: "0",
                     description: "",
                     isActive: true,
-                    storeId: 1
+                    storeId: currentStoreId
                   });
                   setEditingCashAccount(null);
                   setCashAccountDialogOpen(true);
@@ -2224,7 +2227,7 @@ export default function SettingsPage() {
                                     initialBalance: account.initialBalance,
                                     description: account.description || "",
                                     isActive: account.isActive,
-                                    storeId: 1
+                                    storeId: currentStoreId
                                   });
                                   setCashAccountDialogOpen(true);
                                 }}

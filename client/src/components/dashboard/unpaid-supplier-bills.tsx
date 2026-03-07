@@ -5,6 +5,8 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import { FileText, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 
+import { useStore } from "@/lib/store-context";
+
 type GoodsReceipt = {
   id: number;
   receiptNumber: string;
@@ -17,8 +19,9 @@ type GoodsReceipt = {
 };
 
 export function UnpaidSupplierBills() {
+  const { currentStoreId } = useStore();
   const { data: receipts, isLoading } = useQuery<GoodsReceipt[]>({
-    queryKey: ['/api/stores/1/goods-receipts'],
+    queryKey: [`/api/stores/${currentStoreId}/goods-receipts`],
   });
 
   if (isLoading) {

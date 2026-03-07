@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useStore } from "@/lib/store-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -59,6 +60,7 @@ interface ReturnFormProps {
 }
 
 export function ReturnForm({ onSuccess }: ReturnFormProps) {
+  const { currentStoreId } = useStore();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,7 +81,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
   });
 
   const { data: invoices, isLoading: invoicesLoading } = useQuery<(Invoice & { clientName: string | null })[]>({
-    queryKey: ['/api/stores/1/invoices/returnable'],
+    queryKey: [`/api/stores/${currentStoreId}/invoices/returnable`],
     staleTime: Infinity
   });
 
@@ -144,10 +146,10 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', '/api/stores/1/returns', data);
+      return apiRequest('POST', `/api/stores/${currentStoreId}/returns`, data);
     },
     onSuccess: async (response) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       toast({
         title: "Retur berhasil dibuat",
         description: "Data retur telah tersimpan.",

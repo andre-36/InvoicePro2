@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
+import { useStore } from '@/lib/store-context';
 
 const paymentTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -28,6 +29,8 @@ const paymentTypeSchema = z.object({
 type PaymentTypeFormData = z.infer<typeof paymentTypeSchema>;
 
 export default function PaymentTypesPage() {
+  const { currentStoreId } = useStore();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -39,12 +42,12 @@ export default function PaymentTypesPage() {
       name: "",
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
   const { data: paymentTypes, isLoading } = useQuery({
-    queryKey: ['/api/stores/1/payment-types'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-types`],
   });
 
   const createMutation = useMutation({
@@ -52,7 +55,7 @@ export default function PaymentTypesPage() {
       return apiRequest('POST', '/api/payment-types', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({
         title: "Success",
         description: "Payment type created successfully",
@@ -74,7 +77,7 @@ export default function PaymentTypesPage() {
       return apiRequest('PUT', `/api/payment-types/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({
         title: "Success",
         description: "Payment type updated successfully",
@@ -97,7 +100,7 @@ export default function PaymentTypesPage() {
       return apiRequest('DELETE', `/api/payment-types/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({
         title: "Success",
         description: "Payment type deleted successfully",

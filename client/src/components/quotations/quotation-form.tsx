@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
+import { useStore } from "@/lib/store-context";
 import { insertQuotationSchema } from "@shared/schema";
 import { QuotationItemRow } from "@/components/quotations/quotation-item-row";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ interface QuotationFormProps {
 }
 
 export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
+  const { currentStoreId } = useStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -154,7 +156,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
 
   // Fetch products with stock info for product selection
   const { data: products } = useQuery<{ id: number; name: string; currentSellingPrice: string; currentStock?: number; unit?: string }[]>({
-    queryKey: ['/api/stores', 1, 'products', 'stock'],
+    queryKey: ['/api/stores', currentStoreId, 'products', 'stock'],
   });
 
   // Fetch current user for default notes and tax rate
@@ -191,7 +193,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
     defaultValues: {
       quotation: {
         clientId: 0,
-        storeId: 1, // Default store
+        storeId: currentStoreId, // Default store
         issueDate: new Date(),
         expiryDate: null,
         status: "draft",
@@ -232,7 +234,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/quotations'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/quotations`] });
       if (quotationId) {
         queryClient.invalidateQueries({ queryKey: ['/api/quotations', quotationId] });
       }

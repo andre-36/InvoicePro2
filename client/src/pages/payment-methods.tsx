@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
+import { useStore } from '@/lib/store-context';
 
 const paymentTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -35,6 +36,8 @@ type PaymentTypeFormData = z.infer<typeof paymentTypeSchema>;
 type PaymentTermFormData = z.infer<typeof paymentTermSchema>;
 
 export default function PaymentMethodsPage() {
+  const { currentStoreId } = useStore();
+
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [isTermDialogOpen, setIsTermDialogOpen] = useState(false);
   const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
@@ -50,7 +53,7 @@ export default function PaymentMethodsPage() {
       name: "",
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
@@ -61,16 +64,16 @@ export default function PaymentMethodsPage() {
       days: 0,
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
   const { data: paymentTypes, isLoading: typesLoading } = useQuery({
-    queryKey: ['/api/stores/1/payment-types'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-types`],
   });
 
   const { data: paymentTerms, isLoading: termsLoading } = useQuery({
-    queryKey: ['/api/stores/1/payment-terms'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-terms`],
   });
 
   // Payment Type Mutations
@@ -79,7 +82,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('POST', '/api/payment-types', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type created successfully" });
       setIsTypeDialogOpen(false);
       typeForm.reset();
@@ -94,7 +97,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('PUT', `/api/payment-types/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type updated successfully" });
       setIsTypeDialogOpen(false);
       setEditingTypeId(null);
@@ -110,7 +113,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('DELETE', `/api/payment-types/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-types'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-types`] });
       toast({ title: "Success", description: "Payment type deleted successfully" });
       setSelectedTypeId(null);
     },
@@ -125,7 +128,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('POST', '/api/payment-terms', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term created successfully" });
       setIsTermDialogOpen(false);
       termForm.reset();
@@ -140,7 +143,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('PUT', `/api/payment-terms/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term updated successfully" });
       setIsTermDialogOpen(false);
       setEditingTermId(null);
@@ -156,7 +159,7 @@ export default function PaymentMethodsPage() {
       return apiRequest('DELETE', `/api/payment-terms/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({ title: "Success", description: "Payment term deleted successfully" });
       setSelectedTermId(null);
     },

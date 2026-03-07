@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import type { CashAccount } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,10 @@ interface PurchaseOrderDetailProps {
   id: number;
 }
 
-export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps) {
+export default function PurchaseOrderDetailPage({
+ id }: PurchaseOrderDetailProps) {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,7 +69,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ['/api/stores/1/cash-accounts'],
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
     enabled: !!purchaseOrder?.isPrepaid,
   });
 

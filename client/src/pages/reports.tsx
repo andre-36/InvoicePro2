@@ -17,6 +17,7 @@ import { id } from "date-fns/locale";
 import { DateRange as DayPickerDateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import type { CashAccount, InflowCategory, OutflowCategory } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
@@ -130,6 +131,8 @@ type Transaction = {
 };
 
 export default function ReportsPage() {
+  const { currentStoreId } = useStore();
+
   const [activeTab, setActiveTab] = useState("summary");
   const [dateRange, setDateRange] = useState<DateRange>("this_month");
   const [customDateRange, setCustomDateRange] = useState<DayPickerDateRange | undefined>(undefined);
@@ -148,9 +151,9 @@ export default function ReportsPage() {
 
   // Summary Dashboard data
   const { data: summaryReport, isLoading: isLoadingSummary } = useQuery<SummaryReport>({
-    queryKey: ['/api/stores/1/reports/summary', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/reports/summary`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/summary?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/summary?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch summary report');
@@ -160,9 +163,9 @@ export default function ReportsPage() {
   
   // Financial Report data
   const { data: financialReport, isLoading: isLoadingFinancial } = useQuery<FinancialReport>({
-    queryKey: ['/api/stores/1/reports/financial', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/reports/financial`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/financial?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/financial?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch financial report');
@@ -172,9 +175,9 @@ export default function ReportsPage() {
   
   // Cash Flow Report data
   const { data: cashFlowReport, isLoading: isLoadingCashFlow } = useQuery<CashFlowReport>({
-    queryKey: ['/api/stores/1/reports/cashflow', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/reports/cashflow`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/cashflow?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/cashflow?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch cashflow report');
@@ -184,9 +187,9 @@ export default function ReportsPage() {
 
   // Product Performance data
   const { data: productReport, isLoading: isLoadingProducts } = useQuery<ProductReport>({
-    queryKey: ['/api/stores/1/reports/products', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/reports/products`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/products?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/products?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch product report');
@@ -196,9 +199,9 @@ export default function ReportsPage() {
 
   // Customer Report data
   const { data: customerReport, isLoading: isLoadingCustomers } = useQuery<CustomerReport>({
-    queryKey: ['/api/stores/1/reports/customers', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/reports/customers`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/reports/customers?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/customers?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch customer report');
@@ -208,9 +211,9 @@ export default function ReportsPage() {
   
   // Transactions for detailed breakdown
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/stores/1/transactions', apiDateRange],
+    queryKey: [`/api/stores/${currentStoreId}/transactions`, apiDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/1/transactions?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/transactions?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch transactions');
@@ -220,17 +223,17 @@ export default function ReportsPage() {
   
   // Cash accounts for Cash Daily Report
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ['/api/stores/1/cash-accounts'],
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
   });
 
   // Fetch inflow categories from settings
   const { data: inflowCategories } = useQuery<InflowCategory[]>({
-    queryKey: ['/api/stores/1/inflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/inflow-categories`],
   });
 
   // Fetch outflow categories from settings
   const { data: outflowCategories } = useQuery<OutflowCategory[]>({
-    queryKey: ['/api/stores/1/outflow-categories'],
+    queryKey: [`/api/stores/${currentStoreId}/outflow-categories`],
   });
 
   // Process transaction data for charts - now using categories from settings
@@ -365,7 +368,7 @@ export default function ReportsPage() {
     const endpoint = tabToEndpoint[reportType] || reportType;
     
     try {
-      const response = await fetch(`/api/stores/1/reports/${endpoint}/export?dateRange=${encodeURIComponent(apiDateRange)}`, {
+      const response = await fetch(`/api/stores/${currentStoreId}/reports/${endpoint}/export?dateRange=${encodeURIComponent(apiDateRange)}`, {
         credentials: 'include'
       });
       if (response.ok) {
@@ -511,6 +514,7 @@ export default function ReportsPage() {
       >
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="summary">Ringkasan</TabsTrigger>
+          <TabsTrigger value="sales-summary">Ringkasan Penjualan</TabsTrigger>
           <TabsTrigger value="profit-loss">Laba Rugi</TabsTrigger>
           <TabsTrigger value="cash-flow">Arus Kas</TabsTrigger>
           <TabsTrigger value="cash-daily">Kas Harian</TabsTrigger>
@@ -518,6 +522,264 @@ export default function ReportsPage() {
           <TabsTrigger value="customers">Pelanggan</TabsTrigger>
           <TabsTrigger value="breakdown">Rincian</TabsTrigger>
         </TabsList>
+
+        {/* RINGKASAN PENJUALAN */}
+        <TabsContent value="sales-summary" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard
+              title="Total Penjualan (Gross)"
+              value={formatCurrency(summaryReport?.totalSales || 0)}
+              subtitle="Nilai total invoice dibuat"
+              icon={Receipt}
+              color="blue"
+            />
+            <StatCard
+              title="Total Piutang"
+              value={formatCurrency(summaryReport?.totalReceivables || 0)}
+              subtitle="Tagihan belum dibayar"
+              icon={CreditCard}
+              color="yellow"
+            />
+            <StatCard
+              title="Jumlah Invoice"
+              value={(summaryReport?.invoiceCount || 0).toString()}
+              subtitle="Total dokumen penjualan"
+              icon={FileText}
+              color="purple"
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ringkasan Penjualan per Pelanggan</CardTitle>
+              <CardDescription>Daftar pelanggan dengan total pembelian tertinggi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Pelanggan</TableHead>
+                    <TableHead className="text-right">Jumlah Invoice</TableHead>
+                    <TableHead className="text-right">Total Pembelian</TableHead>
+                    <TableHead className="text-right">Total Dibayar</TableHead>
+                    <TableHead className="text-right">Sisa Piutang</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customerReport?.topCustomers.map((customer) => (
+                    <TableRow key={customer.clientId}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className="text-right">{customer.invoiceCount}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(customer.totalPurchase)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(customer.totalPaid)}</TableCell>
+                      <TableCell className="text-right font-semibold text-yellow-600">
+                        {formatCurrency(customer.outstanding)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!customerReport?.topCustomers.length && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                        Tidak ada data penjualan
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* LABA RUGI */}
+        <TabsContent value="profit-loss" className="space-y-6">
+          {isLoadingFinancial ? (
+            <div className="space-y-4">
+              <Skeleton className="h-[200px] w-full" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-[300px]" />
+                <Skeleton className="h-[300px]" />
+              </div>
+            </div>
+          ) : financialReport ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatCard
+                  title="Pendapatan Bersih"
+                  value={formatCurrency(financialReport.revenue.totalRevenue)}
+                  subtitle="Penjualan + Pendapatan lain"
+                  icon={ArrowUpRight}
+                  color="blue"
+                />
+                <StatCard
+                  title="HPP (COGS)"
+                  value={formatCurrency(financialReport.cogs.totalCOGS)}
+                  subtitle="Harga pokok penjualan"
+                  icon={Package}
+                  color="yellow"
+                />
+                <StatCard
+                  title="Laba Kotor"
+                  value={formatCurrency(financialReport.profit.grossProfit)}
+                  subtitle={`${financialReport.profit.grossProfitMargin.toFixed(1)}% margin`}
+                  icon={TrendingUp}
+                  color="green"
+                />
+                <StatCard
+                  title="Laba Bersih"
+                  value={formatCurrency(financialReport.profit.netProfit)}
+                  subtitle={`${financialReport.profit.netProfitMargin.toFixed(1)}% net margin`}
+                  icon={DollarSign}
+                  color={financialReport.profit.netProfit >= 0 ? "green" : "red"}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Laporan Laba Rugi</CardTitle>
+                    <CardDescription>Detail rincian pendapatan dan beban</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Revenue Section */}
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 border-b pb-1 mb-2">PENDAPATAN</h4>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Pendapatan Penjualan</span>
+                            <span>{formatCurrency(financialReport.revenue.salesRevenue)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Pendapatan Lain-lain</span>
+                            <span>{formatCurrency(financialReport.revenue.otherIncome)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-sm pt-1 border-t mt-1">
+                            <span>Total Pendapatan</span>
+                            <span>{formatCurrency(financialReport.revenue.totalRevenue)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* COGS Section */}
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 border-b pb-1 mb-2">HARGA POKOK PENJUALAN</h4>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm italic text-gray-500">
+                            <span>Persediaan Awal</span>
+                            <span>{formatCurrency(financialReport.cogs.beginningInventory)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm italic text-gray-500">
+                            <span>Pembelian</span>
+                            <span>{formatCurrency(financialReport.cogs.purchases)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm italic text-gray-500">
+                            <span>Persediaan Akhir</span>
+                            <span>({formatCurrency(financialReport.cogs.endingInventory)})</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-sm pt-1 border-t mt-1">
+                            <span>Total Harga Pokok Penjualan</span>
+                            <span>({formatCurrency(financialReport.cogs.totalCOGS)})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between font-bold text-base bg-gray-50 p-2 rounded">
+                        <span>LABA KOTOR</span>
+                        <span>{formatCurrency(financialReport.profit.grossProfit)}</span>
+                      </div>
+
+                      {/* Expenses Section */}
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-900 border-b pb-1 mb-2">BEBAN OPERASIONAL</h4>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Beban Operasional & Umum</span>
+                            <span>{formatCurrency(financialReport.expenses.operatingExpenses)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Beban Lain-lain</span>
+                            <span>{formatCurrency(financialReport.expenses.otherExpenses)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-sm pt-1 border-t mt-1">
+                            <span>Total Beban</span>
+                            <span>({formatCurrency(financialReport.expenses.totalExpenses)})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`flex justify-between font-bold text-lg p-2 rounded ${financialReport.profit.netProfit >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span>LABA (RUGI) BERSIH</span>
+                        <span>{formatCurrency(financialReport.profit.netProfit)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Beban per Kategori</CardTitle>
+                      <CardDescription>Distribusi pengeluaran berdasarkan kategori</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={expensesByCategory}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {expensesByCategory.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Efisiensi Bisnis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Margin Laba Kotor</span>
+                          <span className="font-semibold">{financialReport.profit.grossProfitMargin.toFixed(1)}%</span>
+                        </div>
+                        <Progress value={financialReport.profit.grossProfitMargin} className="h-2" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Margin Laba Bersih</span>
+                          <span className="font-semibold">{financialReport.profit.netProfitMargin.toFixed(1)}%</span>
+                        </div>
+                        <Progress value={Math.max(0, financialReport.profit.netProfitMargin)} className="h-2" />
+                      </div>
+                      <p className="text-xs text-muted-foreground italic">
+                        * Margin laba kotor menunjukkan efisiensi produksi/pembelian barang.
+                        * Margin laba bersih menunjukkan profitabilitas akhir setelah dikurangi semua beban.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed rounded-lg">
+              <p className="text-muted-foreground">Data Laba Rugi tidak tersedia untuk periode ini.</p>
+            </div>
+          )}
+        </TabsContent>
 
         {/* RINGKASAN DASHBOARD */}
         <TabsContent value="summary" className="space-y-6">

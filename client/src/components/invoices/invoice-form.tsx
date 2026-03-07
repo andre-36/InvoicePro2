@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
+import { useStore } from "@/lib/store-context";
 import { insertInvoiceSchema, insertInvoicePaymentSchema } from "@shared/schema";
 import type { InvoicePayment, Return } from "@shared/schema";
 import { InvoiceItemRow } from "@/components/invoices/invoice-item-row";
@@ -96,6 +97,7 @@ const defaultItem: InvoiceItem = {
 };
 
 export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
+  const { currentStoreId } = useStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -176,7 +178,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
 
   // Fetch all products with stock info for product selection
   const { data: products } = useQuery<(Product & { currentStock?: number })[]>({
-    queryKey: ['/api/stores', 1, 'products', 'stock'],
+    queryKey: ['/api/stores', currentStoreId, 'products', 'stock'],
   });
 
   // Fetch payment terms from settings
@@ -201,7 +203,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
   
   // Fetch store data for defaults
   const { data: storeData } = useQuery<any>({
-    queryKey: ['/api/stores/1'],
+    queryKey: ['/api/stores', currentStoreId],
   });
 
   // Fetch current user for default notes and tax rate
@@ -288,7 +290,7 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     defaultValues: {
       invoice: {
         ...(invoiceId && { invoiceNumber: "" }),
-        storeId: 1,
+        storeId: currentStoreId,
         clientId: 0,
         paymentTerms: "net_30",
         issueDate: new Date(),

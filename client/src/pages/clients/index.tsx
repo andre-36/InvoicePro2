@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useStore } from "@/lib/store-context";
 
 type Client = {
   id: number;
@@ -61,6 +62,7 @@ type Client = {
 type SortOrder = 'none' | 'asc' | 'desc';
 
 export default function ClientsPage() {
+  const { currentStoreId } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function ClientsPage() {
   // Export clients mutation
   const exportMutation = useMutation({
     mutationFn: async (format: 'csv' | 'xlsx') => {
-      const response = await fetch(`/api/clients/export/${format}?storeId=1`, {
+      const response = await fetch(`/api/clients/export/${format}?storeId=${currentStoreId}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -153,7 +155,7 @@ export default function ClientsPage() {
   // Import clients mutation
   const importMutation = useMutation({
     mutationFn: async (data: any[]) => {
-      const response = await apiRequest('POST', '/api/clients/import', { data, storeId: 1 });
+      const response = await apiRequest('POST', '/api/clients/import', { data, storeId: currentStoreId });
       return await response.json();
     },
     onSuccess: (result) => {

@@ -29,6 +29,7 @@ import {
   History,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useStore } from "@/lib/store-context";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -67,11 +68,10 @@ interface SidebarProps {
   open: boolean;
   onToggle: () => void;
   mobileView: boolean;
-  currentStoreId?: number;
-  onStoreChange?: (storeId: number) => void;
 }
 
-export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onStoreChange }: SidebarProps) {
+export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
+  const { currentStoreId, setCurrentStoreId } = useStore();
   const [location] = useLocation();
   
   const { data: stores } = useQuery<StoreType[]>({
@@ -509,7 +509,7 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
                   {stores.map((store) => (
                     <DropdownMenuItem
                       key={store.id}
-                      onClick={() => onStoreChange?.(store.id)}
+                      onClick={() => setCurrentStoreId(store.id)}
                       className={currentStoreId === store.id ? 'bg-accent' : ''}
                     >
                       <Store className="h-4 w-4 mr-2" />

@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type { Return, ReturnItem, CreditNoteUsage, Invoice, Client, InvoiceItem, Product } from "@shared/schema";
 import { Link } from "wouter";
+import { useStore } from '@/lib/store-context';
 
 type ReturnWithDetails = {
   return: Return;
@@ -27,6 +28,8 @@ type ReturnWithDetails = {
 };
 
 export default function ReturnDetailPage() {
+  const { currentStoreId } = useStore();
+
   const params = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -50,7 +53,7 @@ export default function ReturnDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/returns', returnId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       toast({
         title: "Status diperbarui",
         description: "Status retur berhasil diperbarui.",
@@ -71,7 +74,7 @@ export default function ReturnDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/returns', returnId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       setRefundDialogOpen(false);
       setRefundAmount("");
       toast({
@@ -93,7 +96,7 @@ export default function ReturnDetailPage() {
       return apiRequest('DELETE', `/api/returns/${returnId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       toast({
         title: "Berhasil",
         description: "Retur berhasil dihapus.",
@@ -115,7 +118,7 @@ export default function ReturnDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/returns', returnId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/returns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/returns`] });
       setEditDialogOpen(false);
       toast({
         title: "Berhasil",

@@ -1954,8 +1954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // General invoices endpoint
   app.get("/api/invoices", requireAuth, async (req, res) => {
     try {
-      // Default to store 1 for general invoice listing
-      const invoices = await storage.getInvoicesWithStatus(1);
+      // Get storeId from query param or user's storeId (for staff) or default to 1
+      const storeId = parseInt(req.query.storeId as string) || (req.user as any)?.storeId || 1;
+      const invoices = await storage.getInvoicesWithStatus(storeId);
       res.json(invoices);
     } catch (error) {
       console.error("Error getting invoices:", error);

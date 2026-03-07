@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { useStore } from "@/lib/store-context";
+
 interface RevenueData {
   dates: string[];
   revenue: number[];
@@ -26,14 +28,15 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ startDate, endDate }: RevenueChartProps) {
+  const { currentStoreId } = useStore();
   const { data, isLoading, error } = useQuery<RevenueData>({
-    queryKey: ['/api/stores/1/dashboard/revenue', startDate, endDate],
+    queryKey: [`/api/stores/${currentStoreId}/dashboard/revenue`, startDate, endDate],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (startDate) params.set('start', startDate);
       if (endDate) params.set('end', endDate);
       
-      const response = await fetch(`/api/stores/1/dashboard/revenue?${params.toString()}`);
+      const response = await fetch(`/api/stores/${currentStoreId}/dashboard/revenue?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch revenue data');
       return response.json();
     },

@@ -36,6 +36,8 @@ import { z } from "zod";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, Plus, Minus } from "lucide-react";
 
+import { useStore } from "@/lib/store-context";
+
 type Product = {
   id: number;
   name: string;
@@ -77,8 +79,10 @@ export function StockAdjustmentDialog({
   open,
   onOpenChange,
   product,
-  storeId = 1,
+  storeId: propStoreId,
 }: StockAdjustmentDialogProps) {
+  const { currentStoreId } = useStore();
+  const storeId = propStoreId || currentStoreId;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedBatch, setSelectedBatch] = useState<string>("");
@@ -127,7 +131,7 @@ export function StockAdjustmentDialog({
         title: "Stock adjusted",
         description: `Stock has been ${form.getValues('type') === 'increase' ? 'increased' : 'decreased'} successfully.`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/products/stock'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${storeId}/products/stock`] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       queryClient.invalidateQueries({ queryKey: ['/api/products', product?.id] });
       form.reset();

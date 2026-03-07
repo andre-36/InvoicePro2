@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
+import { useStore } from '@/lib/store-context';
 
 const paymentTermSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,6 +30,8 @@ const paymentTermSchema = z.object({
 type PaymentTermFormData = z.infer<typeof paymentTermSchema>;
 
 export default function PaymentTermsPage() {
+  const { currentStoreId } = useStore();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -41,12 +44,12 @@ export default function PaymentTermsPage() {
       days: 0,
       description: "",
       isActive: true,
-      storeId: 1
+      storeId: currentStoreId
     }
   });
 
   const { data: paymentTerms, isLoading } = useQuery({
-    queryKey: ['/api/stores/1/payment-terms'],
+    queryKey: [`/api/stores/${currentStoreId}/payment-terms`],
   });
 
   const createMutation = useMutation({
@@ -54,7 +57,7 @@ export default function PaymentTermsPage() {
       return apiRequest('POST', '/api/payment-terms', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({
         title: "Success",
         description: "Payment term created successfully",
@@ -76,7 +79,7 @@ export default function PaymentTermsPage() {
       return apiRequest('PUT', `/api/payment-terms/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({
         title: "Success",
         description: "Payment term updated successfully",
@@ -99,7 +102,7 @@ export default function PaymentTermsPage() {
       return apiRequest('DELETE', `/api/payment-terms/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/stores/1/payment-terms'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/payment-terms`] });
       toast({
         title: "Success",
         description: "Payment term deleted successfully",

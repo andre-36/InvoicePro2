@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { DeliveryNote, Invoice, Client, DeliveryNoteItem, InvoiceItem, Product, Category } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 const STORAGE_KEY = "delivery_planning_categories";
 
@@ -49,6 +50,8 @@ type ClientDelivery = {
 };
 
 export default function DeliveryPlanningPage() {
+  const { currentStoreId } = useStore();
+
   const [, navigate] = useLocation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<number>>(new Set());
@@ -57,9 +60,9 @@ export default function DeliveryPlanningPage() {
   const { toast } = useToast();
 
   const { data: allPendingNotes, isLoading } = useQuery<DeliveryNoteWithDetails[]>({
-    queryKey: ['/api/stores/1/delivery-notes', 'pending'],
+    queryKey: [`/api/stores/${currentStoreId}/delivery-notes`, 'pending'],
     queryFn: async () => {
-      const res = await fetch('/api/stores/1/delivery-notes?status=pending', { credentials: 'include' });
+      const res = await fetch(`/api/stores/${currentStoreId}/delivery-notes?status=pending`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch delivery notes');
       return res.json();
     }

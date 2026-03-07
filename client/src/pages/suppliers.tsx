@@ -38,8 +38,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSupplierSchema, type Supplier, type InsertSupplier } from "@shared/schema";
+import { useStore } from '@/lib/store-context';
 
 export default function SuppliersPage() {
+  const { currentStoreId } = useStore();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null);
@@ -58,7 +61,7 @@ export default function SuppliersPage() {
   const form = useForm<InsertSupplier>({
     resolver: zodResolver(insertSupplierSchema),
     defaultValues: {
-      storeId: 1,
+      storeId: currentStoreId,
       name: "",
       email: "",
       phone: "",
@@ -139,7 +142,7 @@ export default function SuppliersPage() {
   const handleAdd = () => {
     setEditingSupplier(null);
     form.reset({
-      storeId: 1,
+      storeId: currentStoreId,
       name: "",
       email: "",
       phone: "",

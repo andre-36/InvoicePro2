@@ -4,6 +4,8 @@ import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Clock, CheckCircle, Percent } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { useStore } from "@/lib/store-context";
+
 type ProfitOverviewData = {
   realizedProfit: number;
   realizedRevenue: number;
@@ -23,13 +25,14 @@ interface ProfitOverviewProps {
 }
 
 export function ProfitOverview({ startDate, endDate }: ProfitOverviewProps) {
+  const { currentStoreId } = useStore();
   const { data, isLoading, error } = useQuery<ProfitOverviewData>({
-    queryKey: ['/api/stores/1/dashboard/profit-overview', { start: startDate, end: endDate }],
+    queryKey: [`/api/stores/${currentStoreId}/dashboard/profit-overview`, { start: startDate, end: endDate }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (startDate) params.set('start', startDate);
       if (endDate) params.set('end', endDate);
-      const response = await fetch(`/api/stores/1/dashboard/profit-overview?${params.toString()}`);
+      const response = await fetch(`/api/stores/${currentStoreId}/dashboard/profit-overview?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch profit overview');
       return response.json();
     },

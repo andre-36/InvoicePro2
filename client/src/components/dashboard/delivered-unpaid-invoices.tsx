@@ -5,6 +5,8 @@ import { format, parseISO } from "date-fns";
 import { Truck, Package } from "lucide-react";
 import { Link } from "wouter";
 
+import { useStore } from "@/lib/store-context";
+
 type Invoice = {
   id: number;
   invoiceNumber: string;
@@ -16,6 +18,7 @@ type Invoice = {
   amountPaid: string;
   status: string;
   deliveryStatus: string;
+  issueDate?: string;
 };
 
 type Client = {
@@ -24,12 +27,13 @@ type Client = {
 };
 
 export function DeliveredUnpaidInvoices() {
+  const { currentStoreId } = useStore();
   const { data: invoices, isLoading: invoicesLoading } = useQuery<Invoice[]>({
-    queryKey: ['/api/stores/1/invoices'],
+    queryKey: [`/api/stores/${currentStoreId}/invoices`],
   });
 
   const { data: clients } = useQuery<Client[]>({
-    queryKey: ['/api/stores/1/clients'],
+    queryKey: [`/api/stores/${currentStoreId}/clients`],
   });
 
   if (invoicesLoading) {

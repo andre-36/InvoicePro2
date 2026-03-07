@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { PrintSettings } from "@shared/schema";
+import { useStore } from "@/lib/store-context";
 
 // Schema for print preferences only
 const printSettingsFormSchema = z.object({
@@ -43,7 +44,7 @@ type PrintSettingsFormValues = z.infer<typeof printSettingsFormSchema>;
 export default function PrintSettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [storeId] = useState(1);
+  const { currentStoreId: storeId } = useStore();
 
   const { data: printSettings, isLoading } = useQuery<PrintSettings>({
     queryKey: ["/api/stores", storeId, "print-settings"],

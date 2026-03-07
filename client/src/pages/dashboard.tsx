@@ -15,6 +15,7 @@ import { TopSellingProducts } from "@/components/dashboard/top-selling-products"
 import { UnpaidSupplierBills } from "@/components/dashboard/unpaid-supplier-bills";
 import { DeliveredUnpaidInvoices } from "@/components/dashboard/delivered-unpaid-invoices";
 import { ProfitOverview } from "@/components/dashboard/profit-overview";
+import { useStore } from '@/lib/store-context';
 
 
 type DashboardStats = {
@@ -30,6 +31,8 @@ type DashboardStats = {
 };
 
 export default function Dashboard() {
+  const { currentStoreId } = useStore();
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
@@ -49,13 +52,13 @@ export default function Dashboard() {
   }, [dateRange]);
   
   const { data, isLoading, error } = useQuery<DashboardStats>({
-    queryKey: ['/api/stores/1/dashboard/stats', queryDates],
+    queryKey: [`/api/stores/${currentStoreId}/dashboard/stats`, queryDates],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('start', queryDates.start);
       params.set('end', queryDates.end);
       
-      const response = await fetch(`/api/stores/1/dashboard/stats?${params.toString()}`);
+      const response = await fetch(`/api/stores/${currentStoreId}/dashboard/stats?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch stats');
       return response.json();
     },

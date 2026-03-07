@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Save, X } from "lucide-react";
 import { useLocation } from "wouter";
+import { useStore } from '@/lib/store-context';
 
 // Extend the schema for validation with proper email preprocessing
 const extendedClientSchema = insertClientSchema
@@ -44,6 +45,8 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
+  const { currentStoreId } = useStore();
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -104,7 +107,7 @@ export function ClientForm({ clientId, onSuccess }: ClientFormProps) {
         return apiRequest('PUT', `/api/clients/${clientId}`, values);
       } else {
         // Add storeId when creating new client
-        const clientData = { ...values, storeId: 1 };
+        const clientData = { ...values, storeId: currentStoreId };
         return apiRequest('POST', '/api/clients', clientData);
       }
     },

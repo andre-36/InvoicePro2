@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import { useStore } from '@/lib/store-context';
 
 // Extended schema for the form
 const extendedPurchaseOrderSchema = insertPurchaseOrderSchema.extend({
@@ -259,6 +260,8 @@ function PurchaseOrderItemRow({
 }
 
 export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderFormProps) {
+  const { currentStoreId } = useStore();
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -405,7 +408,7 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     resolver: zodResolver(purchaseOrderFormSchema),
     defaultValues: {
       purchaseOrder: {
-        storeId: 1,
+        storeId: currentStoreId,
         supplierId: null,
         supplierName: "",
         supplierEmail: "",
