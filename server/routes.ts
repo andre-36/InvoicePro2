@@ -5631,11 +5631,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const storeId = parseInt(req.params.storeId);
       const schema = z.object({
-        showTax: z.boolean(),
-        showDiscount: z.boolean(),
-        showPONumber: z.boolean(),
-        accentColor: z.string(),
-        paperSize: z.enum(["a4", "prs", "halfsize"]),
+        showTax: z.boolean().optional(),
+        showDiscount: z.boolean().optional(),
+        showPONumber: z.boolean().optional(),
+        accentColor: z.string().optional(),
+        paperSize: z.enum(["a4", "prs", "halfsize"]).optional(),
+        quotationNotes: z.string().optional().nullable(),
+        invoiceNotes: z.string().optional().nullable(),
+        deliveryNoteNotes: z.string().optional().nullable(),
+        defaultNotes: z.string().optional().nullable(),
       });
       
       const validatedData = schema.parse(req.body);
