@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { X, Save, Check, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle, AlertTriangle } from "lucide-react";
+import { X, Save, Check, Plus, Trash2, ArrowLeft, DollarSign, Edit, Calendar, ChevronsUpDown, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
@@ -26,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { generatePDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -1362,17 +1361,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
               {/* Items Section */}
               <div>
                 <h4 className="text-lg font-medium text-gray-900 mb-4">Invoice Items</h4>
-
-                {/* Warning when delivery notes exist */}
-                {hasActiveDeliveryNotes && (
-                  <Alert variant="destructive" className="mb-4">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Items tidak dapat diubah</AlertTitle>
-                    <AlertDescription>
-                      Invoice ini sudah memiliki surat jalan (delivery note). Untuk mengubah items, hapus atau batalkan surat jalan terlebih dahulu dari halaman detail invoice.
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 <div className="overflow-x-auto mb-4 invoice-table-container">
                   <table className="excel-table min-w-full">

@@ -500,6 +500,7 @@ export default function InvoiceDetailPage({
   });
 
   // Refund overpayment state
+  const [showEditWarning, setShowEditWarning] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [refundAction, setRefundAction] = useState<'refund' | 'deposit'>('refund');
   const [refundForm, setRefundForm] = useState({
@@ -1607,15 +1608,40 @@ export default function InvoiceDetailPage({
           </Button>
           
           {isEditable && (
-            <Link href={`/invoices/${id}/edit`}>
+            <>
               <Button
                 variant="outline"
                 className="gap-1"
+                onClick={() => {
+                  const hasActive = deliveryNotes?.some(dn => dn.status !== 'cancelled');
+                  if (hasActive) {
+                    setShowEditWarning(true);
+                  } else {
+                    navigate(`/invoices/${id}/edit`);
+                  }
+                }}
               >
                 <Edit className="h-4 w-4" />
                 <span>Edit</span>
               </Button>
-            </Link>
+
+              <AlertDialog open={showEditWarning} onOpenChange={setShowEditWarning}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Invoice Sudah Memiliki Surat Jalan</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Invoice ini sudah memiliki surat jalan aktif. <strong>Data item tidak dapat diubah.</strong> Anda masih bisa mengubah informasi header seperti tanggal, catatan, dan alamat pengiriman. Lanjutkan edit?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => navigate(`/invoices/${id}/edit`)}>
+                      Lanjut Edit
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
           
           {invoice.status !== 'void' && isOwner && (
