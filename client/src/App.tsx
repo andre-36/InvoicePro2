@@ -40,6 +40,7 @@ import DeliveryPlanningPage from "@/pages/delivery-notes/planning";
 import ReturnsPage from "@/pages/returns";
 import CreateReturnPage from "@/pages/returns/create";
 import ReturnDetailPage from "@/pages/returns/detail";
+import ActivityLogPage from "@/pages/activity-log";
 import LoginPage from "@/pages/login";
 import SetupPage from "@/pages/setup";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -286,6 +287,7 @@ function App() {
                     <SettingsPage />
                   </ProtectedRoute>
                 </Route>
+                <Route path="/activity-log" component={ActivityLogPage} />
                 <Route path="/print-settings" component={PrintSettingsPage} />
                 <Route path="/payment-methods" component={PaymentMethodsPage} />
                 <Route path="/payment-types" component={PaymentTypesPage} />

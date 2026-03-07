@@ -1,4 +1,4 @@
-import { eq, and, or, desc, gte, gt, lt, sql, isNull, inArray, count, not } from "drizzle-orm";
+import { eq, and, or, desc, gte, gt, lt, lte, sql, isNull, inArray, count, not } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import {
   users, clients, suppliers, products, productBatches, productBundleComponents, productUnits,
@@ -7,6 +7,7 @@ import {
   purchaseOrderPayments, printSettings, paymentTypes, paymentTermsConfig, deliveryNotes, deliveryNoteItems,
   cashAccounts, accountTransfers, goodsReceipts, goodsReceiptItems, goodsReceiptPayments,
   returns, returnItems, creditNoteUsages, stockAdjustments, roles, companySettings, clientDeposits,
+  activityLogs,
 
   type User, type InsertUser, type Store, type InsertStore, type Role, type InsertRole,
   type Client, type InsertClient, type Supplier, type InsertSupplier,
@@ -32,7 +33,8 @@ import {
   type CreditNoteUsage, type InsertCreditNoteUsage,
   type StockAdjustment, type InsertStockAdjustment,
   type CompanySettings, type InsertCompanySettings,
-  type ClientDeposit, type InsertClientDeposit
+  type ClientDeposit, type InsertClientDeposit,
+  type ActivityLog, type InsertActivityLog
 } from "../shared/schema";
 
 import session from "express-session";
@@ -373,6 +375,11 @@ export interface IStorage {
   getClientDeposits(clientId: number): Promise<ClientDeposit[]>;
   getClientDepositBalance(clientId: number): Promise<number>;
   createClientDeposit(deposit: InsertClientDeposit): Promise<ClientDeposit>;
+
+  // Activity log methods
+  createActivityLog(data: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(filters?: { storeId?: number; userId?: number; action?: string; entity?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ logs: ActivityLog[]; total: number }>;
+
   deleteClientDepositByPaymentId(invoicePaymentId: number): Promise<void>;
 
   // Dashboard metrics
@@ -6691,6 +6698,42 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClientDepositByPaymentId(invoicePaymentId: number): Promise<void> {
     await db.delete(clientDeposits).where(eq(clientDeposits.invoicePaymentId, invoicePaymentId));
+  }
+
+  async createActivityLog(data: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLogs).values(data).returning();
+    return created;
+  }
+
+  async getActivityLogs(filters?: { storeId?: number; userId?: number; action?: string; entity?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ logs: ActivityLog[]; total: number }> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    const conditions: any[] = [];
+    if (filters?.storeId) conditions.push(eq(activityLogs.storeId, filters.storeId));
+    if (filters?.userId) conditions.push(eq(activityLogs.userId, filters.userId));
+    if (filters?.action) conditions.push(eq(activityLogs.action, filters.action));
+    if (filters?.entity) conditions.push(eq(activityLogs.entity, filters.entity));
+    if (filters?.dateFrom) conditions.push(gte(activityLogs.createdAt, new Date(filters.dateFrom)));
+    if (filters?.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(activityLogs.createdAt, toDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [logs, [countResult]] = await Promise.all([
+      db.select().from(activityLogs)
+        .where(whereClause)
+        .orderBy(desc(activityLogs.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: count() }).from(activityLogs).where(whereClause)
+    ]);
+
+    return { logs, total: Number(countResult?.count || 0) };
   }
 }
 

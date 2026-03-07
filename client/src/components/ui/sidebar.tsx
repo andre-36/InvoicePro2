@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Store,
   Briefcase,
+  History,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -466,6 +467,24 @@ export function Sidebar({ user, open, onToggle, mobileView, currentStoreId, onSt
                     isActive("/settings") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                   )} />
                   <span>Settings</span>
+                </Link>
+              )}
+
+              {isOwner && (
+                <Link
+                  href="/activity-log"
+                  className={cn(
+                    "flex items-center px-3 py-2.5 text-sm font-medium rounded-md group",
+                    isActive("/activity-log")
+                      ? "text-primary-foreground bg-primary"
+                      : "text-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <History className={cn(
+                    "mr-3 h-5 w-5",
+                    isActive("/activity-log") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                  )} />
+                  <span>Activity Log</span>
                 </Link>
               )}
             </div>

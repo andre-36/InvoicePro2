@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { logPrint } from "@/lib/activity-log";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -391,6 +392,7 @@ export default function PurchaseOrderDetailPage({ id }: PurchaseOrderDetailProps
     // Wait for content to load, then print
     printFrame.onload = () => {
       setTimeout(() => {
+        logPrint('purchase_order', purchaseOrder.id, purchaseOrder.purchaseOrderNumber, `Mencetak Purchase Order ${purchaseOrder.purchaseOrderNumber}`);
         printFrame.contentWindow?.print();
         // Remove iframe after printing
         setTimeout(() => {

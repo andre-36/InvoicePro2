@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { logPrint } from "@/lib/activity-log";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Edit, FileDown, Trash2, FileEdit, Calendar, Building, Mail, Phone, Printer, XCircle } from "lucide-react";
@@ -255,6 +256,7 @@ export default function QuotationDetailPage({ id }: QuotationDetailPageProps) {
         });
       }
     }
+    logPrint('quotation', quotation.id, quotation.quotationNumber, `Mencetak Penawaran ${quotation.quotationNumber}`);
     window.print();
   };
 

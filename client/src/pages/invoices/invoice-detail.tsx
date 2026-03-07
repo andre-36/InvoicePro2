@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generatePDF } from "@/lib/pdf-generator";
+import { logPrint } from "@/lib/activity-log";
 import { formatDate, formatCurrency, formatCurrencyAccounting, formatQuantity } from "@/lib/utils";
 import type { Invoice, InvoiceItem, Client, PrintSettings, PaymentType, DeliveryNote, Return } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
@@ -1218,6 +1219,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
         frameDoc.close();
         
         printFrame.onload = () => {
+          logPrint('delivery_note', deliveryNote.id, deliveryNote.deliveryNumber, `Mencetak Surat Jalan ${deliveryNote.deliveryNumber}`);
           printFrame.contentWindow?.print();
           // Remove iframe after printing
           setTimeout(() => {
@@ -1593,7 +1595,7 @@ export default function InvoiceDetailPage({ id }: InvoiceDetailProps) {
           <Button
             variant="outline"
             className="gap-1"
-            onClick={() => window.print()}
+            onClick={() => { logPrint('invoice', invoice?.id ?? null, invoice?.invoiceNumber ?? '', `Mencetak Invoice ${invoice?.invoiceNumber}`); window.print(); }}
             data-testid="button-print-invoice"
           >
             <Printer className="h-4 w-4" />

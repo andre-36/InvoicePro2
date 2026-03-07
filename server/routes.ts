@@ -235,6 +235,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return next();
   };
 
+  // Activity log helper — fire-and-forget, never throws
+  const logActivity = (req: Request, data: {
+    action: string;
+    entity: string;
+    entityId?: number | null;
+    entityLabel?: string | null;
+    description: string;
+  }) => {
+    try {
+      const user = req.user as any;
+      if (!user) return;
+      storage.createActivityLog({
+        storeId: user.storeId || null,
+        userId: user.id,
+        userName: user.fullName || user.username,
+        userRole: user.role,
+        action: data.action,
+        entity: data.entity,
+        entityId: data.entityId ?? null,
+        entityLabel: data.entityLabel ?? null,
+        description: data.description
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   // Check if initial setup is needed (no users exist)
   app.get("/api/auth/setup-status", async (req, res) => {
     try {
@@ -539,6 +564,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const updatedUser = await storage.updateUser(userId, updateData);
         const { password: _, ...userData } = updatedUser;
+        if (permissions !== undefined) {
+          logActivity(req, { action: 'permission_change', entity: 'user', entityId: userId, entityLabel: updatedUser.fullName || updatedUser.username, description: `Mengubah izin akses untuk ${updatedUser.fullName || updatedUser.username}` });
+        }
         return res.json(userData);
       }
       
@@ -1994,6 +2022,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceWithCreator,
         validatedData.items
       );
+
+      const clientName = newInvoice.clientId ? (await storage.getClient(newInvoice.clientId))?.name || '' : '';
+      logActivity(req, { action: 'create', entity: 'invoice', entityId: newInvoice.id, entityLabel: newInvoice.invoiceNumber, description: `Membuat Invoice ${newInvoice.invoiceNumber}${clientName ? ` untuk ${clientName}` : ''}` });
       
       res.status(201).json(newInvoice);
     } catch (error) {
@@ -2246,6 +2277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.releaseStockReservationForInvoice(invoiceId);
 
       const updatedInvoice = await storage.voidInvoice(invoiceId);
+      logActivity(req, { action: 'void', entity: 'invoice', entityId: invoiceId, entityLabel: invoice.invoiceNumber, description: `Membatalkan (void) Invoice ${invoice.invoiceNumber}` });
       res.json(updatedInvoice);
     } catch (error) {
       console.error("Error voiding invoice:", error);
@@ -2423,6 +2455,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const invoiceForLog = await storage.getInvoice(invoiceId);
+      const formattedAmount = new Intl.NumberFormat('id-ID').format(parseFloat(validatedData.amount));
+      logActivity(req, { action: 'payment_add', entity: 'invoice', entityId: invoiceId, entityLabel: invoiceForLog?.invoiceNumber || `#${invoiceId}`, description: `Menambah pembayaran Rp ${formattedAmount} (${validatedData.paymentType}) pada Invoice ${invoiceForLog?.invoiceNumber || invoiceId}` });
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating invoice payment:", error);
@@ -2499,6 +2534,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const invoiceForLog2 = await storage.getInvoice(invoiceId);
+      const deletedAmt = payment ? new Intl.NumberFormat('id-ID').format(parseFloat(payment.amount)) : '';
+      logActivity(req, { action: 'payment_delete', entity: 'invoice', entityId: invoiceId, entityLabel: invoiceForLog2?.invoiceNumber || `#${invoiceId}`, description: `Menghapus pembayaran${deletedAmt ? ` Rp ${deletedAmt}` : ''} dari Invoice ${invoiceForLog2?.invoiceNumber || invoiceId}` });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting invoice payment:", error);
@@ -2681,6 +2719,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'cancelled' && previousStatus === 'delivered') {
         await storage.reverseDeliveryNoteStock(deliveryNoteId);
       }
+
+      const statusLabels: Record<string, string> = { pending: 'Pending', delivered: 'Delivered', cancelled: 'Cancelled' };
+      logActivity(req, { action: 'status_change', entity: 'delivery_note', entityId: deliveryNoteId, entityLabel: currentNote?.deliveryNumber, description: `Mengubah status Surat Jalan ${currentNote?.deliveryNumber || deliveryNoteId} dari ${statusLabels[previousStatus || ''] || previousStatus} menjadi ${statusLabels[status] || status}` });
       
       res.json(updatedDeliveryNote);
     } catch (error) {
@@ -2692,7 +2733,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/delivery-notes/:id/revert-to-pending", requireAuth, requirePermission('delivery_notes.update_status'), async (req, res) => {
     try {
       const deliveryNoteId = parseInt(req.params.id);
+      const dnBeforeRevert = await storage.getDeliveryNote(deliveryNoteId);
       const updatedDeliveryNote = await storage.revertDeliveryNoteToPending(deliveryNoteId);
+      logActivity(req, { action: 'status_change', entity: 'delivery_note', entityId: deliveryNoteId, entityLabel: dnBeforeRevert?.deliveryNumber, description: `Mengembalikan status Surat Jalan ${dnBeforeRevert?.deliveryNumber || deliveryNoteId} ke Pending` });
       res.json(updatedDeliveryNote);
     } catch (error: any) {
       console.error("Error reverting delivery note to pending:", error);
@@ -2843,6 +2886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       const newDeliveryNote = await storage.createDeliveryNote(deliveryNoteData, items);
+      logActivity(req, { action: 'create', entity: 'delivery_note', entityId: newDeliveryNote.id, entityLabel: newDeliveryNote.deliveryNumber, description: `Membuat Surat Jalan ${newDeliveryNote.deliveryNumber} untuk Invoice #${invoiceId}` });
       res.status(201).json(newDeliveryNote);
     } catch (error) {
       console.error("Error creating delivery note:", error);
@@ -2868,7 +2912,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/delivery-notes/:id", requireAuth, async (req, res) => {
     try {
       const deliveryNoteId = parseInt(req.params.id);
+      const dnForLog = await storage.getDeliveryNote(deliveryNoteId);
       await storage.deleteDeliveryNote(deliveryNoteId);
+      logActivity(req, { action: 'delete', entity: 'delivery_note', entityId: deliveryNoteId, entityLabel: dnForLog?.deliveryNumber, description: `Menghapus Surat Jalan ${dnForLog?.deliveryNumber || deliveryNoteId}` });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting delivery note:", error);
@@ -2946,6 +2992,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quotationWithCreator,
         validatedData.items
       );
+
+      const qClientName = newQuotation.clientId ? (await storage.getClient(newQuotation.clientId))?.name || '' : '';
+      logActivity(req, { action: 'create', entity: 'quotation', entityId: newQuotation.id, entityLabel: newQuotation.quotationNumber, description: `Membuat Penawaran ${newQuotation.quotationNumber}${qClientName ? ` untuk ${qClientName}` : ''}` });
       
       res.status(201).json(newQuotation);
     } catch (error) {
@@ -3059,7 +3108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotations/:id/convert", requireAuth, async (req, res) => {
     try {
       const quotationId = parseInt(req.params.id);
+      const quotationForLog = await storage.getQuotation(quotationId);
       const newInvoice = await storage.convertQuotationToInvoice(quotationId);
+      logActivity(req, { action: 'convert', entity: 'quotation', entityId: quotationId, entityLabel: quotationForLog?.quotationNumber, description: `Mengubah Penawaran ${quotationForLog?.quotationNumber || quotationId} menjadi Invoice ${newInvoice.invoiceNumber}` });
       res.json(newInvoice);
     } catch (error) {
       console.error("Error converting quotation to invoice:", error);
@@ -3070,7 +3121,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const quotationId = parseInt(req.params.id);
+      const quotationForDel = await storage.getQuotation(quotationId);
       await storage.deleteQuotation(quotationId);
+      logActivity(req, { action: 'delete', entity: 'quotation', entityId: quotationId, entityLabel: quotationForDel?.quotationNumber, description: `Menghapus Penawaran ${quotationForDel?.quotationNumber || quotationId}` });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting quotation:", error);
@@ -3260,6 +3313,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         createdBy: userId || null
       });
+
+      const productForLog = await storage.getProduct(validatedData.productId);
+      const qtySign = parseFloat(String(validatedData.quantity)) >= 0 ? `+${validatedData.quantity}` : String(validatedData.quantity);
+      logActivity(req, { action: 'stock_adjust', entity: 'product', entityId: validatedData.productId, entityLabel: productForLog?.name, description: `Penyesuaian stok produk ${productForLog?.name || validatedData.productId}: ${qtySign} (${validatedData.reason || '-'})` });
       
       res.status(201).json(adjustment);
     } catch (error) {
@@ -3377,6 +3434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         poWithCreator,
         validatedData.items
       );
+      logActivity(req, { action: 'create', entity: 'purchase_order', entityId: newPurchaseOrder.id, entityLabel: newPurchaseOrder.purchaseOrderNumber, description: `Membuat Purchase Order ${newPurchaseOrder.purchaseOrderNumber}${newPurchaseOrder.supplierName ? ` ke ${newPurchaseOrder.supplierName}` : ''}` });
       
       res.status(201).json(newPurchaseOrder);
     } catch (error) {
@@ -3428,7 +3486,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
       const purchaseOrderId = parseInt(req.params.id);
+      const poForDel = await storage.getPurchaseOrder(purchaseOrderId);
       await storage.deletePurchaseOrder(purchaseOrderId);
+      logActivity(req, { action: 'delete', entity: 'purchase_order', entityId: purchaseOrderId, entityLabel: poForDel?.purchaseOrderNumber, description: `Menghapus Purchase Order ${poForDel?.purchaseOrderNumber || purchaseOrderId}` });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting purchase order:", error);
@@ -3539,6 +3599,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         purchaseOrderPaymentId: newPayment.id
       });
       
+      const poPayAmt = new Intl.NumberFormat('id-ID').format(parseFloat(validatedData.amount));
+      logActivity(req, { action: 'payment_add', entity: 'purchase_order', entityId: purchaseOrderId, entityLabel: purchaseOrder.purchaseOrderNumber, description: `Menambah pembayaran Rp ${poPayAmt} pada PO ${purchaseOrder.purchaseOrderNumber}` });
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating purchase order payment:", error);
@@ -3713,6 +3775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      logActivity(req, { action: 'create', entity: 'goods_receipt', entityId: newGoodsReceipt.id, entityLabel: newGoodsReceipt.receiptNumber, description: `Membuat Penerimaan Barang ${newGoodsReceipt.receiptNumber}` });
       res.status(201).json(newGoodsReceipt);
     } catch (error) {
       console.error("Error creating goods receipt:", error);
@@ -3767,7 +3830,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/goods-receipts/:id", requireAuth, async (req, res) => {
     try {
       const receiptId = parseInt(req.params.id);
+      const grForDel = await storage.getGoodsReceipt(receiptId);
       await storage.deleteGoodsReceipt(receiptId);
+      logActivity(req, { action: 'delete', entity: 'goods_receipt', entityId: receiptId, entityLabel: grForDel?.receiptNumber, description: `Menghapus Penerimaan Barang ${grForDel?.receiptNumber || receiptId}` });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting goods receipt:", error);
@@ -3889,6 +3954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const grPayAmt = new Intl.NumberFormat('id-ID').format(parseFloat(String(validatedData.amount)));
+      const grLabel = goodsReceipt?.receiptNumber || `#${goodsReceiptId}`;
+      logActivity(req, { action: 'payment_add', entity: 'goods_receipt', entityId: goodsReceiptId, entityLabel: grLabel, description: `Menambah pembayaran Rp ${grPayAmt} pada Penerimaan Barang ${grLabel}` });
       res.status(201).json(newPayment);
     } catch (error) {
       console.error("Error creating goods receipt payment:", error);
@@ -4048,6 +4116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.returnType === 'refund') {
         await storage.updateReturnStatus(newReturn.id, 'completed');
       }
+
+      const retType = validatedData.returnType === 'refund' ? 'Refund' : 'Credit Note';
+      logActivity(req, { action: 'create', entity: 'return', entityId: newReturn.id, entityLabel: newReturn.returnNumber, description: `Membuat Retur (${retType}) ${newReturn.returnNumber}` });
       
       res.status(201).json(newReturn);
     } catch (error) {
@@ -4211,6 +4282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         key: validatedData.key,
         value: validatedData.value
       });
+      logActivity(req, { action: 'setting_change', entity: 'setting', entityId: null, entityLabel: validatedData.key, description: `Mengubah pengaturan bisnis: ${validatedData.key} = ${validatedData.value}` });
       
       res.status(201).json(setting);
     } catch (error) {
@@ -5579,6 +5651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         printSettings = await storage.updatePrintSettings(storeId, validatedData);
       }
       
+      logActivity(req, { action: 'setting_change', entity: 'setting', entityId: null, entityLabel: 'Print Settings', description: `Mengubah pengaturan cetak untuk toko` });
       res.json(printSettings);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -6012,6 +6085,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Error handling middleware
+  // Activity Log endpoints
+  app.get("/api/activity-logs", requireOwner, async (req, res) => {
+    try {
+      const { storeId, userId, action, entity, dateFrom, dateTo, page, limit } = req.query;
+      const result = await storage.getActivityLogs({
+        storeId: storeId ? parseInt(storeId as string) : undefined,
+        userId: userId ? parseInt(userId as string) : undefined,
+        action: action as string || undefined,
+        entity: entity as string || undefined,
+        dateFrom: dateFrom as string || undefined,
+        dateTo: dateTo as string || undefined,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 50
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/api/activity-log", requireAuth, async (req, res) => {
+    try {
+      const { action, entity, entityId, entityLabel, description } = req.body;
+      if (!action || !entity || !description) {
+        return res.status(400).json({ error: "action, entity, description are required" });
+      }
+      const user = req.user as any;
+      const log = await storage.createActivityLog({
+        storeId: user.storeId || null,
+        userId: user.id,
+        userName: user.fullName || user.username,
+        userRole: user.role,
+        action,
+        entity,
+        entityId: entityId || null,
+        entityLabel: entityLabel || null,
+        description
+      });
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("Error creating activity log:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error("Unhandled error:", err);
     res.status(500).json({ error: "Server error" });

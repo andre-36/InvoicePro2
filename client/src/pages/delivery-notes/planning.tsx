@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { logPrint } from "@/lib/activity-log";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Printer, MapPin, Package, Filter, Check, Navigation, Copy, ExternalLink } from "lucide-react";
@@ -493,6 +494,7 @@ export default function DeliveryPlanningPage() {
 
         setTimeout(() => {
           try {
+            logPrint('planning', null, 'Daftar Pengiriman', `Mencetak daftar pengiriman (${selectedIds.size} surat jalan)`);
             printFrame.contentWindow?.print();
           } catch (e) {
             console.error('Print failed:', e);

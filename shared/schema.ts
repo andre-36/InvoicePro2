@@ -874,6 +874,32 @@ export const clientDeposits = pgTable("client_deposits", {
   };
 });
 
+export const activityLogs = pgTable("activity_logs", {
+  id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }),
+  userId: integer("user_id"),
+  userName: text("user_name"),
+  userRole: text("user_role"),
+  action: text("action").notNull(),
+  entity: text("entity").notNull(),
+  entityId: integer("entity_id"),
+  entityLabel: text("entity_label"),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("activity_logs_store_id_idx").on(table.storeId),
+    userIdIdx: index("activity_logs_user_id_idx").on(table.userId),
+    actionIdx: index("activity_logs_action_idx").on(table.action),
+    entityIdx: index("activity_logs_entity_idx").on(table.entity),
+    createdAtIdx: index("activity_logs_created_at_idx").on(table.createdAt)
+  };
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+
 // Define available permissions for role-based access control
 export const AVAILABLE_PERMISSIONS = [
   'products.view',
