@@ -617,6 +617,7 @@ export default function ProductsPage() {
         </div>
         
         <div className="flex gap-2">
+          {hasPermission('products.export') && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" data-testid="button-export-products">
@@ -641,7 +642,9 @@ export default function ProductsPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+          )}
+
+          {hasPermission('products.import') && (
           <Button 
             variant="outline" 
             onClick={() => setIsImportDialogOpen(true)}
@@ -650,7 +653,8 @@ export default function ProductsPage() {
             <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
-          
+          )}
+
           <Button onClick={() => handleAddNew("standard")}>
             <Plus className="mr-2 h-4 w-4" />
             Add Product

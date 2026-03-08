@@ -79,6 +79,8 @@ const PERMISSION_GROUPS = {
     { id: "products.adjust_stock", label: "Adjust Stock" },
     { id: "products.view_cost", label: "Lihat Cost Price" },
     { id: "products.view_lowest_price", label: "Lihat Lowest Price" },
+    { id: "products.export", label: "Export Produk" },
+    { id: "products.import", label: "Import Produk" },
   ],
   "Invoice": [
     { id: "invoices.view", label: "Lihat Invoice" },

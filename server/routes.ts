@@ -4893,68 +4893,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV/XLSX Export routes
-  app.get("/api/products/export/:format", requireAuth, async (req, res) => {
+  app.get("/api/products/export/:format", requireAuth, requirePermission('products.export'), async (req, res) => {
     try {
       const format = req.params.format; // 'csv' or 'xlsx'
+      const storeId = parseInt(req.query.storeId as string) || 1;
+      const user = req.user as any;
+      const canViewCost = user.role === 'owner' || user.permissions?.includes('products.view_cost');
+      const canViewLowest = user.role === 'owner' || user.permissions?.includes('products.view_lowest_price');
+
       const products = await storage.getProducts();
-      
-      // Get current stock for each product from batches
+
+      // Get current, reserved, and available stock for each product
       const productDataWithStock = await Promise.all(products.map(async (product) => {
-        const batches = await storage.getProductBatches(product.id, 1);
-        const currentStock = batches.reduce((sum, batch) => 
-          sum + parseFloat(batch.remainingQuantity.toString()), 0
-        );
-        
-        return {
+        const { stock, reserved, available } = await storage.getProductAvailableQuantity(product.id, storeId);
+
+        const row: Record<string, any> = {
           ID: product.id,
           Name: product.name,
           SKU: product.sku,
           Description: product.description || '',
           'Current Price': product.currentSellingPrice || '0',
-          'Cost Price': product.costPrice || '',
-          'Lowest Price': product.lowestPrice || '',
           Unit: product.unit,
-          'Current Stock': currentStock,
-          'Initial Stock': '', // Empty for template - user fills this for new imports
+          'Current Stock': stock,
+          'Reserved Stock': reserved,
+          'Available Stock': available,
+          'Initial Stock': '',
           'Min Stock': product.minStock || '0',
           Weight: product.weight || '',
           Dimensions: product.dimensions || '',
-          'Is Active': product.isActive ? 'Yes' : 'No'
+          'Is Active': product.isActive ? 'Yes' : 'No',
         };
+
+        if (canViewCost) row['Cost Price'] = product.costPrice || '';
+        if (canViewLowest) row['Lowest Price'] = product.lowestPrice || '';
+
+        return row;
       }));
 
-      if (format === 'csv') {
-        const csvWriterInstance = csvWriter.createObjectCsvStringifier({
-          header: [
-            { id: 'ID', title: 'ID' },
-            { id: 'Name', title: 'Name' },
-            { id: 'SKU', title: 'SKU' },
-            { id: 'Description', title: 'Description' },
-            { id: 'Current Price', title: 'Current Price' },
-            { id: 'Cost Price', title: 'Cost Price' },
-            { id: 'Lowest Price', title: 'Lowest Price' },
-            { id: 'Unit', title: 'Unit' },
-            { id: 'Current Stock', title: 'Current Stock' },
-            { id: 'Initial Stock', title: 'Initial Stock' },
-            { id: 'Min Stock', title: 'Min Stock' },
-            { id: 'Weight', title: 'Weight' },
-            { id: 'Dimensions', title: 'Dimensions' },
-            { id: 'Is Active', title: 'Is Active' }
-          ]
-        });
+      // Build dynamic headers
+      const baseHeaders = [
+        { id: 'ID', title: 'ID' },
+        { id: 'Name', title: 'Name' },
+        { id: 'SKU', title: 'SKU' },
+        { id: 'Description', title: 'Description' },
+        { id: 'Current Price', title: 'Current Price' },
+        ...(canViewCost ? [{ id: 'Cost Price', title: 'Cost Price' }] : []),
+        ...(canViewLowest ? [{ id: 'Lowest Price', title: 'Lowest Price' }] : []),
+        { id: 'Unit', title: 'Unit' },
+        { id: 'Current Stock', title: 'Current Stock' },
+        { id: 'Reserved Stock', title: 'Reserved Stock' },
+        { id: 'Available Stock', title: 'Available Stock' },
+        { id: 'Initial Stock', title: 'Initial Stock' },
+        { id: 'Min Stock', title: 'Min Stock' },
+        { id: 'Weight', title: 'Weight' },
+        { id: 'Dimensions', title: 'Dimensions' },
+        { id: 'Is Active', title: 'Is Active' },
+      ];
 
+      if (format === 'csv') {
+        const csvWriterInstance = csvWriter.createObjectCsvStringifier({ header: baseHeaders });
         const csvString = csvWriterInstance.getHeaderString() + csvWriterInstance.stringifyRecords(productDataWithStock);
-        
+
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.csv"`);
         res.send(csvString);
       } else if (format === 'xlsx') {
-        const worksheet = XLSX.utils.json_to_sheet(productDataWithStock);
+        const orderedData = productDataWithStock.map(row => {
+          const ordered: Record<string, any> = {};
+          baseHeaders.forEach(h => { if (row[h.id] !== undefined) ordered[h.title] = row[h.id]; });
+          return ordered;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(orderedData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
-        
+
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-        
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="products-${new Date().toISOString().split('T')[0]}.xlsx"`);
         res.send(buffer);
@@ -5314,10 +5329,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV/XLSX Import routes
-  app.post("/api/products/import", requireAuth, async (req, res) => {
+  app.post("/api/products/import", requireAuth, requirePermission('products.import'), async (req, res) => {
     try {
       const { data } = req.body;
-      
+      const importUser = req.user as any;
+      const importCanViewCost = importUser.role === 'owner' || importUser.permissions?.includes('products.view_cost');
+      const importCanViewLowest = importUser.role === 'owner' || importUser.permissions?.includes('products.view_lowest_price');
+
       if (!data || !Array.isArray(data)) {
         res.status(400).json({ error: "Invalid data format" });
         return;
@@ -5370,14 +5388,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productData.currentSellingPrice = String(currentPriceValue);
           }
           
-          const costPriceValue = row['Cost Price'] ?? row.costPrice;
-          if (costPriceValue !== undefined && costPriceValue !== null && costPriceValue !== '') {
-            productData.costPrice = String(costPriceValue);
+          if (importCanViewCost) {
+            const costPriceValue = row['Cost Price'] ?? row.costPrice;
+            if (costPriceValue !== undefined && costPriceValue !== null && costPriceValue !== '') {
+              productData.costPrice = String(costPriceValue);
+            }
           }
-          
-          const lowestPriceValue = row['Lowest Price'] ?? row.lowestPrice;
-          if (lowestPriceValue !== undefined && lowestPriceValue !== null && lowestPriceValue !== '') {
-            productData.lowestPrice = String(lowestPriceValue);
+
+          if (importCanViewLowest) {
+            const lowestPriceValue = row['Lowest Price'] ?? row.lowestPrice;
+            if (lowestPriceValue !== undefined && lowestPriceValue !== null && lowestPriceValue !== '') {
+              productData.lowestPrice = String(lowestPriceValue);
+            }
           }
           
           const unitValue = getValue(row, 'Unit', 'unit');
