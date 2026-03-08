@@ -1331,13 +1331,15 @@ export class DatabaseStorage implements IStorage {
   // Get reserved quantity for a product (from invoices with payment but not fully delivered)
   async getProductReservedQuantity(productId: number, storeId: number): Promise<number> {
     // Reserved = invoice items from invoices that have payments, minus already delivered quantities
+    // Only count delivery note items where the delivery note is NOT cancelled
     const result = await db.execute(sql`
       SELECT 
         COALESCE(SUM(
           CAST(ii.quantity AS DECIMAL) - COALESCE(
             (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
              FROM ${deliveryNoteItems} dni 
-             WHERE dni.invoice_item_id = ii.id), 0
+             JOIN ${deliveryNotes} dn ON dn.id = dni.delivery_note_id
+             WHERE dni.invoice_item_id = ii.id AND dn.status != 'cancelled'), 0
           )
         ), 0) as reserved_qty
       FROM ${invoiceItems} ii
@@ -1350,7 +1352,8 @@ export class DatabaseStorage implements IStorage {
         AND CAST(ii.quantity AS DECIMAL) > COALESCE(
           (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
            FROM ${deliveryNoteItems} dni 
-           WHERE dni.invoice_item_id = ii.id), 0
+           JOIN ${deliveryNotes} dn ON dn.id = dni.delivery_note_id
+           WHERE dni.invoice_item_id = ii.id AND dn.status != 'cancelled'), 0
         )
     `);
     return parseFloat(result[0]?.reserved_qty?.toString() || '0');
@@ -1376,7 +1379,8 @@ export class DatabaseStorage implements IStorage {
         COALESCE(
           (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
            FROM ${deliveryNoteItems} dni 
-           WHERE dni.invoice_item_id = ii.id), 0
+           JOIN ${deliveryNotes} dn ON dn.id = dni.delivery_note_id
+           WHERE dni.invoice_item_id = ii.id AND dn.status != 'cancelled'), 0
         ) as delivered_qty
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
@@ -1389,7 +1393,8 @@ export class DatabaseStorage implements IStorage {
         AND CAST(ii.quantity AS DECIMAL) > COALESCE(
           (SELECT SUM(CAST(dni.delivered_quantity AS DECIMAL)) 
            FROM ${deliveryNoteItems} dni 
-           WHERE dni.invoice_item_id = ii.id), 0
+           JOIN ${deliveryNotes} dn ON dn.id = dni.delivery_note_id
+           WHERE dni.invoice_item_id = ii.id AND dn.status != 'cancelled'), 0
         )
       ORDER BY i.issue_date DESC
     `);
@@ -3011,71 +3016,6 @@ export class DatabaseStorage implements IStorage {
             deliveryNoteId: newDeliveryNote.id
           })));
 
-        // Reduce stock for each delivered item using FIFO (with bundle expansion)
-        for (const item of items) {
-          const [invoiceItem] = await tx
-            .select()
-            .from(invoiceItems)
-            .where(eq(invoiceItems.id, item.invoiceItemId));
-
-          if (!invoiceItem || !invoiceItem.productId) continue;
-
-          const deliveredQty = parseFloat(item.deliveredQuantity.toString());
-          if (deliveredQty <= 0) continue;
-
-          const [product] = await tx.select().from(products).where(eq(products.id, invoiceItem.productId));
-          
-          let stockItems: { productId: number; quantity: number }[] = [];
-          if (product && product.productType === 'bundle') {
-            const components = await tx
-              .select()
-              .from(productBundleComponents)
-              .where(eq(productBundleComponents.bundleProductId, product.id));
-            for (const comp of components) {
-              stockItems.push({
-                productId: comp.componentProductId,
-                quantity: parseFloat(comp.quantity) * deliveredQty
-              });
-            }
-          } else {
-            stockItems.push({ productId: invoiceItem.productId, quantity: deliveredQty });
-          }
-
-          for (const { productId: stockProductId, quantity: quantityToReduce } of stockItems) {
-            const availableBatches = await tx
-              .select()
-              .from(productBatches)
-              .where(
-                and(
-                  eq(productBatches.productId, stockProductId),
-                  eq(productBatches.storeId, invoice.store_id),
-                  gt(productBatches.remainingQuantity, 0)
-                )
-              )
-              .orderBy(productBatches.purchaseDate);
-
-            let remainingQuantity = quantityToReduce;
-
-            for (const batch of availableBatches) {
-              if (remainingQuantity <= 0) break;
-
-              const batchRemaining = parseFloat(batch.remainingQuantity.toString());
-              const quantityFromBatch = Math.min(remainingQuantity, batchRemaining);
-
-              if (quantityFromBatch <= 0) continue;
-
-              await tx
-                .update(productBatches)
-                .set({ 
-                  remainingQuantity: (batchRemaining - quantityFromBatch).toString(),
-                  updatedAt: new Date()
-                })
-                .where(eq(productBatches.id, batch.id));
-
-              remainingQuantity -= quantityFromBatch;
-            }
-          }
-        }
       }
 
       return newDeliveryNote;
@@ -6438,41 +6378,37 @@ export class DatabaseStorage implements IStorage {
         baseQtyToStock = qtyToStock * ratio;
       }
 
-      // Get the unit cost from invoice item's unitCost or calculate from available data
-      // If invoice item has a unitCost field, use it; otherwise, use FIFO average from batches
-      let returnCost = parseFloat(invoiceItem.unitCost?.toString() || '0');
+      // Get the unit cost from the most recent batch for this product (capitalCost field)
+      let returnCost = 0;
       
-      if (returnCost === 0) {
-        // Fallback: Get average cost from existing batches for this product
-        const existingBatches = await tx
-          .select()
-          .from(productBatches)
-          .where(
-            and(
-              eq(productBatches.productId, invoiceItem.productId),
-              eq(productBatches.storeId, invoice.storeId)
-            )
+      const existingBatches = await tx
+        .select()
+        .from(productBatches)
+        .where(
+          and(
+            eq(productBatches.productId, invoiceItem.productId),
+            eq(productBatches.storeId, invoice.storeId)
           )
-          .orderBy(desc(productBatches.purchaseDate))
-          .limit(1);
-        
-        if (existingBatches.length > 0) {
-          returnCost = parseFloat(existingBatches[0].baseCost?.toString() || existingBatches[0].cost?.toString() || '0');
-        }
+        )
+        .orderBy(desc(productBatches.purchaseDate))
+        .limit(1);
+      
+      if (existingBatches.length > 0) {
+        returnCost = parseFloat(existingBatches[0].capitalCost?.toString() || '0');
       }
 
       // Create a new batch only for the delivered portion being returned
-      const batchReference = `RTN-${returnRecord.returnNumber}`;
+      const batchNumber = returnRecord.returnNumber;
       await tx.insert(productBatches).values({
         productId: invoiceItem.productId,
         storeId: invoice.storeId,
-        quantity: baseQtyToStock.toString(),
+        batchNumber,
+        capitalCost: returnCost.toString(),
+        initialQuantity: baseQtyToStock.toString(),
         remainingQuantity: baseQtyToStock.toString(),
         reservedQuantity: '0',
-        cost: returnCost.toString(),
-        baseCost: returnCost.toString(),
         purchaseDate: returnRecord.returnDate,
-        batchReference: batchReference,
+        notes: `Return dari ${returnRecord.returnNumber}`,
         createdAt: new Date(),
         updatedAt: new Date()
       });

@@ -73,3 +73,24 @@ Features include comprehensive delivery note management with status tracking, ba
 - **date-fns**: Date manipulation utilities.
 - **class-variance-authority**: Type-safe CSS class generation.
 - **clsx**: Conditional CSS class utility.
+
+## Critical Business Logic — Stock Management
+
+### Delivery Note Stock Flow (post-fix)
+Stock is ONLY deducted via `allocateStockOnDelivery` when delivery note status changes to `delivered`. Creating a delivery note (pending status) does NOT deduct stock. Cancelling a pending delivery note requires no stock restoration. Cancelling a delivered note calls `reverseDeliveryNoteStock` which only reverses if `profit != null` (set by allocateStockOnDelivery).
+
+### Stock Reservation
+`reserveStockForInvoice` is called when invoice status becomes `paid` for delivery/combination type. `deductStockForSelfPickup` is called for self_pickup. `getProductReservedQuantity` SQL query excludes cancelled delivery notes from the "already delivered" count to prevent over-counting available stock.
+
+### Return Stock Flow (post-fix)
+`createBatchesForReturn` creates a new `productBatches` row with:
+- `batchNumber` = return number (e.g., `RTN-2603-0001`)
+- `capitalCost` = capitalCost from most recent existing batch for the product
+- `initialQuantity` / `remainingQuantity` = quantity returned to stock
+Called when return status changes to `completed`.
+
+### Key Bugs Fixed (March 2026)
+1. **Double stock deduction**: Removed duplicate FIFO block from `createDeliveryNote` — stock now only deducted via `allocateStockOnDelivery`
+2. **Return batch field names**: Fixed `createBatchesForReturn` to use correct schema fields (`batchNumber`, `capitalCost`, `initialQuantity` instead of `batchReference`, `cost`, `quantity`)
+3. **Return cost lookup**: Fixed to use `capitalCost` from existing batches instead of non-existent `baseCost`/`cost` fields
+4. **Reserved quantity SQL**: Added filter to exclude cancelled delivery notes from delivered quantity subqueries in `getProductReservedQuantity` and `getProductReservations`
