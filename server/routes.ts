@@ -341,7 +341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const END_HOUR = 17;
 
     console.log(currentHour);
-    return;
+    // return;
 
     if (currentHour < START_HOUR || currentHour >= END_HOUR) {
       return res.status(403).json({ error: "Login is only allowed between 09:00 and 17:00 Jakarta time" });
