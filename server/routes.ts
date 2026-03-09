@@ -333,6 +333,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth routes
   app.post("/api/auth/login", (req, res, next) => {
+    const now = new Date(); // server's current date & time
+    const currentHour = now.getHours(); // 0-23
+
+    const START_HOUR = 9; // 09:00
+    const END_HOUR = 17;  // 17:00
+
+    if (currentHour < START_HOUR || currentHour >= END_HOUR) {
+      return res.status(403).json({ error: "Login is only allowed between 09:00 and 17:00" });
+    }
+
     const validatedData = validateRequestBody(loginSchema, req, res);
     if (!validatedData) return;
     
