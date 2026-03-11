@@ -2458,23 +2458,21 @@ export class DatabaseStorage implements IStorage {
 
         totalCost += itemCost;
 
-        const baseQty = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        if (baseQty > 0) {
-          const avgCost = itemCost / baseQty;
-          await tx
-            .update(invoiceItems)
-            .set({ unitCost: avgCost.toString() })
-            .where(eq(invoiceItems.id, item.id));
-        }
+        // Save per-item profit to invoice_items.profit (uses quantity at the invoice unit level)
+        const itemRevenue = itemQty * unitPrice;
+        const itemProfit = itemRevenue - itemCost;
+        await tx
+          .update(invoiceItems)
+          .set({ profit: itemProfit.toString() })
+          .where(eq(invoiceItems.id, item.id));
       }
 
-      // Update invoice profit data
+      // Save total profit to invoices.totalProfit
       const profit = totalRevenue - totalCost;
       await tx
         .update(invoices)
         .set({
-          totalCost: totalCost.toString(),
-          profit: profit.toString(),
+          totalProfit: profit.toString(),
           updatedAt: new Date()
         })
         .where(eq(invoices.id, invoiceId));
@@ -3204,6 +3202,24 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      // Update invoice total profit = sum of all delivered delivery notes' profits
+      const allDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const invoiceTotalProfit = allDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, profit); // include current delivery note's profit
+      await tx
+        .update(invoices)
+        .set({ totalProfit: invoiceTotalProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -3306,6 +3322,24 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      // Recalculate invoice total profit from remaining delivered delivery notes
+      const remainingDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await tx
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -5515,17 +5549,34 @@ export class DatabaseStorage implements IStorage {
         AND date <= ${endStr}
     `);
 
-    // Get total COGS from invoices
+    // Get total COGS from paid invoices:
+    // For self_pickup: COGS = total_amount - total_profit (profit saved at payment time)
+    // For delivery: COGS = SUM(delivery_notes.total_cost) for delivered notes
     const cogsResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(iib.quantity::numeric * iib.capital_cost::numeric), 0) as total_cogs
-      FROM ${invoiceItemBatches} iib
-      JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
-      JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE i.store_id = ${storeId}
-        AND i.status = 'paid'
-        AND i.issue_date >= ${startStr}
-        AND i.issue_date <= ${endStr}
+        COALESCE(
+          -- Self-pickup: cost = revenue - profit (stored in invoices.total_profit when paid)
+          (SELECT SUM((i.total_amount - COALESCE(i.total_profit, 0))::numeric)
+           FROM ${invoices} i
+           WHERE i.store_id = ${storeId}
+             AND i.delivery_type = 'self_pickup'
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND i.total_profit IS NOT NULL AND i.total_profit != 0),
+        0) +
+        COALESCE(
+          -- Delivery: cost from delivered delivery notes (total_cost set by FIFO allocation)
+          (SELECT SUM(dn.total_cost::numeric)
+           FROM ${deliveryNotes} dn
+           JOIN ${invoices} i ON i.id = dn.invoice_id
+           WHERE i.store_id = ${storeId}
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND dn.status = 'delivered'
+             AND dn.profit IS NOT NULL),
+        0) as total_cogs
     `);
 
     // Get inventory values
