@@ -2435,10 +2435,10 @@ export class DatabaseStorage implements IStorage {
 
             const remaining = parseFloat(batch.remainingQuantity.toString());
             const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
 
             const deductFromBatch = Math.min(remainingToDeduct, remaining);
-            itemCost += deductFromBatch * baseCost;
+            itemCost += deductFromBatch * capitalCost;
 
             const newReserved = Math.max(0, reserved - deductFromBatch);
             const newRemaining = remaining - deductFromBatch;
@@ -3129,11 +3129,11 @@ export class DatabaseStorage implements IStorage {
 
             const remaining = parseFloat(batch.remainingQuantity.toString());
             const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
             
             const quantityFromBatch = Math.min(remainingToAllocate, remaining);
 
-            totalCost += quantityFromBatch * baseCost;
+            totalCost += quantityFromBatch * capitalCost;
 
             const newRemaining = remaining - quantityFromBatch;
             const reservedReduction = Math.min(reserved, quantityFromBatch);
@@ -3184,8 +3184,6 @@ export class DatabaseStorage implements IStorage {
                 batchNumber: `NEG-${stockProductId}-${today}`,
                 purchaseDate: today,
                 capitalCost: '0',
-                cost: '0',
-                baseCost: '0',
                 initialQuantity: '0',
                 remainingQuantity: (-remainingToAllocate).toString(),
                 reservedQuantity: '0',
@@ -5847,9 +5845,9 @@ export class DatabaseStorage implements IStorage {
         p.id as product_id,
         p.name as product_name,
         pb.batch_number,
-        COALESCE(pb.base_cost, pb.cost) as capital_cost,
+        pb.capital_cost as capital_cost,
         pb.purchase_date,
-        (pb.quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
+        (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
         COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) as avg_selling_price,
         CASE 
           WHEN COALESCE(pds.cost, 0) > 0 
@@ -5857,10 +5855,10 @@ export class DatabaseStorage implements IStorage {
           ELSE 0 
         END as profit_margin,
         CASE 
-          WHEN (pb.quantity::numeric - pb.remaining_quantity::numeric) > 0 
+          WHEN (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) > 0 
           THEN (
-            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.quantity::numeric - pb.remaining_quantity::numeric)) -
-            (COALESCE(pb.base_cost, pb.cost)::numeric * (pb.quantity::numeric - pb.remaining_quantity::numeric))
+            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric)) -
+            (pb.capital_cost::numeric * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric))
           )
           ELSE 0 
         END as total_profit
