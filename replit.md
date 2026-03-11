@@ -41,6 +41,7 @@ Features include comprehensive delivery note management with status tracking, ba
 - **Delivery Management**: Delivery note lifecycle management, status tracking, batch delivery planning, and Google Maps route generation.
 - **Financials**: Invoice payment tracking, integrated tax rate management (e.g., Faktur Pajak support), and transaction management.
 - **Reporting**: Dashboards and detailed reports for business performance analysis.
+- **Notification System**: Real-time notification bell in sidebar header. Polls `GET /api/stores/:storeId/notifications` every 60 seconds. 5 notification types gated by existing permissions: stok hampir habis (`products.view`), invoice jatuh tempo (`invoices.view`), surat jalan tertunda > 3 hari (`delivery_notes.view`), retur pending (`returns.view`), PO belum diterima (`purchase_orders.view`). Red badge shows total count; popover shows grouped items with severity colors (red=error, amber=warning).
 
 ## External Dependencies
 
@@ -94,4 +95,3 @@ Called when return status changes to `completed`.
 2. **Return batch field names**: Fixed `createBatchesForReturn` to use correct schema fields (`batchNumber`, `capitalCost`, `initialQuantity` instead of `batchReference`, `cost`, `quantity`)
 3. **Return cost lookup**: Fixed to use `capitalCost` from existing batches instead of non-existent `baseCost`/`cost` fields
 4. **Reserved quantity SQL**: Added filter to exclude cancelled delivery notes from delivered quantity subqueries in `getProductReservedQuantity` and `getProductReservations`
-5. **"Failed to fetch" on invoice create/edit**: Root cause was `process.exit(1)` in `server/vite.ts` Vite customLogger.error. When Vite triggered its error logger (for any reason during dev), the entire Node.js process would silently exit, dropping all in-flight POST/PUT requests. Browser received "Failed to fetch". Fixed by removing `process.exit(1)` from the Vite custom logger. Also removed `throw err` from the global Express error handler in `server/index.ts` to prevent Express from crashing on errors.

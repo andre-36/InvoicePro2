@@ -62,6 +62,11 @@ const transactionFormSchema = insertTransactionSchema.extend({
 
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
+type UserData = {
+  role: string;
+  permissions?: string[];
+};
+
 const PAGE_SIZE = 10;
 
 export default function TransactionsPage() {
@@ -82,6 +87,18 @@ export default function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: currentUser } = useQuery<UserData>({
+    queryKey: ['/api/auth/user'],
+  });
+
+  const hasPermission = useMemo(() => {
+    return (permission: string): boolean => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'owner') return true;
+      return currentUser.permissions?.includes(permission) ?? false;
+    };
+  }, [currentUser]);
   
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: [`/api/stores/${currentStoreId}/transactions`],
@@ -332,10 +349,12 @@ export default function TransactionsPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-1">Manage income and expense transactions</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Excel
-          </Button>
+          {hasPermission('transactions.export') && (
+            <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
+            </Button>
+          )}
           <Button onClick={handleAdd} data-testid="button-add-transaction">
             <Plus className="mr-2 h-4 w-4" />
             Add Transaction

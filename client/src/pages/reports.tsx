@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, ComposedChart } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,6 +130,11 @@ type Transaction = {
   category: string | null;
 };
 
+type UserData = {
+  role: string;
+  permissions?: string[];
+};
+
 export default function ReportsPage() {
   const { currentStoreId } = useStore();
 
@@ -137,6 +142,18 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("this_month");
   const [customDateRange, setCustomDateRange] = useState<DayPickerDateRange | undefined>(undefined);
   const [isCustomOpen, setIsCustomOpen] = useState(false);
+
+  const { data: currentUser } = useQuery<UserData>({
+    queryKey: ['/api/auth/user'],
+  });
+
+  const hasPermission = useMemo(() => {
+    return (permission: string): boolean => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'owner') return true;
+      return currentUser.permissions?.includes(permission) ?? false;
+    };
+  }, [currentUser]);
   
   const getApiDateRange = () => {
     if (dateRange === "custom" && customDateRange?.from && customDateRange?.to) {
@@ -499,10 +516,12 @@ export default function ReportsPage() {
             </Popover>
           )}
           
-          <Button variant="outline" onClick={() => downloadReport(activeTab)}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          {hasPermission('reports.export') && (
+            <Button variant="outline" onClick={() => downloadReport(activeTab)}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          )}
         </div>
       </div>
       

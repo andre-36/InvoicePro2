@@ -61,6 +61,11 @@ type Client = {
 
 type SortOrder = 'none' | 'asc' | 'desc';
 
+type UserData = {
+  role: string;
+  permissions?: string[];
+};
+
 export default function ClientsPage() {
   const { currentStoreId } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,6 +77,18 @@ export default function ClientsPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: currentUser } = useQuery<UserData>({
+    queryKey: ['/api/auth/user'],
+  });
+
+  const hasPermission = useMemo(() => {
+    return (permission: string): boolean => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'owner') return true;
+      return currentUser.permissions?.includes(permission) ?? false;
+    };
+  }, [currentUser]);
   
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: [`/api/stores/${currentStoreId}/clients`],
@@ -271,39 +288,43 @@ export default function ClientsPage() {
         </div>
         
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" data-testid="button-export-clients">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem 
-                onClick={() => exportMutation.mutate('csv')}
-                disabled={exportMutation.isPending}
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Export as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => exportMutation.mutate('xlsx')}
-                disabled={exportMutation.isPending}
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Export as XLSX
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {hasPermission('clients.export') && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="button-export-clients">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem 
+                  onClick={() => exportMutation.mutate('csv')}
+                  disabled={exportMutation.isPending}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => exportMutation.mutate('xlsx')}
+                  disabled={exportMutation.isPending}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Export as XLSX
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           
-          <Button 
-            variant="outline" 
-            onClick={() => setIsImportDialogOpen(true)}
-            data-testid="button-import-clients"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
+          {hasPermission('clients.import') && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsImportDialogOpen(true)}
+              data-testid="button-import-clients"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
+          )}
           
           <Link href="/clients/create">
             <Button>

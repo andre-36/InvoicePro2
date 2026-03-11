@@ -126,6 +126,8 @@ const PERMISSION_GROUPS = {
     { id: "clients.create", label: "Tambah Klien" },
     { id: "clients.edit", label: "Edit Klien" },
     { id: "clients.delete", label: "Hapus Klien" },
+    { id: "clients.export", label: "Export Klien" },
+    { id: "clients.import", label: "Import Klien" },
   ],
   "Supplier": [
     { id: "suppliers.view", label: "Lihat Supplier" },
@@ -138,6 +140,7 @@ const PERMISSION_GROUPS = {
     { id: "transactions.create", label: "Buat Transaksi" },
     { id: "transactions.edit", label: "Edit Transaksi" },
     { id: "transactions.delete", label: "Hapus Transaksi" },
+    { id: "transactions.export", label: "Export Transaksi" },
   ],
   "Laporan": [
     { id: "reports.view", label: "Lihat Laporan" },
