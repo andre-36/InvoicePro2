@@ -115,7 +115,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           )}
           <CardTitle className="text-2xl font-bold">{companySettings.companyName}</CardTitle>
           <CardDescription>
-            Masuk ke akun Anda untuk melanjutkan
+            Masuk ke akun Anda untuk melanjutkan test asd
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -144,7 +144,6 @@ export interface IStorage {
 
   // Invoice methods
   getInvoice(id: number): Promise<Invoice | undefined>;
-  getInvoiceItem(id: number): Promise<InvoiceItem | undefined>;
   getInvoiceWithItems(id: number): Promise<{ invoice: Invoice, items: (InvoiceItem & { productCode?: string; productSku?: string; unitLabel?: string })[], client?: Client } | undefined>;
   getInvoices(storeId: number): Promise<(Invoice & { clientName: string | null })[]>;
   getInvoicesWithStatus(storeId: number): Promise<(Invoice & { 
@@ -1627,11 +1626,6 @@ export class DatabaseStorage implements IStorage {
     return this.checkAndUpdateOverdueStatus(invoice);
   }
 
-  async getInvoiceItem(id: number): Promise<InvoiceItem | undefined> {
-    const [item] = await db.select().from(invoiceItems).where(eq(invoiceItems.id, id));
-    return item;
-  }
-
   async getInvoiceWithItems(id: number): Promise<{ invoice: Invoice; items: (InvoiceItem & { productCode?: string; productSku?: string; unitLabel?: string })[]; client?: Client } | undefined> {
     let [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
 
@@ -1930,21 +1924,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, newInvoice.id));
 
-      // Create a transaction record for non-draft invoices
-      if (invoiceData.status !== 'draft') {
-        await tx
-          .insert(transactions)
-          .values({
-            storeId: invoiceData.storeId,
-            type: 'income',
-            date: invoiceData.issueDate,
-            amount: invoiceTotalAmount.toString(),
-            description: `Invoice #${invoiceNumber}`,
-            invoiceId: newInvoice.id,
-            referenceNumber: invoiceNumber,
-          });
-      }
-
       // Return the invoice with the updated totals
       const [updatedInvoice] = await tx
         .select()
@@ -2071,28 +2050,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, id))
         .returning();
-
-      // Create a transaction record when changing from draft to active status
-      if (invoice.status === 'draft' && status !== 'draft') {
-        const [existingTransaction] = await tx
-          .select()
-          .from(transactions)
-          .where(eq(transactions.invoiceId, id));
-
-        if (!existingTransaction) {
-          await tx
-            .insert(transactions)
-            .values({
-              storeId: invoice.storeId,
-              type: 'income',
-              date: invoice.issueDate,
-              amount: invoice.totalAmount,
-              description: `Invoice #${invoice.invoiceNumber}`,
-              invoiceId: invoice.id,
-              referenceNumber: invoice.invoiceNumber,
-            });
-        }
-      }
 
       return updatedInvoice;
     });
@@ -2478,10 +2435,10 @@ export class DatabaseStorage implements IStorage {
 
             const remaining = parseFloat(batch.remainingQuantity.toString());
             const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
 
             const deductFromBatch = Math.min(remainingToDeduct, remaining);
-            itemCost += deductFromBatch * baseCost;
+            itemCost += deductFromBatch * capitalCost;
 
             const newReserved = Math.max(0, reserved - deductFromBatch);
             const newRemaining = remaining - deductFromBatch;
@@ -2501,23 +2458,21 @@ export class DatabaseStorage implements IStorage {
 
         totalCost += itemCost;
 
-        const baseQty = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        if (baseQty > 0) {
-          const avgCost = itemCost / baseQty;
-          await tx
-            .update(invoiceItems)
-            .set({ unitCost: avgCost.toString() })
-            .where(eq(invoiceItems.id, item.id));
-        }
+        // Save per-item profit to invoice_items.profit (uses quantity at the invoice unit level)
+        const itemRevenue = itemQty * unitPrice;
+        const itemProfit = itemRevenue - itemCost;
+        await tx
+          .update(invoiceItems)
+          .set({ profit: itemProfit.toString() })
+          .where(eq(invoiceItems.id, item.id));
       }
 
-      // Update invoice profit data
+      // Save total profit to invoices.totalProfit
       const profit = totalRevenue - totalCost;
       await tx
         .update(invoices)
         .set({
-          totalCost: totalCost.toString(),
-          profit: profit.toString(),
+          totalProfit: profit.toString(),
           updatedAt: new Date()
         })
         .where(eq(invoices.id, invoiceId));
@@ -3172,11 +3127,11 @@ export class DatabaseStorage implements IStorage {
 
             const remaining = parseFloat(batch.remainingQuantity.toString());
             const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
             
             const quantityFromBatch = Math.min(remainingToAllocate, remaining);
 
-            totalCost += quantityFromBatch * baseCost;
+            totalCost += quantityFromBatch * capitalCost;
 
             const newRemaining = remaining - quantityFromBatch;
             const reservedReduction = Math.min(reserved, quantityFromBatch);
@@ -3227,8 +3182,6 @@ export class DatabaseStorage implements IStorage {
                 batchNumber: `NEG-${stockProductId}-${today}`,
                 purchaseDate: today,
                 capitalCost: '0',
-                cost: '0',
-                baseCost: '0',
                 initialQuantity: '0',
                 remainingQuantity: (-remainingToAllocate).toString(),
                 reservedQuantity: '0',
@@ -3249,6 +3202,24 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      // Update invoice total profit = sum of all delivered delivery notes' profits
+      const allDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const invoiceTotalProfit = allDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, profit); // include current delivery note's profit
+      await tx
+        .update(invoices)
+        .set({ totalProfit: invoiceTotalProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -3351,6 +3322,24 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      // Recalculate invoice total profit from remaining delivered delivery notes
+      const remainingDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await tx
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -5560,17 +5549,34 @@ export class DatabaseStorage implements IStorage {
         AND date <= ${endStr}
     `);
 
-    // Get total COGS from invoices
+    // Get total COGS from paid invoices:
+    // For self_pickup: COGS = total_amount - total_profit (profit saved at payment time)
+    // For delivery: COGS = SUM(delivery_notes.total_cost) for delivered notes
     const cogsResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(iib.quantity::numeric * iib.capital_cost::numeric), 0) as total_cogs
-      FROM ${invoiceItemBatches} iib
-      JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
-      JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE i.store_id = ${storeId}
-        AND i.status = 'paid'
-        AND i.issue_date >= ${startStr}
-        AND i.issue_date <= ${endStr}
+        COALESCE(
+          -- Self-pickup: cost = revenue - profit (stored in invoices.total_profit when paid)
+          (SELECT SUM((i.total_amount - COALESCE(i.total_profit, 0))::numeric)
+           FROM ${invoices} i
+           WHERE i.store_id = ${storeId}
+             AND i.delivery_type = 'self_pickup'
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND i.total_profit IS NOT NULL AND i.total_profit != 0),
+        0) +
+        COALESCE(
+          -- Delivery: cost from delivered delivery notes (total_cost set by FIFO allocation)
+          (SELECT SUM(dn.total_cost::numeric)
+           FROM ${deliveryNotes} dn
+           JOIN ${invoices} i ON i.id = dn.invoice_id
+           WHERE i.store_id = ${storeId}
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND dn.status = 'delivered'
+             AND dn.profit IS NOT NULL),
+        0) as total_cogs
     `);
 
     // Get inventory values
@@ -5890,9 +5896,9 @@ export class DatabaseStorage implements IStorage {
         p.id as product_id,
         p.name as product_name,
         pb.batch_number,
-        COALESCE(pb.base_cost, pb.cost) as capital_cost,
+        pb.capital_cost as capital_cost,
         pb.purchase_date,
-        (pb.quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
+        (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
         COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) as avg_selling_price,
         CASE 
           WHEN COALESCE(pds.cost, 0) > 0 
@@ -5900,10 +5906,10 @@ export class DatabaseStorage implements IStorage {
           ELSE 0 
         END as profit_margin,
         CASE 
-          WHEN (pb.quantity::numeric - pb.remaining_quantity::numeric) > 0 
+          WHEN (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) > 0 
           THEN (
-            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.quantity::numeric - pb.remaining_quantity::numeric)) -
-            (COALESCE(pb.base_cost, pb.cost)::numeric * (pb.quantity::numeric - pb.remaining_quantity::numeric))
+            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric)) -
+            (pb.capital_cost::numeric * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric))
           )
           ELSE 0 
         END as total_profit
@@ -6333,19 +6339,6 @@ export class DatabaseStorage implements IStorage {
       // If return is completed (e.g., refund type), create batches for returned items
       if (returnData.status === 'completed') {
         await this.createBatchesForReturn(tx, newReturn, items);
-
-        // Create expense transaction for refund type
-        if (returnData.returnType === 'refund') {
-          await tx.insert(transactions).values({
-            storeId: newReturn.storeId,
-            type: 'expense',
-            amount: newReturn.totalAmount.toString(),
-            description: `Refund Retur ${newReturn.returnNumber}`,
-            date: newReturn.returnDate,
-            category: 'Retur',
-            returnId: newReturn.id,
-          });
-        }
       }
 
       return newReturn;

@@ -182,13 +182,11 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
   };
 
   const handleItemReturnValueChange = (index: number, value: string) => {
-    const parsed = parseFloat(value) || 0;
+    const returnValue = parseFloat(value) || 0;
     setReturnItems(prev => {
       const updated = [...prev];
-      const maxPrice = updated[index].invoicePrice;
-      const returnValue = Math.min(parsed, maxPrice);
       updated[index].returnValue = returnValue;
-      updated[index].subtotal = updated[index].quantity * returnValue;
+      updated[index].subtotal = updated[index].quantity * updated[index].returnValue;
       return updated;
     });
   };
@@ -420,23 +418,15 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                               <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.invoicePrice)}</TableCell>
                               <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.currentPrice)}</TableCell>
                               <TableCell>
-                                <div className="space-y-1">
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={item.invoicePrice}
-                                    step="any"
-                                    value={item.returnValue || ''}
-                                    onChange={(e) => handleItemReturnValueChange(index, e.target.value)}
-                                    className={`w-24 text-right ${item.selected && item.returnValue > item.invoicePrice ? 'border-red-500' : ''}`}
-                                    disabled={!item.selected}
-                                  />
-                                  {item.selected && (
-                                    <p className="text-xs text-muted-foreground">
-                                      Maks: {formatCurrency(item.invoicePrice)}
-                                    </p>
-                                  )}
-                                </div>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="any"
+                                  value={item.returnValue || ''}
+                                  onChange={(e) => handleItemReturnValueChange(index, e.target.value)}
+                                  className="w-24 text-right"
+                                  disabled={!item.selected}
+                                />
                               </TableCell>
                               <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
                               <TableCell>

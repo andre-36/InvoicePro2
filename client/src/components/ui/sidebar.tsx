@@ -27,14 +27,7 @@ import {
   Store,
   Briefcase,
   History,
-  ShoppingCart,
-  CheckCircle,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
 import { useStore } from "@/lib/store-context";
 import { useToast } from "@/hooks/use-toast";
@@ -84,32 +77,7 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
   const { data: stores } = useQuery<StoreType[]>({
     queryKey: ['/api/stores'],
   });
-
-  type NotificationItem = {
-    type: string;
-    title: string;
-    message: string;
-    count: number;
-    link: string;
-    severity: 'warning' | 'error';
-  };
-
-  const { data: notifications = [] } = useQuery<NotificationItem[]>({
-    queryKey: [`/api/stores/${currentStoreId}/notifications`],
-    refetchInterval: 60000,
-    enabled: !!currentStoreId,
-  });
-
-  const totalNotifications = notifications.reduce((sum, n) => sum + n.count, 0);
-
-  const notificationIcon: Record<string, JSX.Element> = {
-    stock: <Package className="h-4 w-4" />,
-    invoice: <FileText className="h-4 w-4" />,
-    delivery: <Truck className="h-4 w-4" />,
-    return: <RotateCcw className="h-4 w-4" />,
-    purchase_order: <ShoppingCart className="h-4 w-4" />,
-  };
-
+  
   const currentStore = stores?.find(s => s.id === currentStoreId);
   const userStore = stores?.find(s => s.id === user.storeId);
   const isOwner = user.role === 'owner';
@@ -258,62 +226,9 @@ export function Sidebar({ user, open, onToggle, mobileView }: SidebarProps) {
             </div>
             <div className="flex items-center space-x-2">
               {/* Notifications */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="relative p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-accent">
-                    <Bell className="h-5 w-5" />
-                    {totalNotifications > 0 && (
-                      <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-                        {totalNotifications > 99 ? '99+' : totalNotifications}
-                      </span>
-                    )}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <h4 className="font-semibold text-sm">Notifikasi</h4>
-                    {totalNotifications > 0 && (
-                      <span className="text-xs text-muted-foreground">{totalNotifications} item</span>
-                    )}
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                        <CheckCircle className="h-8 w-8 mb-2 text-green-500" />
-                        <p className="text-sm">Tidak ada notifikasi</p>
-                      </div>
-                    ) : (
-                      notifications.map((notif, idx) => (
-                        <Link key={idx} href={notif.link}>
-                          <div className={cn(
-                            "flex items-start gap-3 px-4 py-3 hover:bg-accent cursor-pointer border-b border-border last:border-0",
-                            notif.severity === 'error' ? "bg-red-50 dark:bg-red-950/20" : "bg-amber-50 dark:bg-amber-950/20"
-                          )}>
-                            <div className={cn(
-                              "mt-0.5 flex-shrink-0 p-1.5 rounded-full",
-                              notif.severity === 'error' ? "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400" : "bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400"
-                            )}>
-                              {notificationIcon[notif.type] ?? <Bell className="h-4 w-4" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground">{notif.title}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{notif.message}</p>
-                            </div>
-                            {notif.count > 1 && (
-                              <span className={cn(
-                                "flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full",
-                                notif.severity === 'error' ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-                              )}>
-                                {notif.count}
-                              </span>
-                            )}
-                          </div>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <button className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-accent">
+                <Bell className="h-5 w-5" />
+              </button>
             </div>
           </div>
           
