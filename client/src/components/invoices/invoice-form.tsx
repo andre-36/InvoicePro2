@@ -413,7 +413,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     },
     onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      await queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
       toast({
         title: invoiceId ? "Invoice updated" : "Invoice created",
@@ -472,7 +471,6 @@ export function InvoiceForm({ invoiceId, onSuccess }: InvoiceFormProps) {
     },
     onSuccess: async (result: any) => {
       await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      await queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-invoices'] });
       // If this was a new invoice, store the ID so subsequent saves update the same invoice
       const newId = result?.id;

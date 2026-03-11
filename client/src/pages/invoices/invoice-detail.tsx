@@ -285,7 +285,6 @@ export default function InvoiceDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       toast({
         title: "Invoice di-void",
         description: "Invoice berhasil di-void.",
@@ -308,7 +307,6 @@ export default function InvoiceDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       toast({
         title: "Status updated",
         description: "The invoice status has been updated successfully.",
@@ -401,7 +399,6 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -447,7 +444,6 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       setPaymentDialogOpen(false);
       setEditingPayment(null);
       setPaymentForm({
@@ -482,7 +478,6 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -526,7 +521,6 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -608,7 +602,6 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
