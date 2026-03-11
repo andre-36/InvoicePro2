@@ -1924,21 +1924,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, newInvoice.id));
 
-      // Create a transaction record for non-draft invoices
-      if (invoiceData.status !== 'draft') {
-        await tx
-          .insert(transactions)
-          .values({
-            storeId: invoiceData.storeId,
-            type: 'income',
-            date: invoiceData.issueDate,
-            amount: invoiceTotalAmount.toString(),
-            description: `Invoice #${invoiceNumber}`,
-            invoiceId: newInvoice.id,
-            referenceNumber: invoiceNumber,
-          });
-      }
-
       // Return the invoice with the updated totals
       const [updatedInvoice] = await tx
         .select()
@@ -2065,28 +2050,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, id))
         .returning();
-
-      // Create a transaction record when changing from draft to active status
-      if (invoice.status === 'draft' && status !== 'draft') {
-        const [existingTransaction] = await tx
-          .select()
-          .from(transactions)
-          .where(eq(transactions.invoiceId, id));
-
-        if (!existingTransaction) {
-          await tx
-            .insert(transactions)
-            .values({
-              storeId: invoice.storeId,
-              type: 'income',
-              date: invoice.issueDate,
-              amount: invoice.totalAmount,
-              description: `Invoice #${invoice.invoiceNumber}`,
-              invoiceId: invoice.id,
-              referenceNumber: invoice.invoiceNumber,
-            });
-        }
-      }
 
       return updatedInvoice;
     });
