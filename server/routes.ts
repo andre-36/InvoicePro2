@@ -3136,12 +3136,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { status },
         );
 
-        // When status changes to 'delivered', allocate stock using FIFO and calculate profit
+        // When status changes to 'delivered', update invoice profit (stock already deducted at DN creation)
         if (status === "delivered" && previousStatus !== "delivered") {
           await storage.allocateStockOnDelivery(deliveryNoteId);
         }
 
-        // When status changes from 'delivered' to 'cancelled', reverse the stock allocation
+        // When cancelling a pending DN, restore stock and re-reserve
+        if (status === "cancelled" && previousStatus === "pending") {
+          await storage.restorePendingDeliveryNoteStock(deliveryNoteId);
+        }
+
+        // When cancelling a delivered DN, only clear profit (stock stays deducted — goods already delivered)
         if (status === "cancelled" && previousStatus === "delivered") {
           await storage.reverseDeliveryNoteStock(deliveryNoteId);
         }

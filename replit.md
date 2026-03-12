@@ -76,8 +76,8 @@ Features include comprehensive delivery note management with status tracking, ba
 
 ## Critical Business Logic — Stock Management
 
-### Delivery Note Stock Flow (post-fix)
-Stock is ONLY deducted via `allocateStockOnDelivery` when delivery note status changes to `delivered`. Creating a delivery note (pending status) does NOT deduct stock. Cancelling a pending delivery note requires no stock restoration. Cancelling a delivered note calls `reverseDeliveryNoteStock` which only reverses if `profit != null` (set by allocateStockOnDelivery).
+### Delivery Note Stock Flow (March 2026 redesign)
+Stock is deducted at **delivery note creation** time (not when marked delivered). FIFO batch deduction runs in `createDeliveryNote`, which also calculates and stores `total_cost` and `profit` on the DN record. When the DN is marked "delivered", `allocateStockOnDelivery` only updates `invoices.total_profit` (no stock changes). Cancelling a **pending** DN calls `restorePendingDeliveryNoteStock` which restores `remainingQuantity` AND `reservedQuantity` on batches. Cancelling a **delivered** DN calls `reverseDeliveryNoteStock` which only clears profit (no stock restore — goods already delivered). Reverting delivered→pending does NOT restore stock (goods still in transit), only clears profit. Editing items on a pending DN (via `updateDeliveryNoteItems`) restores old stock, deletes old items, inserts new items, and re-deducts stock with new FIFO calculation.
 
 ### Stock Reservation
 `reserveStockForInvoice` is called when invoice status becomes `paid` for delivery/combination type. `deductStockForSelfPickup` is called for self_pickup. `getProductReservedQuantity` SQL query excludes cancelled delivery notes from the "already delivered" count to prevent over-counting available stock.
