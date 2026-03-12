@@ -33,6 +33,7 @@ const extendedQuotationSchema = insertQuotationSchema.extend({
   subtotal: z.string().optional(),
   taxAmount: z.string().optional(),
   discount: z.string().optional(),
+  shipping: z.string().optional(),
   totalAmount: z.string().optional(),
 });
 
@@ -201,6 +202,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
         taxRate: "0",
         taxAmount: "0",
         discount: "0",
+        shipping: "0",
         totalAmount: "0",
         notes: "",
         useFakturPajak: false,
@@ -289,6 +291,7 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
           subtotal: quotation.subtotal,
           taxAmount: quotation.taxAmount,
           discount: quotation.discount,
+          shipping: quotation.shipping || "0",
           totalAmount: quotation.totalAmount,
         },
         items: quotationItems.map(item => ({
@@ -375,17 +378,16 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
   };
 
   const calculateTotals = (currentItems: QuotationItem[]) => {
-    // Simple calculation - no tax separation
     const subtotal = currentItems.reduce((sum, item) => {
       return sum + parseFloat(item.subtotal || "0");
     }, 0);
-    const taxAmount = 0;
 
     const discountAmount = parseFloat(form.getValues('quotation.discount') || "0");
-    const total = subtotal - discountAmount;
+    const shippingAmount = parseFloat(form.getValues('quotation.shipping') || "0");
+    const total = subtotal - discountAmount + shippingAmount;
 
     form.setValue('quotation.subtotal', subtotal.toString());
-    form.setValue('quotation.taxAmount', taxAmount.toString());
+    form.setValue('quotation.taxAmount', "0");
     form.setValue('quotation.taxRate', "0");
     form.setValue('quotation.totalAmount', Math.max(0, total).toString());
   };
@@ -722,6 +724,31 @@ export function QuotationForm({ quotationId, onSuccess }: QuotationFormProps) {
                             setTimeout(() => calculateTotals(items), 0);
                           }}
                           data-testid="input-discount"
+                        />
+                      </div>
+                    </div>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quotation.shipping"
+                  render={({ field }) => (
+                    <div className="flex justify-between items-center">
+                      <span>Ongkos Kirim:</span>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className="w-24 text-right"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                            setTimeout(() => calculateTotals(items), 0);
+                          }}
+                          data-testid="input-shipping"
                         />
                       </div>
                     </div>

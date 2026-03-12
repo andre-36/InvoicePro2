@@ -972,7 +972,7 @@ export default function InvoiceDetailPage({
             ${pageItems.map((item: any, idx: number) => `
               <tr>
                 <td class="text-center"><div class="cell-clip">${startIdx + idx + 1}</div></td>
-                <td class="text-center"><div class="cell-clip">${item.invoiceItem?.product?.sku || '-'}</div></td>
+                <td class="text-center"><div class="cell-clip" style="font-size:9pt">${item.invoiceItem?.product?.sku || '-'}</div></td>
                 <td class="text-left"><div class="cell-clip">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</div></td>
                 <td class="text-center"><div class="cell-clip">${item.deliveredQuantity}</div></td>
                 <td class="text-center"><div class="cell-clip">${item.invoiceItem?.unitLabel || '-'}</div></td>
@@ -1521,7 +1521,7 @@ export default function InvoiceDetailPage({
                 {page.items.map((item, itemIndex) => (
                   <tr key={itemIndex}>
                     <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{getRunningItemNumber(pageIndex, itemIndex)}</div></td>
-                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{(item as any).productCode || (item as any).productSku || '-'}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip" style={{ fontSize: '9pt' }}>{(item as any).productCode || (item as any).productSku || '-'}</div></td>
                     <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
                     <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatQuantity(item.quantity)}</div></td>
                     <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{(item as any).unitLabel || '-'}</div></td>
