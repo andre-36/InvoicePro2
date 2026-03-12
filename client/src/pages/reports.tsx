@@ -52,6 +52,7 @@ type FinancialReport = {
     beginningInventory: number;
     purchases: number;
     endingInventory: number;
+    returnCost: number;
     totalCOGS: number;
   };
   expenses: {
@@ -606,6 +607,12 @@ export default function ReportsPage() {
                             <span>Persediaan Akhir</span>
                             <span>({formatCurrency(financialReport.cogs.endingInventory)})</span>
                           </div>
+                          {financialReport.cogs.returnCost > 0 && (
+                            <div className="flex justify-between text-sm text-green-600">
+                              <span>Pengurangan Retur</span>
+                              <span>({formatCurrency(financialReport.cogs.returnCost)})</span>
+                            </div>
+                          )}
                           <div className="flex justify-between font-bold text-sm pt-1 border-t mt-1">
                             <span>Total Harga Pokok Penjualan</span>
                             <span>({formatCurrency(financialReport.cogs.totalCOGS)})</span>

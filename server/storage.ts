@@ -5697,13 +5697,14 @@ export class DatabaseStorage implements IStorage {
         AND issue_date <= ${endStr}
     `);
 
-    // Get other income from transactions
+    // Get other income from transactions (exclude invoice payment transactions to avoid double counting)
     const otherIncomeResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as other_income
       FROM ${transactions}
       WHERE store_id = ${storeId}
         AND type = 'income'
         AND category != 'Sales'
+        AND invoice_payment_id IS NULL
         AND date >= ${startStr}
         AND date <= ${endStr}
     `);
@@ -5738,6 +5739,16 @@ export class DatabaseStorage implements IStorage {
         0) as total_cogs
     `);
 
+    // Get return cost adjustment (batches created from returns in the period)
+    const returnCostResult = await db.execute(sql`
+      SELECT COALESCE(SUM(pb.initial_quantity::numeric * pb.capital_cost::numeric), 0) as return_cost
+      FROM ${productBatches} pb
+      WHERE pb.store_id = ${storeId}
+        AND pb.batch_number LIKE 'RTN-%'
+        AND pb.purchase_date >= ${startStr}
+        AND pb.purchase_date <= ${endStr}
+    `);
+
     // Get inventory values
     const inventoryResult = await db.execute(sql`
       SELECT 
@@ -5765,7 +5776,9 @@ export class DatabaseStorage implements IStorage {
     const beginningInventory = parseFloat(inventoryResult[0]?.beginning_inventory || '0');
     const purchases = parseFloat(inventoryResult[0]?.purchases || '0');
     const endingInventory = parseFloat(inventoryResult[0]?.ending_inventory || '0');
-    const totalCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+    const grossCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+    const returnCost = parseFloat(returnCostResult[0]?.return_cost || '0');
+    const totalCOGS = grossCOGS - returnCost;
 
     const operatingExpenses = parseFloat(operatingExpensesResult[0]?.operating_expenses || '0');
     const otherExpenses = 0; // Can be expanded later
@@ -5786,6 +5799,7 @@ export class DatabaseStorage implements IStorage {
         beginningInventory,
         purchases,
         endingInventory,
+        returnCost,
         totalCOGS
       },
       expenses: {
