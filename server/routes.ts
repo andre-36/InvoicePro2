@@ -5472,8 +5472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate date range
         const { startDate, endDate } = parseDateRange(dateRange);
 
-        // Get all invoices
-        const allInvoices = await storage.getInvoices(storeId);
+        // Get all invoices (exclude voided)
+        const allInvoicesRaw = await storage.getInvoices(storeId);
+        const allInvoices = allInvoicesRaw.filter((inv) => !inv.isVoided && inv.status !== 'void');
         const invoicesInRange = allInvoices.filter((inv) => {
           const invDate = new Date(inv.issueDate);
           return invDate >= startDate && invDate <= endDate;
@@ -5617,9 +5618,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { startDate, endDate } = parseDateRange(dateRange);
 
-        // Get all invoices in range
-        const allInvoices = await storage.getInvoices(storeId);
-        const invoicesInRange = allInvoices.filter((inv) => {
+        // Get all invoices in range (exclude voided)
+        const allInvoicesRaw = await storage.getInvoices(storeId);
+        const invoicesInRange = allInvoicesRaw.filter((inv) => {
+          if (inv.isVoided || inv.status === 'void') return false;
           const invDate = new Date(inv.issueDate);
           return invDate >= startDate && invDate <= endDate;
         });
@@ -5659,7 +5661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 item.quantity || "0",
               );
               productSales[item.productId].revenue += parseFloat(
-                item.total || "0",
+                item.totalAmount || "0",
               );
             }
           }
