@@ -5802,12 +5802,13 @@ export class DatabaseStorage implements IStorage {
       WHERE pb.store_id = ${storeId}
     `);
 
-    // Get operating expenses
+    // Get operating expenses (exclude PO prepaid payments — those are already in COGS via product batches purchases)
     const operatingExpensesResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as operating_expenses
       FROM ${transactions}
       WHERE store_id = ${storeId}
         AND type = 'expense'
+        AND purchase_order_payment_id IS NULL
         AND date >= ${startStr}
         AND date <= ${endStr}
     `);

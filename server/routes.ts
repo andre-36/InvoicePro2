@@ -4283,7 +4283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const purchaseOrderId = parseInt(req.params.purchaseOrderId);
 
         const validatedData = validateRequestBody(
-          insertPurchaseOrderPaymentSchema,
+          insertPurchaseOrderPaymentSchema.omit({ purchaseOrderId: true }),
           req,
           res,
         );
