@@ -1163,6 +1163,9 @@ export default function InvoiceDetailPage({
             th, td {
               border: 1px solid #333;
               padding: 4px 6px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
             }
             th {
               background-color: #f0f0f0;
@@ -1230,10 +1233,18 @@ export default function InvoiceDetailPage({
         frameDoc.write(printContent);
         frameDoc.close();
         
-        printFrame.onload = () => {
+        printFrame.onload = async () => {
+          const images = Array.from(printFrame.contentDocument?.images || []);
+          await Promise.all(images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise<void>(resolve => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 3000);
+            });
+          }));
           logPrint('delivery_note', deliveryNote.id, deliveryNote.deliveryNumber, `Mencetak Surat Jalan ${deliveryNote.deliveryNumber}`);
           printFrame.contentWindow?.print();
-          // Remove iframe after printing
           setTimeout(() => {
             document.body.removeChild(printFrame);
           }, 1000);
@@ -1607,7 +1618,7 @@ export default function InvoiceDetailPage({
           <Button
             variant="outline"
             className="gap-1"
-            onClick={() => { logPrint('invoice', invoice?.id ?? null, invoice?.invoiceNumber ?? '', `Mencetak Invoice ${invoice?.invoiceNumber}`); window.print(); }}
+            onClick={async () => { logPrint('invoice', invoice?.id ?? null, invoice?.invoiceNumber ?? '', `Mencetak Invoice ${invoice?.invoiceNumber}`); const logoImg = document.querySelector('.print-only .print-logo-image') as HTMLImageElement | null; if (logoImg && !logoImg.complete) { await new Promise<void>((resolve) => { logoImg.onload = () => resolve(); logoImg.onerror = () => resolve(); setTimeout(resolve, 3000); }); } window.print(); }}
             data-testid="button-print-invoice"
           >
             <Printer className="h-4 w-4" />

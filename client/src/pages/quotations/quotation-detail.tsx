@@ -261,6 +261,14 @@ export default function QuotationDetailPage({
       }
     }
     logPrint('quotation', quotation.id, quotation.quotationNumber, `Mencetak Penawaran ${quotation.quotationNumber}`);
+    const logoImg = document.querySelector('.print-only .print-logo-image') as HTMLImageElement | null;
+    if (logoImg && !logoImg.complete) {
+      await new Promise<void>((resolve) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => resolve();
+        setTimeout(resolve, 3000);
+      });
+    }
     window.print();
   };
 

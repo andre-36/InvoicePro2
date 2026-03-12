@@ -207,7 +207,7 @@ export interface IStorage {
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
-  getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
+  getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: (QuotationItem & { productSku?: string; productCode?: string; unitLabel?: string })[], client?: Client } | undefined>;
   getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]>;
   createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>, items?: InsertQuotationItem[]): Promise<Quotation>;
@@ -4064,18 +4064,60 @@ export class DatabaseStorage implements IStorage {
     return quotation;
   }
 
-  async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: QuotationItem[]; client?: Client } | undefined> {
+  async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: (QuotationItem & { productSku?: string; productCode?: string; unitLabel?: string })[]; client?: Client } | undefined> {
     const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
 
     if (!quotation) {
       return undefined;
     }
 
-    const items = await db
-      .select()
+    const enrichedItems = await db
+      .select({
+        id: quotationItems.id,
+        quotationId: quotationItems.quotationId,
+        productId: quotationItems.productId,
+        productUnitId: quotationItems.productUnitId,
+        description: quotationItems.description,
+        quantity: quotationItems.quantity,
+        baseQuantity: quotationItems.baseQuantity,
+        unitPrice: quotationItems.unitPrice,
+        taxRate: quotationItems.taxRate,
+        taxAmount: quotationItems.taxAmount,
+        discount: quotationItems.discount,
+        subtotal: quotationItems.subtotal,
+        totalAmount: quotationItems.totalAmount,
+        createdAt: quotationItems.createdAt,
+        updatedAt: quotationItems.updatedAt,
+        productSku: products.sku,
+        productBaseUnit: products.unit,
+        selectedUnitLabel: productUnits.unitLabel,
+      })
       .from(quotationItems)
+      .leftJoin(products, eq(quotationItems.productId, products.id))
+      .leftJoin(productUnits, eq(quotationItems.productUnitId, productUnits.id))
       .where(eq(quotationItems.quotationId, id))
       .orderBy(quotationItems.id);
+
+    const items = enrichedItems.map(item => ({
+      id: item.id,
+      quotationId: item.quotationId,
+      productId: item.productId,
+      productUnitId: item.productUnitId,
+      description: item.description,
+      quantity: item.quantity,
+      baseQuantity: item.baseQuantity,
+      unitPrice: item.unitPrice,
+      taxRate: item.taxRate,
+      taxAmount: item.taxAmount,
+      discount: item.discount,
+      subtotal: item.subtotal,
+      totalAmount: item.totalAmount,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      productCode: item.productSku || undefined,
+      productSku: item.productSku || undefined,
+      unitLabel: item.selectedUnitLabel || item.productBaseUnit || undefined,
+    }));
 
     let client;
     if (quotation.clientId) {
