@@ -4279,6 +4279,7 @@ export class DatabaseStorage implements IStorage {
           taxRate: quotation.taxRate,
           taxAmount: quotation.taxAmount,
           discount: quotation.discount,
+          shipping: quotation.shipping,
           totalAmount: quotation.totalAmount,
           paperSize: quotation.paperSize,
           notes: quotation.notes,

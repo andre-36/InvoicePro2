@@ -390,7 +390,7 @@ export default function QuotationDetailPage({
               {items.map((item, index) => (
                 <tr key={index}>
                   <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{index + 1}</div></td>
-                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip" style={{ fontSize: '9pt' }}>{item.productCode || item.productSku || '-'}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip" style={{ fontSize: '7pt' }}>{item.productCode || item.productSku || '-'}</div></td>
                   <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
                   <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.quantity}</div></td>
                   <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.unitLabel || '-'}</div></td>
