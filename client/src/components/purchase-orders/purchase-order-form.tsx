@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/unsaved-changes-dialog";
 import { insertPurchaseOrderSchema } from "@shared/schema";
+import type { CashAccount } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -290,8 +291,8 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [paymentForm, setPaymentForm] = useState({
     paymentDate: format(new Date(), 'yyyy-MM-dd'),
-    paymentType: 'Bank Transfer',
     amount: '',
+    cashAccountId: '',
     notes: ''
   });
   
@@ -401,6 +402,12 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
   const { data: poPayments = [] } = useQuery<any[]>({
     queryKey: ['/api/purchase-orders', purchaseOrderId, 'payments'],
     enabled: !!purchaseOrderId,
+  });
+
+  // Fetch cash accounts for payment recording
+  const { data: cashAccounts = [] } = useQuery<CashAccount[]>({
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
+    enabled: !!currentStoreId,
   });
 
   // Form setup
@@ -814,8 +821,8 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     setEditingPayment(null);
     setPaymentForm({
       paymentDate: format(new Date(), 'yyyy-MM-dd'),
-      paymentType: 'Bank Transfer',
       amount: '',
+      cashAccountId: '',
       notes: ''
     });
     setPaymentDialogOpen(true);
@@ -825,8 +832,8 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
     setEditingPayment(payment);
     setPaymentForm({
       paymentDate: payment.paymentDate,
-      paymentType: payment.paymentType,
       amount: payment.amount,
+      cashAccountId: payment.cashAccountId?.toString() || '',
       notes: payment.notes || ''
     });
     setPaymentDialogOpen(true);
@@ -834,14 +841,29 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
 
   const handleSavePayment = async () => {
     if (!purchaseOrderId) return;
+
+    if (!paymentForm.cashAccountId) {
+      toast({ title: "Cash account wajib dipilih", variant: "destructive" });
+      return;
+    }
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      toast({ title: "Jumlah harus lebih dari 0", variant: "destructive" });
+      return;
+    }
     
+    const payload = {
+      ...paymentForm,
+      paymentType: 'PO Prepaid',
+      cashAccountId: parseInt(paymentForm.cashAccountId),
+    };
+
     try {
       if (editingPayment) {
-        await apiRequest('PUT', `/api/purchase-orders/${purchaseOrderId}/payments/${editingPayment.id}`, paymentForm);
-        toast({ title: "Payment updated successfully" });
+        await apiRequest('PUT', `/api/purchase-orders/${purchaseOrderId}/payments/${editingPayment.id}`, payload);
+        toast({ title: "Pembayaran berhasil diperbarui" });
       } else {
-        await apiRequest('POST', `/api/purchase-orders/${purchaseOrderId}/payments`, paymentForm);
-        toast({ title: "Payment added successfully" });
+        await apiRequest('POST', `/api/purchase-orders/${purchaseOrderId}/payments`, payload);
+        toast({ title: "Pembayaran berhasil ditambahkan" });
       }
       setPaymentDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', purchaseOrderId, 'payments'] });
@@ -1479,32 +1501,46 @@ export function PurchaseOrderForm({ purchaseOrderId, onSuccess }: PurchaseOrderF
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Pembayaran</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cash Account *</label>
                   <Select
-                    value={paymentForm.paymentType}
-                    onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value })}
+                    value={paymentForm.cashAccountId}
+                    onValueChange={(value) => setPaymentForm({ ...paymentForm, cashAccountId: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih tipe pembayaran" />
+                      <SelectValue placeholder="Pilih cash account" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="Check">Check</SelectItem>
-                      <SelectItem value="Other">Lainnya</SelectItem>
+                      {cashAccounts.filter(ca => ca.isActive).map((account) => (
+                        <SelectItem key={account.id} value={account.id.toString()}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
-                  <Input
-                    type="number"
-                    value={paymentForm.amount}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const poTotal = parseFloat(form.watch('purchaseOrder.totalAmount') || '0');
+                        setPaymentForm({ ...paymentForm, amount: poTotal.toString() });
+                      }}
+                    >
+                      Fill
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
