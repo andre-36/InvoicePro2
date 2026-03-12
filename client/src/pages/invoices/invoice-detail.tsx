@@ -971,11 +971,11 @@ export default function InvoiceDetailPage({
           <tbody>
             ${pageItems.map((item: any, idx: number) => `
               <tr>
-                <td class="text-center">${startIdx + idx + 1}</td>
-                <td class="text-center">${item.invoiceItem?.product?.sku || '-'}</td>
-                <td class="text-left">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</td>
-                <td class="text-center">${item.deliveredQuantity}</td>
-                <td class="text-center">${item.invoiceItem?.unitLabel || '-'}</td>
+                <td class="text-center"><div class="cell-clip">${startIdx + idx + 1}</div></td>
+                <td class="text-center"><div class="cell-clip">${item.invoiceItem?.product?.sku || '-'}</div></td>
+                <td class="text-left"><div class="cell-clip">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</div></td>
+                <td class="text-center"><div class="cell-clip">${item.deliveredQuantity}</div></td>
+                <td class="text-center"><div class="cell-clip">${item.invoiceItem?.unitLabel || '-'}</div></td>
                 <td class="text-center"><span class="check-box"></span></td>
               </tr>
             `).join('')}
@@ -1162,14 +1162,20 @@ export default function InvoiceDetailPage({
             }
             th, td {
               border: 1px solid #333;
+              padding: 0;
+              overflow: hidden;
+            }
+            th {
               padding: 4px 6px;
+              background-color: #f0f0f0;
+              font-weight: bold;
+            }
+            .cell-clip {
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
-            }
-            th {
-              background-color: #f0f0f0;
-              font-weight: bold;
+              max-width: 100%;
+              padding: 4px 6px;
             }
             .text-center { text-align: center; }
             .text-left { text-align: left; }
@@ -1511,13 +1517,13 @@ export default function InvoiceDetailPage({
               <tbody>
                 {page.items.map((item, itemIndex) => (
                   <tr key={itemIndex}>
-                    <td style={{ textAlign: 'center' }}>{getRunningItemNumber(pageIndex, itemIndex)}</td>
-                    <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
-                    <td style={{ textAlign: 'left' }}>{item.description}</td>
-                    <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
-                    <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
-                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{getRunningItemNumber(pageIndex, itemIndex)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{(item as any).productCode || (item as any).productSku || '-'}</div></td>
+                    <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatQuantity(item.quantity)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{(item as any).unitLabel || '-'}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrencyAccounting(item.unitPrice)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrencyAccounting(item.totalAmount)}</div></td>
                   </tr>
                 ))}
               </tbody>

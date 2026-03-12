@@ -68,6 +68,9 @@ type QuotationWithItems = {
     discount: string;
     subtotal: string;
     totalAmount: string;
+    productSku?: string;
+    productCode?: string;
+    unitLabel?: string;
   }>;
   client?: {
     id: number;
@@ -385,13 +388,13 @@ export default function QuotationDetailPage({
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
-                  <td style={{ textAlign: 'left' }}>{item.description}</td>
-                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{index + 1}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.productCode || item.productSku || '-'}</div></td>
+                  <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.quantity}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.unitLabel || '-'}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrency(parseFloat(item.unitPrice))}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrency(parseFloat(item.totalAmount))}</div></td>
                 </tr>
               ))}
             </tbody>

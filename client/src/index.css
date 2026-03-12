@@ -455,14 +455,20 @@
 
   .print-items-table td {
     border: 1px solid #000;
-    padding: 3px 6px;
+    padding: 0;
     font-size: 11pt;
     vertical-align: middle;
     height: 0.7cm;
     max-height: 0.7cm;
     overflow: hidden;
+  }
+
+  .print-cell-clip {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
+    padding: 3px 6px;
   }
   
   .print-items-table tbody tr {
