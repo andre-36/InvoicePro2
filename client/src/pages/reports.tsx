@@ -1479,6 +1479,38 @@ export default function ReportsPage() {
                 </Card>
               </div>
 
+              {/* Customer Purchase Chart */}
+              {customerReport.topCustomers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Pembelian per Pelanggan</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={customerReport.topCustomers.slice(0, 8).map(c => ({ name: c.name, value: c.totalPurchase }))}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {customerReport.topCustomers.slice(0, 8).map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Ringkasan Penjualan per Pelanggan</CardTitle>
@@ -1518,38 +1550,6 @@ export default function ReportsPage() {
                   </Table>
                 </CardContent>
               </Card>
-
-              {/* Customer Purchase Chart */}
-              {customerReport.topCustomers.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Distribusi Pembelian per Pelanggan</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[350px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={customerReport.topCustomers.slice(0, 8).map(c => ({ name: c.name, value: c.totalPurchase }))}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={120}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {customerReport.topCustomers.slice(0, 8).map((_, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </>
           ) : (
             <div className="flex justify-center items-center h-[400px]">
