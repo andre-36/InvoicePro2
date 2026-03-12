@@ -292,9 +292,15 @@ export default function InvoiceDetailPage({
       });
     },
     onError: (error: Error) => {
+      let msg = error.message || '';
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        msg = parsed.message || parsed.error || msg;
+      } catch {}
       toast({
         title: "Tidak dapat void invoice",
-        description: error.message,
+        description: msg,
         variant: "destructive",
       });
     }
@@ -1303,10 +1309,10 @@ export default function InvoiceDetailPage({
   const canAddPayment = true;
 
   const handlePaymentSubmit = () => {
-    if (!paymentForm.amount) {
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
       toast({
-        title: "Error",
-        description: "Amount is required",
+        title: "Jumlah tidak valid",
+        description: "Jumlah pembayaran harus lebih dari 0.",
         variant: "destructive",
       });
       return;
