@@ -1171,11 +1171,14 @@ export default function InvoiceDetailPage({
               font-weight: bold;
             }
             .cell-clip {
+              display: block;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
+              width: 100%;
               max-width: 100%;
               padding: 4px 6px;
+              box-sizing: border-box;
             }
             .text-center { text-align: center; }
             .text-left { text-align: left; }

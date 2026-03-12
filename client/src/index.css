@@ -460,15 +460,18 @@
     vertical-align: middle;
     height: 0.7cm;
     max-height: 0.7cm;
-    overflow: hidden;
+    overflow: hidden !important;
   }
 
   .print-cell-clip {
-    overflow: hidden;
+    overflow: hidden !important;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: nowrap !important;
+    width: 100%;
     max-width: 100%;
     padding: 3px 6px;
+    display: block;
+    box-sizing: border-box;
   }
   
   .print-items-table tbody tr {
