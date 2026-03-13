@@ -4489,22 +4489,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
 
-      // Validate over-receipt: qty must not exceed remaining PO item qty
+      // Validate over-receipt: aggregate qty per PO item, must not exceed remaining
+      const poItemAggregated = new Map<string, { totalQty: number, purchaseOrderId: number, purchaseOrderItemId: number, description: string }>();
       for (const item of validatedData.items) {
         if (item.purchaseOrderId && item.purchaseOrderItemId) {
-          const poData = await storage.getPurchaseOrderWithItems(item.purchaseOrderId);
-          if (poData) {
-            const poItem = poData.items.find((pi: any) => pi.id === item.purchaseOrderItemId);
-            if (poItem) {
-              const ordered = parseFloat(poItem.quantity);
-              const received = parseFloat(poItem.receivedQuantity || '0');
-              const remaining = ordered - received;
-              const requestedQty = parseFloat(String(item.quantity || 0));
-              if (requestedQty > remaining) {
-                return res.status(400).json({
-                  error: `Qty barang "${item.description}" melebihi sisa PO. Sisa: ${remaining}, diminta: ${requestedQty}`
-                });
-              }
+          const key = `${item.purchaseOrderId}-${item.purchaseOrderItemId}`;
+          const existing = poItemAggregated.get(key);
+          const qty = parseFloat(String(item.quantity || 0));
+          if (existing) {
+            existing.totalQty += qty;
+          } else {
+            poItemAggregated.set(key, {
+              totalQty: qty,
+              purchaseOrderId: item.purchaseOrderId,
+              purchaseOrderItemId: item.purchaseOrderItemId,
+              description: item.description || '',
+            });
+          }
+        }
+      }
+      for (const [, agg] of poItemAggregated) {
+        const poData = await storage.getPurchaseOrderWithItems(agg.purchaseOrderId);
+        if (poData) {
+          const poItem = poData.items.find((pi: any) => pi.id === agg.purchaseOrderItemId);
+          if (poItem) {
+            const ordered = parseFloat(poItem.quantity);
+            const received = parseFloat(poItem.receivedQuantity || '0');
+            const remaining = ordered - received;
+            if (agg.totalQty > remaining) {
+              return res.status(400).json({
+                error: `Qty barang "${agg.description}" melebihi sisa PO. Sisa: ${remaining}, diminta: ${agg.totalQty}`
+              });
             }
           }
         }
@@ -4638,6 +4653,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
+
+      if (validatedData.items) {
+        const existingGR = await storage.getGoodsReceiptWithItems(receiptId);
+        const oldQtyByPoItem = new Map<string, number>();
+        if (existingGR?.items) {
+          for (const item of existingGR.items) {
+            if (item.purchaseOrderId && item.purchaseOrderItemId) {
+              const key = `${item.purchaseOrderId}-${item.purchaseOrderItemId}`;
+              oldQtyByPoItem.set(key, (oldQtyByPoItem.get(key) || 0) + parseFloat(String(item.quantity || 0)));
+            }
+          }
+        }
+
+        const newAgg = new Map<string, { totalQty: number, purchaseOrderId: number, purchaseOrderItemId: number, description: string }>();
+        for (const item of validatedData.items) {
+          if (item.purchaseOrderId && item.purchaseOrderItemId) {
+            const key = `${item.purchaseOrderId}-${item.purchaseOrderItemId}`;
+            const existing = newAgg.get(key);
+            const qty = parseFloat(String(item.quantity || 0));
+            if (existing) {
+              existing.totalQty += qty;
+            } else {
+              newAgg.set(key, { totalQty: qty, purchaseOrderId: item.purchaseOrderId, purchaseOrderItemId: item.purchaseOrderItemId, description: item.description || '' });
+            }
+          }
+        }
+
+        for (const [key, agg] of newAgg) {
+          const poData = await storage.getPurchaseOrderWithItems(agg.purchaseOrderId);
+          if (poData) {
+            const poItem = poData.items.find((pi: any) => pi.id === agg.purchaseOrderItemId);
+            if (poItem) {
+              const ordered = parseFloat(poItem.quantity);
+              const received = parseFloat(poItem.receivedQuantity || '0');
+              const oldQty = oldQtyByPoItem.get(key) || 0;
+              const remaining = ordered - received + oldQty;
+              if (agg.totalQty > remaining) {
+                return res.status(400).json({
+                  error: `Qty barang "${agg.description}" melebihi sisa PO. Sisa: ${remaining}, diminta: ${agg.totalQty}`
+                });
+              }
+            }
+          }
+        }
+      }
 
       const updatedGoodsReceipt = await storage.updateGoodsReceipt(
         receiptId,
