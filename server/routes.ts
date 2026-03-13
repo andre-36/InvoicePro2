@@ -4826,45 +4826,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get goods receipt to find store and receipt number
         const goodsReceipt = await storage.getGoodsReceipt(goodsReceiptId);
         if (goodsReceipt) {
-          // Check if store has auto transaction setting for goods receipt payments
-          const store = await storage.getStore(goodsReceipt.storeId);
-          const outflowCategoryId = store?.goodsReceiptPaymentCategoryId;
-
-          if (outflowCategoryId) {
-            // Get category name
-            const outflowCategory =
-              await storage.getOutflowCategory(outflowCategoryId);
-            const categoryName = outflowCategory?.name || "supplier_payment";
-
-            // Get supplier name for description
-            let supplierName = "";
-            if (goodsReceipt.supplierId) {
-              const supplier = await storage.getSupplier(
-                goodsReceipt.supplierId,
-              );
-              supplierName = supplier?.name || "";
-            }
-
-            // Create a transaction entry for this payment as expense
-            const transactionData: any = {
-              storeId: goodsReceipt.storeId,
-              type: "expense" as const,
-              category: categoryName,
-              amount: String(validatedData.amount),
-              date: validatedData.paymentDate,
-              description: `Payment for goods receipt ${goodsReceipt.receiptNumber}${supplierName ? ` - ${supplierName}` : ""}`,
-              referenceNumber: `GR #${goodsReceipt.receiptNumber}`,
-              goodsReceiptId: goodsReceiptId,
-              goodsReceiptPaymentId: newPayment.id,
-              accountId: validatedData.cashAccountId || undefined,
-            };
-
-            console.log(
-              "Creating goods receipt payment transaction:",
-              transactionData,
-            );
-            await storage.createTransaction(transactionData);
+          // Get supplier name for description
+          let supplierName = goodsReceipt.supplierName || "";
+          if (!supplierName && goodsReceipt.supplierId) {
+            const supplier = await storage.getSupplier(goodsReceipt.supplierId);
+            supplierName = supplier?.name || "";
           }
+
+          // Create an expense transaction for this payment
+          const transactionData: any = {
+            storeId: goodsReceipt.storeId,
+            type: "expense" as const,
+            amount: String(validatedData.amount),
+            date: validatedData.paymentDate,
+            description: `Pembayaran GR: ${goodsReceipt.receiptNumber}${supplierName ? ` - ${supplierName}` : ""}`,
+            referenceNumber: `GR #${goodsReceipt.receiptNumber}`,
+            goodsReceiptId: goodsReceiptId,
+            goodsReceiptPaymentId: newPayment.id,
+            cashAccountId: validatedData.cashAccountId || null,
+          };
+
+          if (validatedData.cashAccountId) {
+            transactionData.accountId = validatedData.cashAccountId;
+          }
+
+          await storage.createTransaction(transactionData);
         }
 
         const grPayAmt = new Intl.NumberFormat("id-ID").format(

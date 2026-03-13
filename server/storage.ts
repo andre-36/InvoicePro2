@@ -4067,21 +4067,6 @@ export class DatabaseStorage implements IStorage {
 
       await tx.update(goodsReceipts).set({ amountPaid: String(totalPaid), status: newStatus, updatedAt: new Date() }).where(eq(goodsReceipts.id, payment.goodsReceiptId));
 
-      // Create expense transaction for this payment
-      const paymentDateObj = new Date(payment.paymentDate || new Date());
-      const txData: any = {
-        storeId: receipt.storeId,
-        type: 'expense',
-        amount: payment.amount.toString(),
-        description: `Pembayaran GR ${receipt.receiptNumber}`,
-        date: paymentDateObj.toISOString().split('T')[0],
-        goodsReceiptId: payment.goodsReceiptId,
-      };
-      if (payment.cashAccountId) {
-        txData.accountId = payment.cashAccountId;
-      }
-      await tx.insert(transactions).values(txData);
-
       return newPayment;
     });
   }
@@ -4120,39 +4105,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async deleteGoodsReceiptPayment(id: number, deleteTransaction: boolean = true): Promise<void> {
+  async deleteGoodsReceiptPayment(id: number): Promise<void> {
     await withTransaction(async (tx) => {
       const [payment] = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
       if (!payment) return;
 
-      // Delete associated expense transaction using payment date as additional identifier
       const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, payment.goodsReceiptId));
-      if (receipt && deleteTransaction) {
-        const paymentAmount = parseFloat(String(payment.amount));
-        const paymentDate = payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : null;
-        
-        // Find transaction matching amount AND date for more precise deletion
-        const expenseTransactions = await tx
-          .select()
-          .from(transactions)
-          .where(
-            and(
-              eq(transactions.storeId, receipt.storeId),
-              eq(transactions.type, 'expense'),
-              eq(transactions.goodsReceiptId, payment.goodsReceiptId)
-            )
-          );
-        
-        for (const txn of expenseTransactions) {
-          const txnAmount = parseFloat(String(txn.amount));
-          const txnDate = txn.date;
-          // Match by amount and date for precise deletion
-          if (Math.abs(txnAmount - paymentAmount) < 0.01 && (!paymentDate || txnDate === paymentDate)) {
-            await tx.delete(transactions).where(eq(transactions.id, txn.id));
-            break; // Only delete one matching transaction
-          }
-        }
-      }
 
       await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
 
