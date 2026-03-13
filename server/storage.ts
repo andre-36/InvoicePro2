@@ -3897,7 +3897,13 @@ export class DatabaseStorage implements IStorage {
       const grItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
       await this.reversePOReceivedFromGR(tx, grItems);
 
-      // Delete payments first
+      // Delete transactions linked to GR payments first
+      const grPayments = await tx.select({ id: goodsReceiptPayments.id }).from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id));
+      for (const payment of grPayments) {
+        await tx.delete(transactions).where(eq(transactions.goodsReceiptPaymentId, payment.id));
+      }
+
+      // Delete payments
       await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id));
       
       // Delete items
@@ -4881,15 +4887,20 @@ export class DatabaseStorage implements IStorage {
 
   async deletePurchaseOrder(id: number): Promise<void> {
     return withTransaction(async (tx) => {
-      // Delete purchase order items (cascading)
-      await tx
-        .delete(purchaseOrderItems)
-        .where(eq(purchaseOrderItems.purchaseOrderId, id));
+      // Delete transactions linked to PO payments first
+      const poPayments = await tx.select({ id: purchaseOrderPayments.id }).from(purchaseOrderPayments).where(eq(purchaseOrderPayments.purchaseOrderId, id));
+      for (const payment of poPayments) {
+        await tx.delete(transactions).where(eq(transactions.purchaseOrderPaymentId, payment.id));
+      }
+
+      // Delete PO payments
+      await tx.delete(purchaseOrderPayments).where(eq(purchaseOrderPayments.purchaseOrderId, id));
+
+      // Delete purchase order items
+      await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
 
       // Delete the purchase order
-      await tx
-        .delete(purchaseOrders)
-        .where(eq(purchaseOrders.id, id));
+      await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
     });
   }
 
