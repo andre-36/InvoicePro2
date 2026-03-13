@@ -226,6 +226,7 @@ export interface IStorage {
   updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
   receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder>;
+  updatePOReceivedFromGR(purchaseOrderId: number, items: Array<{ purchaseOrderItemId: number, quantityReceived: number }>): Promise<void>;
   deletePurchaseOrder(id: number): Promise<void>;
   getProductPendingPOs(productId: number, storeId: number): Promise<Array<{
     purchaseOrderId: number;
@@ -4682,6 +4683,76 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       return updatedPurchaseOrder;
+    });
+  }
+
+  async updatePOReceivedFromGR(purchaseOrderId: number, items: Array<{ purchaseOrderItemId: number, quantityReceived: number }>): Promise<void> {
+    return withTransaction(async (tx) => {
+      const [purchaseOrder] = await tx
+        .select()
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.id, purchaseOrderId));
+
+      if (!purchaseOrder) return;
+
+      for (const item of items) {
+        const [poItem] = await tx
+          .select()
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+
+        if (!poItem) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.min(
+          currentReceived + item.quantityReceived,
+          parseFloat(poItem.quantity)
+        );
+
+        await tx
+          .update(purchaseOrderItems)
+          .set({
+            receivedQuantity: newReceivedQuantity.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+
+      const allFullyReceived = allItems.every(item =>
+        parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity)
+      );
+
+      const anyReceived = allItems.some(item =>
+        parseFloat(item.receivedQuantity || '0') > 0
+      );
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = purchaseOrder.status;
+      }
+
+      const updateData: any = {
+        status: newStatus as any,
+        updatedAt: new Date()
+      };
+
+      if (newStatus === 'received') {
+        updateData.deliveredDate = new Date();
+      }
+
+      await tx
+        .update(purchaseOrders)
+        .set(updateData)
+        .where(eq(purchaseOrders.id, purchaseOrderId));
     });
   }
 

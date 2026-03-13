@@ -4501,8 +4501,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.items,
       );
 
-      // Check if items are fully covered by prepaid PO payments — if so, mark as paid
+      // Update PO received quantities and status for linked items
       const items = validatedData.items;
+      const poItemsMap = new Map<number, Array<{ purchaseOrderItemId: number, quantityReceived: number }>>();
+      for (const item of items) {
+        if (item.purchaseOrderId && item.purchaseOrderItemId) {
+          const existing = poItemsMap.get(item.purchaseOrderId) || [];
+          existing.push({
+            purchaseOrderItemId: item.purchaseOrderItemId,
+            quantityReceived: parseFloat(String(item.quantity || 0)),
+          });
+          poItemsMap.set(item.purchaseOrderId, existing);
+        }
+      }
+
+      for (const [poId, poItems] of poItemsMap.entries()) {
+        try {
+          await storage.updatePOReceivedFromGR(poId, poItems);
+        } catch (err) {
+          console.error(`Error updating PO ${poId} received quantities:`, err);
+        }
+      }
+
+      // Check if items are fully covered by prepaid PO payments — if so, mark as paid
       const uniquePOIds = [
         ...new Set(
           items.filter((i) => i.purchaseOrderId).map((i) => i.purchaseOrderId!),
@@ -4517,7 +4538,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const poPaidAmount = await storage.getPurchaseOrderPaidAmount(poId);
             const poTotal = parseFloat(po.totalAmount);
             if (poPaidAmount >= poTotal) {
-              // PO is fully paid — sum up GR items from this PO
               for (const item of items) {
                 if (item.purchaseOrderId === poId) {
                   prepaidTotal += parseFloat(String(item.totalAmount || 0));
@@ -4532,9 +4552,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (prepaidTotal + grPaid >= grTotal) {
           await storage.updateGoodsReceipt(newGoodsReceipt.id, {
             status: "paid" as any,
-          });
+            amountPaid: grTotal.toString(),
+          } as any);
           const updated = await storage.getGoodsReceipt(newGoodsReceipt.id);
           if (updated) {
+            logActivity(req, {
+              action: "create",
+              entity: "goods_receipt",
+              entityId: newGoodsReceipt.id,
+              entityLabel: newGoodsReceipt.receiptNumber,
+              description: `Membuat Penerimaan Barang ${newGoodsReceipt.receiptNumber}`,
+            });
             return res.status(201).json(updated);
           }
         }

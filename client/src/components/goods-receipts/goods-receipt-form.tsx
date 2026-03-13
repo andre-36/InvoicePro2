@@ -456,9 +456,12 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       // Filter by status - include pending, sent, and partial (not received or cancelled)
       if (!['pending', 'sent', 'partial'].includes(po.status)) return false;
       
-      // Filter by product - PO must contain the selected product
-      const hasProduct = po.items?.some(item => item.productId === productId);
-      if (!hasProduct) return false;
+      // Filter by product - PO must contain the selected product with remaining unreceived quantity
+      const hasUnreceivedProduct = po.items?.some(item => 
+        item.productId === productId && 
+        parseFloat(item.receivedQuantity || '0') < parseFloat(item.quantity)
+      );
+      if (!hasUnreceivedProduct) return false;
       
       // Filter by search query
       if (poSearchQuery && !po.purchaseOrderNumber.toLowerCase().includes(poSearchQuery.toLowerCase())) {
