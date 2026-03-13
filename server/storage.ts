@@ -3737,6 +3737,9 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (items) {
+        const oldItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
+        await this.reversePOReceivedFromGR(tx, oldItems);
+
         await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
 
         const hasReturns = items.some(item => parseFloat(String(item.returnQuantity || 0)) > 0);
@@ -3750,10 +3753,68 @@ export class DatabaseStorage implements IStorage {
         }
 
         await tx.update(goodsReceipts).set({ hasReturns }).where(eq(goodsReceipts.id, id));
+
+        await this.applyPOReceivedFromGR(tx, items);
       }
 
       return updatedReceipt;
     });
+  }
+
+  private async applyPOReceivedFromGR(tx: any, grItems: any[]): Promise<void> {
+    const poItemsMap = new Map<number, Array<{ purchaseOrderItemId: number, quantityReceived: number }>>();
+    for (const item of grItems) {
+      const poId = item.purchaseOrderId;
+      const poItemId = item.purchaseOrderItemId;
+      if (poId && poItemId) {
+        const existing = poItemsMap.get(poId) || [];
+        existing.push({
+          purchaseOrderItemId: poItemId,
+          quantityReceived: parseFloat(String(item.quantity || 0)),
+        });
+        poItemsMap.set(poId, existing);
+      }
+    }
+
+    for (const [poId, items] of poItemsMap.entries()) {
+      const [purchaseOrder] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!purchaseOrder) continue;
+
+      for (const item of items) {
+        const [poItem] = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+        if (!poItem || poItem.purchaseOrderId !== poId) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.min(
+          currentReceived + item.quantityReceived,
+          parseFloat(poItem.quantity)
+        );
+
+        await tx.update(purchaseOrderItems)
+          .set({ receivedQuantity: newReceivedQuantity.toString(), updatedAt: new Date() })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+      const allFullyReceived = allItems.every((item: any) => parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity));
+      const anyReceived = allItems.some((item: any) => parseFloat(item.receivedQuantity || '0') > 0);
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'pending';
+      }
+
+      const updateData: any = { status: newStatus as any, updatedAt: new Date() };
+      if (newStatus === 'received') updateData.deliveredDate = new Date();
+
+      await tx.update(purchaseOrders)
+        .set(updateData)
+        .where(eq(purchaseOrders.id, poId));
+    }
   }
 
   async updateGoodsReceiptStatus(id: number, status: string): Promise<GoodsReceipt> {

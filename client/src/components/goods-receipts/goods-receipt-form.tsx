@@ -863,6 +863,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                           <div className="mt-2">
                             {totalPaid >= totalAmount && totalAmount > 0 ? (
                               <Badge className="bg-green-500 text-white">Terbayar</Badge>
+                            ) : totalPaid > 0 ? (
+                              <Badge className="bg-yellow-500 text-white">Terbayar Sebagian</Badge>
                             ) : (
                               <Badge variant="destructive">Belum Terbayar</Badge>
                             )}

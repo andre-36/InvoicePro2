@@ -93,10 +93,9 @@ export default function GoodsReceiptsPage() {
           receipt.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (receipt.supplierDocNumber && receipt.supplierDocNumber.toLowerCase().includes(searchQuery.toLowerCase()));
         
-        // Calculate payment status for filtering
         const total = parseFloat(receipt.totalAmount) || 0;
         const paid = parseFloat(receipt.amountPaid) || 0;
-        const paymentStatus = paid >= total && total > 0 ? 'paid' : 'unpaid';
+        const paymentStatus = (paid >= total && total > 0) ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
         const matchesStatus = statusFilter === 'all' || paymentStatus === statusFilter;
         
         return matchesSearch && matchesStatus;
