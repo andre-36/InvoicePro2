@@ -4701,7 +4701,7 @@ export class DatabaseStorage implements IStorage {
           .from(purchaseOrderItems)
           .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
 
-        if (!poItem) continue;
+        if (!poItem || poItem.purchaseOrderId !== purchaseOrderId) continue;
 
         const currentReceived = parseFloat(poItem.receivedQuantity || '0');
         const newReceivedQuantity = Math.min(
