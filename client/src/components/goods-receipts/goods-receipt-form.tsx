@@ -80,6 +80,7 @@ interface PurchaseOrderWithItems {
     baseCost?: string | null; 
     baseQuantity?: string | null;
     productUnitId?: number | null;
+    receivedQuantity?: string;
   }[];
 }
 
@@ -174,7 +175,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       supplierDocNumber: "",
       receiptDate: new Date(),
       dueDate: null as Date | null,
-      status: "draft" as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
+      status: "confirmed" as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
       subtotal: "0",
       taxRate: "0",
       taxAmount: "0",

@@ -4489,6 +4489,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(schema, req, res);
       if (!validatedData) return;
 
+      // Validate over-receipt: qty must not exceed remaining PO item qty
+      for (const item of validatedData.items) {
+        if (item.purchaseOrderId && item.purchaseOrderItemId) {
+          const poData = await storage.getPurchaseOrderWithItems(item.purchaseOrderId);
+          if (poData) {
+            const poItem = poData.items.find((pi: any) => pi.id === item.purchaseOrderItemId);
+            if (poItem) {
+              const ordered = parseFloat(poItem.quantity);
+              const received = parseFloat(poItem.receivedQuantity || '0');
+              const remaining = ordered - received;
+              const requestedQty = parseFloat(String(item.quantity || 0));
+              if (requestedQty > remaining) {
+                return res.status(400).json({
+                  error: `Qty barang "${item.description}" melebihi sisa PO. Sisa: ${remaining}, diminta: ${requestedQty}`
+                });
+              }
+            }
+          }
+        }
+      }
+
       // Convert all Date objects to strings (drizzle-zod coerces date columns to Date objects)
       const grData = { ...validatedData.goodsReceipt } as any;
       for (const key of Object.keys(grData)) {

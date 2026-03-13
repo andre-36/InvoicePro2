@@ -3832,6 +3832,10 @@ export class DatabaseStorage implements IStorage {
         await this.reverseGoodsReceiptStock(tx, id);
       }
 
+      // Reverse PO received quantities for linked items
+      const grItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
+      await this.reversePOReceivedFromGR(tx, grItems);
+
       // Delete payments first
       await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id));
       
@@ -3841,6 +3845,54 @@ export class DatabaseStorage implements IStorage {
       // Delete the receipt
       await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, id));
     });
+  }
+
+  private async reversePOReceivedFromGR(tx: any, grItems: any[]): Promise<void> {
+    const poItemsMap = new Map<number, Array<{ purchaseOrderItemId: number, quantityToReverse: number }>>();
+    for (const item of grItems) {
+      if (item.purchaseOrderId && item.purchaseOrderItemId) {
+        const existing = poItemsMap.get(item.purchaseOrderId) || [];
+        existing.push({
+          purchaseOrderItemId: item.purchaseOrderItemId,
+          quantityToReverse: parseFloat(String(item.quantity || 0)),
+        });
+        poItemsMap.set(item.purchaseOrderId, existing);
+      }
+    }
+
+    for (const [poId, items] of poItemsMap.entries()) {
+      const [purchaseOrder] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!purchaseOrder) continue;
+
+      for (const item of items) {
+        const [poItem] = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+        if (!poItem || poItem.purchaseOrderId !== poId) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.max(0, currentReceived - item.quantityToReverse);
+
+        await tx.update(purchaseOrderItems)
+          .set({ receivedQuantity: newReceivedQuantity.toString(), updatedAt: new Date() })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+      const allFullyReceived = allItems.every((item: any) => parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity));
+      const anyReceived = allItems.some((item: any) => parseFloat(item.receivedQuantity || '0') > 0);
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'pending';
+      }
+
+      await tx.update(purchaseOrders)
+        .set({ status: newStatus as any, updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, poId));
+    }
   }
 
   async getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string> {
@@ -4378,10 +4430,15 @@ export class DatabaseStorage implements IStorage {
     for (const po of pos) {
       const items = await db
         .select({
+          id: purchaseOrderItems.id,
           productId: purchaseOrderItems.productId,
           description: purchaseOrderItems.description,
           quantity: purchaseOrderItems.quantity,
           unitCost: purchaseOrderItems.unitCost,
+          baseCost: purchaseOrderItems.baseCost,
+          baseQuantity: purchaseOrderItems.baseQuantity,
+          productUnitId: purchaseOrderItems.productUnitId,
+          receivedQuantity: purchaseOrderItems.receivedQuantity,
         })
         .from(purchaseOrderItems)
         .where(eq(purchaseOrderItems.purchaseOrderId, po.id));
@@ -4389,10 +4446,15 @@ export class DatabaseStorage implements IStorage {
       result.push({
         ...po,
         items: items.map(item => ({
+          id: item.id,
           productId: item.productId,
           description: item.description,
           quantity: item.quantity,
           unitCost: item.unitCost,
+          baseCost: item.baseCost,
+          baseQuantity: item.baseQuantity,
+          productUnitId: item.productUnitId,
+          receivedQuantity: item.receivedQuantity || '0',
         })),
       });
     }

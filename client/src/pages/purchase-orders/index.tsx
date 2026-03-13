@@ -47,6 +47,7 @@ type PurchaseOrder = {
   orderDate: string;
   totalAmount: string;
   status: 'pending' | 'partial' | 'received' | 'cancelled';
+  isPrepaid: boolean;
 };
 
 type PendingPOItem = {
@@ -61,7 +62,7 @@ type PendingPOItem = {
   pendingQty: number;
 };
 
-type PurchaseOrderStatus = 'all' | 'pending' | 'partial' | 'received' | 'cancelled';
+type PurchaseOrderStatus = 'all' | 'pending' | 'partial' | 'received';
 
 export default function PurchaseOrdersPage() {
   const [, navigate] = useLocation();
@@ -101,26 +102,6 @@ export default function PurchaseOrdersPage() {
     }
   });
   
-  // Update purchase order status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: string }) => {
-      return apiRequest('PATCH', `/api/purchase-orders/${id}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
-      toast({
-        title: "Status updated",
-        description: "The purchase order status has been updated successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update status: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
 
   // Filter purchase orders based on search query and status
   const filteredPurchaseOrders = purchaseOrders
@@ -146,6 +127,8 @@ export default function PurchaseOrdersPage() {
         return <Badge className="bg-green-100 text-green-800">Received</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+      case 'sent':
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">Sent</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -222,7 +205,6 @@ export default function PurchaseOrdersPage() {
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="partial">Partial</SelectItem>
                       <SelectItem value="received">Received</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -280,11 +262,18 @@ export default function PurchaseOrdersPage() {
                   {filteredPurchaseOrders.map((purchaseOrder) => (
                     <TableRow key={purchaseOrder.id} className="group" data-testid={`row-purchase-order-${purchaseOrder.id}`}>
                       <TableCell className="font-medium text-primary">
-                        <Link href={`/purchase-orders/${purchaseOrder.id}`}>
-                          <a className="hover:underline" data-testid={`link-purchase-order-${purchaseOrder.id}`}>
-                            {purchaseOrder.purchaseOrderNumber}
-                          </a>
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/purchase-orders/${purchaseOrder.id}`}>
+                            <a className="hover:underline" data-testid={`link-purchase-order-${purchaseOrder.id}`}>
+                              {purchaseOrder.purchaseOrderNumber}
+                            </a>
+                          </Link>
+                          {purchaseOrder.isPrepaid && (
+                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] px-1.5 py-0">
+                              Prepaid
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell data-testid={`text-supplier-${purchaseOrder.id}`}>{purchaseOrder.supplierName}</TableCell>
                       <TableCell data-testid={`text-order-date-${purchaseOrder.id}`}>{formatDate(purchaseOrder.orderDate)}</TableCell>
@@ -308,25 +297,6 @@ export default function PurchaseOrdersPage() {
                             <DropdownMenuItem onClick={() => navigate(`/purchase-orders/${purchaseOrder.id}/edit`)} data-testid={`button-edit-${purchaseOrder.id}`}>
                               <FilePenLine className="mr-2 h-4 w-4" />
                               <span>Edit</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled={purchaseOrder.status === 'received'}>
-                              <Select
-                                onValueChange={(value) => {
-                                  updateStatusMutation.mutate({ id: purchaseOrder.id, status: value });
-                                }}
-                                value={purchaseOrder.status}
-                              >
-                                <SelectTrigger className="border-none p-0 h-auto font-normal shadow-none">
-                                  <span className="text-sm">Change Status</span>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="partial">Partial</SelectItem>
-                                  <SelectItem value="received">Received</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                              </Select>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <AlertDialog>
