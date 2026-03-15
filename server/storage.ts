@@ -6719,6 +6719,17 @@ export class DatabaseStorage implements IStorage {
       // If return is completed (e.g., refund type), create batches for returned items
       if (returnData.status === 'completed') {
         await this.createBatchesForReturn(tx, newReturn, items);
+
+        if (returnData.returnType === 'refund' || returnData.returnType === 'immediate_refund') {
+          await tx.insert(transactions).values({
+            storeId: newReturn.storeId,
+            type: 'expense',
+            amount: newReturn.totalAmount.toString(),
+            description: `Refund Retur ${newReturn.returnNumber}`,
+            date: new Date().toISOString().split('T')[0],
+            returnId: newReturn.id
+          });
+        }
       }
 
       return newReturn;
@@ -6871,7 +6882,6 @@ export class DatabaseStorage implements IStorage {
         const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, id));
         await this.createBatchesForReturn(tx, updated, items);
 
-        // If this is a refund (not credit note), create expense transaction
         if (existingReturn.returnType === 'refund' || existingReturn.returnType === 'immediate_refund') {
           await tx.insert(transactions).values({
             storeId: existingReturn.storeId,
@@ -6884,20 +6894,41 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      if (previousStatus === 'completed' && status !== 'completed' && existingReturn) {
+        await tx.delete(transactions).where(eq(transactions.returnId, id));
+
+        if (existingReturn.returnNumber) {
+          await tx.delete(productBatches).where(
+            eq(productBatches.batchNumber, existingReturn.returnNumber)
+          );
+        }
+      }
+
       return updated;
     });
   }
 
   async deleteReturn(id: number): Promise<void> {
-    // Check if return has usages before deleting
     const [existingReturn] = await db.select().from(returns).where(eq(returns.id, id));
-    if (existingReturn && parseFloat(existingReturn.usedAmount || '0') > 0) {
+    if (!existingReturn) return;
+
+    if (parseFloat(existingReturn.usedAmount || '0') > 0) {
       throw new Error("Cannot delete return with existing usages");
     }
-    
-    await db.delete(returnItems).where(eq(returnItems.returnId, id));
-    await db.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
-    await db.delete(returns).where(eq(returns.id, id));
+
+    await withTransaction(async (tx) => {
+      await tx.delete(transactions).where(eq(transactions.returnId, id));
+
+      if (existingReturn.status === 'completed' && existingReturn.returnNumber) {
+        await tx.delete(productBatches).where(
+          eq(productBatches.batchNumber, existingReturn.returnNumber)
+        );
+      }
+
+      await tx.delete(returnItems).where(eq(returnItems.returnId, id));
+      await tx.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
+      await tx.delete(returns).where(eq(returns.id, id));
+    });
   }
 
   async getNextReturnNumber(returnDate?: Date): Promise<string> {

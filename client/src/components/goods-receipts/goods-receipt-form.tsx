@@ -532,7 +532,13 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       navigate('/goods-receipts');
     },
     onError: (error) => {
-      toast({ title: "Error", description: `Failed to create goods receipt: ${error.message}`, variant: "destructive" });
+      let msg = error.message;
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) msg = parsed.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   });
 
@@ -545,7 +551,13 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       toast({ title: "Success", description: "Goods receipt updated successfully." });
     },
     onError: (error) => {
-      toast({ title: "Error", description: `Failed to update goods receipt: ${error.message}`, variant: "destructive" });
+      let msg = error.message;
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) msg = parsed.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   });
 
