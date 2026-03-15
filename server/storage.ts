@@ -6909,14 +6909,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteReturn(id: number): Promise<void> {
-    const [existingReturn] = await db.select().from(returns).where(eq(returns.id, id));
-    if (!existingReturn) return;
-
-    if (parseFloat(existingReturn.usedAmount || '0') > 0) {
-      throw new Error("Cannot delete return with existing usages");
-    }
-
     await withTransaction(async (tx) => {
+      const [existingReturn] = await tx.select().from(returns).where(eq(returns.id, id));
+      if (!existingReturn) return;
+
+      if (parseFloat(existingReturn.usedAmount || '0') > 0) {
+        throw new Error("Cannot delete return with existing usages");
+      }
+
       await tx.delete(transactions).where(eq(transactions.returnId, id));
 
       if (existingReturn.status === 'completed' && existingReturn.returnNumber) {

@@ -5044,11 +5044,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           items,
         );
 
-        // If it's a refund, mark it as completed immediately
-        if (validatedData.returnType === "refund") {
-          await storage.updateReturnStatus(newReturn.id, "completed");
-        }
-
         const retType =
           validatedData.returnType === "refund" ? "Refund" : "Credit Note";
         logActivity(req, {
