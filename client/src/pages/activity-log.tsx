@@ -30,6 +30,7 @@ type User = {
   username: string;
   fullName: string;
   role: string;
+  permissions?: string[];
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -99,7 +100,7 @@ export default function ActivityLogPage() {
   const [filterDateTo, setFilterDateTo] = useState("");
 
   const { data: currentUser } = useQuery<User>({
-    queryKey: ['/api/auth/me'],
+    queryKey: ['/api/user'],
   });
 
   const { data: usersData } = useQuery<User[]>({

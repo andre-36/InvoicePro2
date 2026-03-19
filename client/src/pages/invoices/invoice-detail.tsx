@@ -285,15 +285,22 @@ export default function InvoiceDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       toast({
         title: "Invoice di-void",
         description: "Invoice berhasil di-void.",
       });
     },
     onError: (error: Error) => {
+      let msg = error.message || '';
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        msg = parsed.message || parsed.error || msg;
+      } catch {}
       toast({
         title: "Tidak dapat void invoice",
-        description: error.message,
+        description: msg,
         variant: "destructive",
       });
     }
@@ -307,6 +314,7 @@ export default function InvoiceDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       toast({
         title: "Status updated",
         description: "The invoice status has been updated successfully.",
@@ -399,6 +407,7 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -444,6 +453,7 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       setPaymentDialogOpen(false);
       setEditingPayment(null);
       setPaymentForm({
@@ -478,6 +488,7 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -521,6 +532,7 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'payments'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`], refetchType: 'all' });
       if (invoice) {
         queryClient.invalidateQueries({ queryKey: [`/api/stores/${invoice.storeId}/transactions`], refetchType: 'all' });
       }
@@ -602,6 +614,7 @@ export default function InvoiceDetailPage({
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id, 'delivery-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/invoices`] });
       queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/delivery-notes`] });
       queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/products/stock`] });
       toast({
@@ -964,11 +977,11 @@ export default function InvoiceDetailPage({
           <tbody>
             ${pageItems.map((item: any, idx: number) => `
               <tr>
-                <td class="text-center">${startIdx + idx + 1}</td>
-                <td class="text-center">${item.invoiceItem?.product?.sku || '-'}</td>
-                <td class="text-left">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</td>
-                <td class="text-center">${item.deliveredQuantity}</td>
-                <td class="text-center">${item.invoiceItem?.unitLabel || '-'}</td>
+                <td class="text-center"><div class="cell-clip">${startIdx + idx + 1}</div></td>
+                <td class="text-center"><div class="cell-clip" style="font-size:7pt">${item.invoiceItem?.product?.sku || '-'}</div></td>
+                <td class="text-left"><div class="cell-clip">${item.invoiceItem?.product?.name || item.invoiceItem?.description || ''}</div></td>
+                <td class="text-center"><div class="cell-clip">${item.deliveredQuantity}</div></td>
+                <td class="text-center"><div class="cell-clip">${item.invoiceItem?.unitLabel || '-'}</div></td>
                 <td class="text-center"><span class="check-box"></span></td>
               </tr>
             `).join('')}
@@ -1155,11 +1168,23 @@ export default function InvoiceDetailPage({
             }
             th, td {
               border: 1px solid #333;
-              padding: 4px 6px;
+              padding: 0;
+              overflow: hidden;
             }
             th {
+              padding: 4px 6px;
               background-color: #f0f0f0;
               font-weight: bold;
+            }
+            .cell-clip {
+              display: block;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              width: 100%;
+              max-width: 100%;
+              padding: 4px 6px;
+              box-sizing: border-box;
             }
             .text-center { text-align: center; }
             .text-left { text-align: left; }
@@ -1223,10 +1248,18 @@ export default function InvoiceDetailPage({
         frameDoc.write(printContent);
         frameDoc.close();
         
-        printFrame.onload = () => {
+        printFrame.onload = async () => {
+          const images = Array.from(printFrame.contentDocument?.images || []);
+          await Promise.all(images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise<void>(resolve => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 3000);
+            });
+          }));
           logPrint('delivery_note', deliveryNote.id, deliveryNote.deliveryNumber, `Mencetak Surat Jalan ${deliveryNote.deliveryNumber}`);
           printFrame.contentWindow?.print();
-          // Remove iframe after printing
           setTimeout(() => {
             document.body.removeChild(printFrame);
           }, 1000);
@@ -1276,10 +1309,10 @@ export default function InvoiceDetailPage({
   const canAddPayment = true;
 
   const handlePaymentSubmit = () => {
-    if (!paymentForm.amount) {
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
       toast({
-        title: "Error",
-        description: "Amount is required",
+        title: "Jumlah tidak valid",
+        description: "Jumlah pembayaran harus lebih dari 0.",
         variant: "destructive",
       });
       return;
@@ -1493,13 +1526,13 @@ export default function InvoiceDetailPage({
               <tbody>
                 {page.items.map((item, itemIndex) => (
                   <tr key={itemIndex}>
-                    <td style={{ textAlign: 'center' }}>{getRunningItemNumber(pageIndex, itemIndex)}</td>
-                    <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
-                    <td style={{ textAlign: 'left' }}>{item.description}</td>
-                    <td style={{ textAlign: 'center' }}>{formatQuantity(item.quantity)}</td>
-                    <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.unitPrice)}</td>
-                    <td style={{ textAlign: 'center' }}>{formatCurrencyAccounting(item.totalAmount)}</td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{getRunningItemNumber(pageIndex, itemIndex)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip" style={{ fontSize: '7pt' }}>{(item as any).productCode || (item as any).productSku || '-'}</div></td>
+                    <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatQuantity(item.quantity)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{(item as any).unitLabel || '-'}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrencyAccounting(item.unitPrice)}</div></td>
+                    <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrencyAccounting(item.totalAmount)}</div></td>
                   </tr>
                 ))}
               </tbody>
@@ -1600,7 +1633,7 @@ export default function InvoiceDetailPage({
           <Button
             variant="outline"
             className="gap-1"
-            onClick={() => { logPrint('invoice', invoice?.id ?? null, invoice?.invoiceNumber ?? '', `Mencetak Invoice ${invoice?.invoiceNumber}`); window.print(); }}
+            onClick={async () => { logPrint('invoice', invoice?.id ?? null, invoice?.invoiceNumber ?? '', `Mencetak Invoice ${invoice?.invoiceNumber}`); const logoImg = document.querySelector('.print-only .print-logo-image') as HTMLImageElement | null; if (logoImg && !logoImg.complete) { await new Promise<void>((resolve) => { logoImg.onload = () => resolve(); logoImg.onerror = () => resolve(); setTimeout(resolve, 3000); }); } window.print(); }}
             data-testid="button-print-invoice"
           >
             <Printer className="h-4 w-4" />

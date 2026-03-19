@@ -495,8 +495,17 @@ export default function DeliveryPlanningPage() {
         frameDoc.write(printContent);
         frameDoc.close();
 
-        setTimeout(() => {
+        printFrame.onload = async () => {
           try {
+            const images = Array.from(printFrame.contentDocument?.images || []);
+            await Promise.all(images.map(img => {
+              if (img.complete) return Promise.resolve();
+              return new Promise<void>(resolve => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                setTimeout(resolve, 3000);
+              });
+            }));
             logPrint('planning', null, 'Daftar Pengiriman', `Mencetak daftar pengiriman (${selectedIds.size} surat jalan)`);
             printFrame.contentWindow?.print();
           } catch (e) {
@@ -507,7 +516,7 @@ export default function DeliveryPlanningPage() {
               document.body.removeChild(printFrame);
             }
           }, 2000);
-        }, 250);
+        };
       } else {
         document.body.removeChild(printFrame);
         toast({

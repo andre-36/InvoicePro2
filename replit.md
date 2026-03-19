@@ -76,8 +76,8 @@ Features include comprehensive delivery note management with status tracking, ba
 
 ## Critical Business Logic — Stock Management
 
-### Delivery Note Stock Flow (post-fix)
-Stock is ONLY deducted via `allocateStockOnDelivery` when delivery note status changes to `delivered`. Creating a delivery note (pending status) does NOT deduct stock. Cancelling a pending delivery note requires no stock restoration. Cancelling a delivered note calls `reverseDeliveryNoteStock` which only reverses if `profit != null` (set by allocateStockOnDelivery).
+### Delivery Note Stock Flow (March 2026 redesign)
+Stock is deducted at **delivery note creation** time (not when marked delivered). FIFO batch deduction runs in `createDeliveryNote`, which also calculates and stores `total_cost` and `profit` on the DN record. When the DN is marked "delivered", `allocateStockOnDelivery` only updates `invoices.total_profit` (no stock changes). Cancelling a **pending** DN calls `restorePendingDeliveryNoteStock` which restores `remainingQuantity` AND `reservedQuantity` on batches. Cancelling a **delivered** DN calls `reverseDeliveryNoteStock` which only clears profit (no stock restore — goods already delivered). Reverting delivered→pending does NOT restore stock (goods still in transit), only recalculates invoice profit (excluding this DN). DN cost/profit is preserved so re-delivering correctly re-adds profit to the invoice. Editing items on a pending DN (via `updateDeliveryNoteItems`) restores old stock, deletes old items, inserts new items, and re-deducts stock with new FIFO calculation.
 
 ### Stock Reservation
 `reserveStockForInvoice` is called when invoice status becomes `paid` for delivery/combination type. `deductStockForSelfPickup` is called for self_pickup. `getProductReservedQuantity` SQL query excludes cancelled delivery notes from the "already delivered" count to prevent over-counting available stock.
@@ -90,7 +90,15 @@ Stock is ONLY deducted via `allocateStockOnDelivery` when delivery note status c
 Called when return status changes to `completed`.
 
 ### Key Bugs Fixed (March 2026)
-1. **Double stock deduction**: Removed duplicate FIFO block from `createDeliveryNote` — stock now only deducted via `allocateStockOnDelivery`
+1. **Stock deduction flow redesigned**: FIFO stock deduction now happens in `createDeliveryNote` (at creation time). `allocateStockOnDelivery` only updates `invoices.total_profit` for financial recognition.
 2. **Return batch field names**: Fixed `createBatchesForReturn` to use correct schema fields (`batchNumber`, `capitalCost`, `initialQuantity` instead of `batchReference`, `cost`, `quantity`)
 3. **Return cost lookup**: Fixed to use `capitalCost` from existing batches instead of non-existent `baseCost`/`cost` fields
 4. **Reserved quantity SQL**: Added filter to exclude cancelled delivery notes from delivered quantity subqueries in `getProductReservedQuantity` and `getProductReservations`
+5. **"Failed to fetch" on invoice create/edit**: Root cause was `process.exit(1)` in `server/vite.ts` Vite customLogger.error. When Vite triggered its error logger (for any reason during dev), the entire Node.js process would silently exit, dropping all in-flight POST/PUT requests. Browser received "Failed to fetch". Fixed by removing `process.exit(1)` from the Vite custom logger. Also removed `throw err` from the global Express error handler in `server/index.ts` to prevent Express from crashing on errors.
+6. **Financial report always showing 100% margin (COGS = 0)**: Root cause: `getFinancialReport` read COGS from `invoice_item_batches` table which is NEVER populated. Fixed: COGS now computed from (a) `invoices.total_profit` for self_pickup invoices, (b) `delivery_notes.total_cost` for delivered delivery notes.
+7. **`deductStockForSelfPickup` writing to non-existent DB columns**: Was writing to `invoiceItems.unitCost` (no such column in DB), `invoices.totalCost` (no such column), and `invoices.profit` (column is `totalProfit`). All writes were silently lost. Fixed to write per-item profit to `invoice_items.profit` (exists) and invoice total profit to `invoices.total_profit` (exists).
+8. **`allocateStockOnDelivery` simplified**: Now only updates `invoices.total_profit` (sums all delivered DN profits). `reverseDeliveryNoteStock` clears DN cost/profit and recalculates `invoices.total_profit` (no stock restore for delivered DNs).
+9. **Double counting Pendapatan Lain-lain**: Invoice payment transactions (auto-created with `invoice_payment_id`) were being counted in both `salesRevenue` (from invoices) and `otherIncome` (from transactions). Fixed by adding `AND invoice_payment_id IS NULL` filter to `otherIncome` query in `getFinancialReport`.
+10. **HPP not adjusted for returns**: Return batches (`RTN-*` batch numbers) were not deducted from COGS. Fixed by querying return batch costs in the period and subtracting from total COGS. UI shows "Pengurangan Retur" line in COGS section when returns exist.
+11. **Voided invoices included in reports**: Summary and product reports were counting voided invoices. Fixed by filtering `!isVoided && status !== 'void'` in summary and product report endpoints.
+12. **Product revenue always 0**: Product report used `item.total` (non-existent field) instead of `item.totalAmount`. Fixed field reference.

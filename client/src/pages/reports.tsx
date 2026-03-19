@@ -52,6 +52,7 @@ type FinancialReport = {
     beginningInventory: number;
     purchases: number;
     endingInventory: number;
+    returnCost: number;
     totalCOGS: number;
   };
   expenses: {
@@ -361,8 +362,7 @@ export default function ReportsPage() {
       'profit-loss': 'financial',
       'cash-flow': 'cashflow',
       'products': 'products',
-      'customers': 'customers',
-      'breakdown': 'breakdown'
+      'customers': 'customers'
     };
     
     const endpoint = tabToEndpoint[reportType] || reportType;
@@ -514,81 +514,12 @@ export default function ReportsPage() {
       >
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="summary">Ringkasan</TabsTrigger>
-          <TabsTrigger value="sales-summary">Ringkasan Penjualan</TabsTrigger>
           <TabsTrigger value="profit-loss">Laba Rugi</TabsTrigger>
           <TabsTrigger value="cash-flow">Arus Kas</TabsTrigger>
           <TabsTrigger value="cash-daily">Kas Harian</TabsTrigger>
           <TabsTrigger value="products">Performa Produk</TabsTrigger>
           <TabsTrigger value="customers">Pelanggan</TabsTrigger>
-          <TabsTrigger value="breakdown">Rincian</TabsTrigger>
         </TabsList>
-
-        {/* RINGKASAN PENJUALAN */}
-        <TabsContent value="sales-summary" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard
-              title="Total Penjualan (Gross)"
-              value={formatCurrency(summaryReport?.totalSales || 0)}
-              subtitle="Nilai total invoice dibuat"
-              icon={Receipt}
-              color="blue"
-            />
-            <StatCard
-              title="Total Piutang"
-              value={formatCurrency(summaryReport?.totalReceivables || 0)}
-              subtitle="Tagihan belum dibayar"
-              icon={CreditCard}
-              color="yellow"
-            />
-            <StatCard
-              title="Jumlah Invoice"
-              value={(summaryReport?.invoiceCount || 0).toString()}
-              subtitle="Total dokumen penjualan"
-              icon={FileText}
-              color="purple"
-            />
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ringkasan Penjualan per Pelanggan</CardTitle>
-              <CardDescription>Daftar pelanggan dengan total pembelian tertinggi</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama Pelanggan</TableHead>
-                    <TableHead className="text-right">Jumlah Invoice</TableHead>
-                    <TableHead className="text-right">Total Pembelian</TableHead>
-                    <TableHead className="text-right">Total Dibayar</TableHead>
-                    <TableHead className="text-right">Sisa Piutang</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {customerReport?.topCustomers.map((customer) => (
-                    <TableRow key={customer.clientId}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="text-right">{customer.invoiceCount}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(customer.totalPurchase)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(customer.totalPaid)}</TableCell>
-                      <TableCell className="text-right font-semibold text-yellow-600">
-                        {formatCurrency(customer.outstanding)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!customerReport?.topCustomers.length && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                        Tidak ada data penjualan
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* LABA RUGI */}
         <TabsContent value="profit-loss" className="space-y-6">
@@ -676,6 +607,12 @@ export default function ReportsPage() {
                             <span>Persediaan Akhir</span>
                             <span>({formatCurrency(financialReport.cogs.endingInventory)})</span>
                           </div>
+                          {financialReport.cogs.returnCost > 0 && (
+                            <div className="flex justify-between text-sm text-green-600">
+                              <span>Pengurangan Retur</span>
+                              <span>({formatCurrency(financialReport.cogs.returnCost)})</span>
+                            </div>
+                          )}
                           <div className="flex justify-between font-bold text-sm pt-1 border-t mt-1">
                             <span>Total Harga Pokok Penjualan</span>
                             <span>({formatCurrency(financialReport.cogs.totalCOGS)})</span>
@@ -792,13 +729,19 @@ export default function ReportsPage() {
           ) : summaryReport ? (
             <>
               {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <StatCard
                   title="Total Penjualan"
                   value={formatCurrency(summaryReport.totalSales)}
-                  subtitle={`${summaryReport.invoiceCount} invoice`}
                   icon={Receipt}
                   color="blue"
+                />
+                <StatCard
+                  title="Jumlah Invoice"
+                  value={(summaryReport.invoiceCount || 0).toString()}
+                  subtitle="Total dokumen penjualan"
+                  icon={FileText}
+                  color="purple"
                 />
                 <StatCard
                   title="Uang Masuk"
@@ -921,112 +864,132 @@ export default function ReportsPage() {
           )}
         </TabsContent>
         
-        {/* LAPORAN LABA RUGI */}
-        <TabsContent value="profit-loss" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Laporan Laba Rugi (Income Statement)</CardTitle>
-              <CardDescription>Ringkasan pendapatan, beban, dan laba bersih</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingFinancial ? (
-                <Skeleton className="h-[500px] w-full" />
-              ) : !financialReport ? (
-                <div className="flex justify-center items-center h-[400px]">
-                  <p className="text-gray-500">Failed to load financial report</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Revenue Section */}
-                  <div className="border rounded-lg p-4 bg-green-50">
-                    <h3 className="font-semibold text-lg mb-3">PENDAPATAN</h3>
-                    <div className="space-y-2 ml-4">
-                      <div className="flex justify-between">
-                        <span>Pendapatan Penjualan</span>
-                        <span className="font-medium">{formatCurrency(financialReport.revenue.salesRevenue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Pendapatan Lain-lain</span>
-                        <span className="font-medium">{formatCurrency(financialReport.revenue.otherIncome)}</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t font-semibold text-green-700">
-                        <span>Total Pendapatan</span>
-                        <span>{formatCurrency(financialReport.revenue.totalRevenue)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* COGS Section */}
-                  <div className="border rounded-lg p-4 bg-yellow-50">
-                    <h3 className="font-semibold text-lg mb-3">HARGA POKOK PENJUALAN (HPP)</h3>
-                    <div className="space-y-2 ml-4">
-                      <div className="flex justify-between">
-                        <span>Persediaan Awal</span>
-                        <span className="font-medium">{formatCurrency(financialReport.cogs.beginningInventory)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Pembelian</span>
-                        <span className="font-medium">{formatCurrency(financialReport.cogs.purchases)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Persediaan Akhir</span>
-                        <span className="font-medium">({formatCurrency(financialReport.cogs.endingInventory)})</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t font-semibold text-yellow-700">
-                        <span>Total HPP</span>
-                        <span>{formatCurrency(financialReport.cogs.totalCOGS)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gross Profit */}
-                  <div className="border rounded-lg p-4 bg-blue-50">
-                    <div className="flex justify-between text-lg font-semibold text-blue-700">
-                      <span>LABA KOTOR</span>
-                      <span>{formatCurrency(financialReport.profit.grossProfit)}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Margin: {financialReport.profit.grossProfitMargin.toFixed(2)}%
-                    </p>
-                  </div>
-
-                  {/* Expenses Section */}
-                  <div className="border rounded-lg p-4 bg-red-50">
-                    <h3 className="font-semibold text-lg mb-3">BEBAN OPERASIONAL</h3>
-                    <div className="space-y-2 ml-4">
-                      <div className="flex justify-between">
-                        <span>Beban Operasional</span>
-                        <span className="font-medium">{formatCurrency(financialReport.expenses.operatingExpenses)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Beban Lain-lain</span>
-                        <span className="font-medium">{formatCurrency(financialReport.expenses.otherExpenses)}</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t font-semibold text-red-700">
-                        <span>Total Beban</span>
-                        <span>{formatCurrency(financialReport.expenses.totalExpenses)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Net Profit */}
-                  <div className="border-2 rounded-lg p-4 bg-indigo-50 border-indigo-300">
-                    <div className="flex justify-between text-xl font-bold text-indigo-700">
-                      <span>LABA BERSIH</span>
-                      <span>{formatCurrency(financialReport.profit.netProfit)}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Margin Laba Bersih: {financialReport.profit.netProfitMargin.toFixed(2)}%
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         {/* LAPORAN ARUS KAS */}
         <TabsContent value="cash-flow" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rincian Pendapatan</CardTitle>
+                <CardDescription>Breakdown pendapatan per kategori</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingTransactions ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : incomeByCategory.length === 0 ? (
+                  <div className="flex justify-center items-center h-[400px]">
+                    <p className="text-gray-500">Tidak ada data pendapatan</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={incomeByCategory}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {incomeByCategory.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {incomeByCategory.map((category, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-4 h-4 rounded-full mr-2" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            ></div>
+                            <span className="text-sm font-medium">{category.name}</span>
+                          </div>
+                          <span className="text-sm font-semibold">{formatCurrency(category.value)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-2 border-t font-bold">
+                        <span>Total Pendapatan:</span>
+                        <span className="text-green-600">
+                          {formatCurrency(incomeByCategory.reduce((sum, item) => sum + item.value, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Rincian Beban</CardTitle>
+                <CardDescription>Breakdown beban per kategori</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingTransactions ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : expensesByCategory.length === 0 ? (
+                  <div className="flex justify-center items-center h-[400px]">
+                    <p className="text-gray-500">Tidak ada data beban</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={expensesByCategory}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {expensesByCategory.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {expensesByCategory.map((category, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-4 h-4 rounded-full mr-2" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            ></div>
+                            <span className="text-sm font-medium">{category.name}</span>
+                          </div>
+                          <span className="text-sm font-semibold">{formatCurrency(category.value)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-2 border-t font-bold">
+                        <span>Total Beban:</span>
+                        <span className="text-red-600">
+                          {formatCurrency(expensesByCategory.reduce((sum, item) => sum + item.value, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Laporan Arus Kas (Cash Flow Statement)</CardTitle>
@@ -1554,6 +1517,46 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
               )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ringkasan Penjualan per Pelanggan</CardTitle>
+                  <CardDescription>Daftar pelanggan dengan total pembelian tertinggi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama Pelanggan</TableHead>
+                        <TableHead className="text-right">Jumlah Invoice</TableHead>
+                        <TableHead className="text-right">Total Pembelian</TableHead>
+                        <TableHead className="text-right">Total Dibayar</TableHead>
+                        <TableHead className="text-right">Sisa Piutang</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {customerReport.topCustomers.map((customer) => (
+                        <TableRow key={customer.clientId}>
+                          <TableCell className="font-medium">{customer.name}</TableCell>
+                          <TableCell className="text-right">{customer.invoiceCount}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(customer.totalPurchase)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(customer.totalPaid)}</TableCell>
+                          <TableCell className="text-right font-semibold text-yellow-600">
+                            {formatCurrency(customer.outstanding)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {!customerReport.topCustomers.length && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                            Tidak ada data penjualan
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <div className="flex justify-center items-center h-[400px]">
@@ -1562,132 +1565,6 @@ export default function ReportsPage() {
           )}
         </TabsContent>
         
-        {/* RINCIAN INCOME & EXPENSES */}
-        <TabsContent value="breakdown" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Rincian Pendapatan</CardTitle>
-                <CardDescription>Breakdown pendapatan per kategori</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingTransactions ? (
-                  <Skeleton className="h-[400px] w-full" />
-                ) : incomeByCategory.length === 0 ? (
-                  <div className="flex justify-center items-center h-[400px]">
-                    <p className="text-gray-500">Tidak ada data pendapatan</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={incomeByCategory}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {incomeByCategory.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {incomeByCategory.map((category, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center">
-                            <div 
-                              className="w-4 h-4 rounded-full mr-2" 
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            ></div>
-                            <span className="text-sm font-medium">{category.name}</span>
-                          </div>
-                          <span className="text-sm font-semibold">{formatCurrency(category.value)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between pt-2 border-t font-bold">
-                        <span>Total Pendapatan:</span>
-                        <span className="text-green-600">
-                          {formatCurrency(incomeByCategory.reduce((sum, item) => sum + item.value, 0))}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Rincian Beban</CardTitle>
-                <CardDescription>Breakdown beban per kategori</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingTransactions ? (
-                  <Skeleton className="h-[400px] w-full" />
-                ) : expensesByCategory.length === 0 ? (
-                  <div className="flex justify-center items-center h-[400px]">
-                    <p className="text-gray-500">Tidak ada data beban</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={expensesByCategory}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {expensesByCategory.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(typeof value === 'number' ? value : 0)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {expensesByCategory.map((category, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center">
-                            <div 
-                              className="w-4 h-4 rounded-full mr-2" 
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            ></div>
-                            <span className="text-sm font-medium">{category.name}</span>
-                          </div>
-                          <span className="text-sm font-semibold">{formatCurrency(category.value)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between pt-2 border-t font-bold">
-                        <span>Total Beban:</span>
-                        <span className="text-red-600">
-                          {formatCurrency(expensesByCategory.reduce((sum, item) => sum + item.value, 0))}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
       </Tabs>
     </div>
   );

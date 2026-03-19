@@ -80,6 +80,7 @@ interface PurchaseOrderWithItems {
     baseCost?: string | null; 
     baseQuantity?: string | null;
     productUnitId?: number | null;
+    receivedQuantity?: string;
   }[];
 }
 
@@ -174,7 +175,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       supplierDocNumber: "",
       receiptDate: new Date(),
       dueDate: null as Date | null,
-      status: "draft" as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
+      status: "confirmed" as "draft" | "confirmed" | "partial_paid" | "paid" | "cancelled",
       subtotal: "0",
       taxRate: "0",
       taxAmount: "0",
@@ -456,9 +457,12 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       // Filter by status - include pending, sent, and partial (not received or cancelled)
       if (!['pending', 'sent', 'partial'].includes(po.status)) return false;
       
-      // Filter by product - PO must contain the selected product
-      const hasProduct = po.items?.some(item => item.productId === productId);
-      if (!hasProduct) return false;
+      // Filter by product - PO must contain the selected product with remaining unreceived quantity
+      const hasUnreceivedProduct = po.items?.some(item => 
+        item.productId === productId && 
+        parseFloat(item.receivedQuantity || '0') < parseFloat(item.quantity)
+      );
+      if (!hasUnreceivedProduct) return false;
       
       // Filter by search query
       if (poSearchQuery && !po.purchaseOrderNumber.toLowerCase().includes(poSearchQuery.toLowerCase())) {
@@ -528,7 +532,13 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       navigate('/goods-receipts');
     },
     onError: (error) => {
-      toast({ title: "Error", description: `Failed to create goods receipt: ${error.message}`, variant: "destructive" });
+      let msg = error.message;
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) msg = parsed.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   });
 
@@ -541,7 +551,13 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
       toast({ title: "Success", description: "Goods receipt updated successfully." });
     },
     onError: (error) => {
-      toast({ title: "Error", description: `Failed to update goods receipt: ${error.message}`, variant: "destructive" });
+      let msg = error.message;
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        if (parsed.error) msg = parsed.error;
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   });
 
@@ -859,6 +875,8 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                           <div className="mt-2">
                             {totalPaid >= totalAmount && totalAmount > 0 ? (
                               <Badge className="bg-green-500 text-white">Terbayar</Badge>
+                            ) : totalPaid > 0 ? (
+                              <Badge className="bg-yellow-500 text-white">Terbayar Sebagian</Badge>
                             ) : (
                               <Badge variant="destructive">Belum Terbayar</Badge>
                             )}

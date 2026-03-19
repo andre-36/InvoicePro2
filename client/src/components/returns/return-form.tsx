@@ -274,187 +274,188 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
+            {/* Pilih Invoice — full width */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Pilih Invoice</CardTitle>
+                <CardDescription>Pilih invoice yang akan diretur</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Popover open={invoiceSearchOpen} onOpenChange={setInvoiceSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {selectedInvoice ? (
+                        <span>{selectedInvoice.invoiceNumber} - {selectedInvoice.clientName}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Cari invoice...</span>
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Cari nomor invoice atau pelanggan..." 
+                        value={invoiceSearch}
+                        onValueChange={setInvoiceSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>Tidak ada invoice ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {invoicesLoading ? (
+                            <div className="p-2">
+                              <Skeleton className="h-8 w-full" />
+                            </div>
+                          ) : (
+                            filteredInvoices?.slice(0, 20).map((inv) => (
+                              <CommandItem
+                                key={inv.id}
+                                value={`${inv.invoiceNumber} ${inv.clientName}`}
+                                onSelect={() => {
+                                  setSelectedInvoiceId(inv.id);
+                                  setInvoiceSearchOpen(false);
+                                  setInvoiceSearch("");
+                                }}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{inv.invoiceNumber}</span>
+                                  <span className="text-sm text-muted-foreground">{inv.clientName}</span>
+                                </div>
+                              </CommandItem>
+                            ))
+                          )}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </CardContent>
+            </Card>
+
+            {/* Item Retur — full width */}
+            {selectedInvoiceId && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Pilih Invoice</CardTitle>
-                  <CardDescription>Pilih invoice yang akan diretur</CardDescription>
+                  <CardTitle>Item Retur</CardTitle>
+                  <CardDescription>Pilih item dan jumlah yang akan diretur</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Popover open={invoiceSearchOpen} onOpenChange={setInvoiceSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {selectedInvoice ? (
-                          <span>{selectedInvoice.invoiceNumber} - {selectedInvoice.clientName}</span>
-                        ) : (
-                          <span className="text-muted-foreground">Cari invoice...</span>
-                        )}
-                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
-                      <Command>
-                        <CommandInput 
-                          placeholder="Cari nomor invoice atau pelanggan..." 
-                          value={invoiceSearch}
-                          onValueChange={setInvoiceSearch}
-                        />
-                        <CommandList>
-                          <CommandEmpty>Tidak ada invoice ditemukan.</CommandEmpty>
-                          <CommandGroup>
-                            {invoicesLoading ? (
-                              <div className="p-2">
-                                <Skeleton className="h-8 w-full" />
-                              </div>
-                            ) : (
-                              filteredInvoices?.slice(0, 20).map((inv) => (
-                                <CommandItem
-                                  key={inv.id}
-                                  value={`${inv.invoiceNumber} ${inv.clientName}`}
-                                  onSelect={() => {
-                                    setSelectedInvoiceId(inv.id);
-                                    setInvoiceSearchOpen(false);
-                                    setInvoiceSearch("");
-                                  }}
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{inv.invoiceNumber}</span>
-                                    <span className="text-sm text-muted-foreground">{inv.clientName}</span>
-                                  </div>
-                                </CommandItem>
-                              ))
-                            )}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </CardContent>
-              </Card>
-
-              {selectedInvoiceId && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Item Retur</CardTitle>
-                    <CardDescription>Pilih item dan jumlah yang akan diretur</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {invoiceItemsLoading ? (
-                      <div className="space-y-2">
-                        {[1, 2, 3].map(i => (
-                          <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                      </div>
-                    ) : returnItems.length === 0 ? (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>Invoice ini tidak memiliki item.</AlertDescription>
-                      </Alert>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>Produk</TableHead>
-                            <TableHead className="text-right w-[70px]">Qty</TableHead>
-                            <TableHead className="text-right w-[80px]">Qty Kirim</TableHead>
-                            <TableHead className="w-[130px]">Qty Retur</TableHead>
-                            <TableHead className="text-right w-[100px]">Hrg Invoice</TableHead>
-                            <TableHead className="text-right w-[100px]">Hrg Skrg</TableHead>
-                            <TableHead className="text-right w-[110px]">Nilai Retur</TableHead>
-                            <TableHead className="text-right w-[100px]">Subtotal</TableHead>
-                            <TableHead className="w-[120px]">Alasan</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {returnItems.map((item, index) => {
-                            const qtyToStock = Math.min(item.quantity, item.deliveredQty);
-                            const showStockBadge = item.selected && item.quantity > 0;
-                            return (
-                            <TableRow key={item.invoiceItemId}>
-                              <TableCell>
-                                <Checkbox 
-                                  checked={item.selected}
-                                  onCheckedChange={() => handleItemToggle(index)}
-                                />
-                              </TableCell>
-                              <TableCell className="max-w-[180px] truncate" title={item.description}>{item.description}</TableCell>
-                              <TableCell className="text-right">{item.originalQty}</TableCell>
-                              <TableCell className="text-right text-gray-500 text-sm">{item.deliveredQty}</TableCell>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={item.originalQty}
-                                    step="any"
-                                    value={item.quantity || ''}
-                                    onChange={(e) => handleItemQuantityChange(index, e.target.value)}
-                                    className="w-16 text-right"
-                                    disabled={!item.selected}
-                                  />
-                                  {showStockBadge && (
-                                    <div className={`text-xs px-1 py-0.5 rounded inline-block ${
-                                      item.deliveredQty === 0
-                                        ? 'bg-red-100 text-red-700'
-                                        : qtyToStock < item.quantity
-                                        ? 'bg-yellow-100 text-yellow-700'
-                                        : 'bg-green-100 text-green-700'
-                                    }`}>
-                                      {item.deliveredQty === 0
-                                        ? 'Belum terkirim'
-                                        : qtyToStock < item.quantity
-                                        ? `${qtyToStock} ke stok`
-                                        : 'Semua ke stok'}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.invoicePrice)}</TableCell>
-                              <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.currentPrice)}</TableCell>
-                              <TableCell>
+                  {invoiceItemsLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => (
+                        <Skeleton key={i} className="h-12 w-full" />
+                      ))}
+                    </div>
+                  ) : returnItems.length === 0 ? (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>Invoice ini tidak memiliki item.</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]"></TableHead>
+                          <TableHead>Produk</TableHead>
+                          <TableHead className="text-right w-[70px]">Qty</TableHead>
+                          <TableHead className="text-right w-[80px]">Qty Kirim</TableHead>
+                          <TableHead className="w-[130px]">Qty Retur</TableHead>
+                          <TableHead className="text-right w-[100px]">Hrg Invoice</TableHead>
+                          <TableHead className="text-right w-[100px]">Hrg Skrg</TableHead>
+                          <TableHead className="text-right w-[110px]">Nilai Retur</TableHead>
+                          <TableHead className="text-right w-[100px]">Subtotal</TableHead>
+                          <TableHead className="w-[120px]">Alasan</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {returnItems.map((item, index) => {
+                          const qtyToStock = Math.min(item.quantity, item.deliveredQty);
+                          const showStockBadge = item.selected && item.quantity > 0;
+                          return (
+                          <TableRow key={item.invoiceItemId}>
+                            <TableCell>
+                              <Checkbox 
+                                checked={item.selected}
+                                onCheckedChange={() => handleItemToggle(index)}
+                              />
+                            </TableCell>
+                            <TableCell title={item.description}>{item.description}</TableCell>
+                            <TableCell className="text-right">{item.originalQty}</TableCell>
+                            <TableCell className="text-right text-gray-500 text-sm">{item.deliveredQty}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
                                 <Input
                                   type="number"
                                   min={0}
+                                  max={item.originalQty}
                                   step="any"
-                                  value={item.returnValue || ''}
-                                  onChange={(e) => handleItemReturnValueChange(index, e.target.value)}
-                                  className="w-24 text-right"
+                                  value={item.quantity || ''}
+                                  onChange={(e) => handleItemQuantityChange(index, e.target.value)}
+                                  className="w-16 text-right"
                                   disabled={!item.selected}
                                 />
-                              </TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
-                              <TableCell>
-                                <Input
-                                  placeholder="Alasan..."
-                                  value={item.reason}
-                                  onChange={(e) => handleItemReasonChange(index, e.target.value)}
-                                  className="w-28"
-                                  disabled={!item.selected}
-                                />
-                              </TableCell>
-                            </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                                {showStockBadge && (
+                                  <div className={`text-xs px-1 py-0.5 rounded inline-block ${
+                                    item.deliveredQty === 0
+                                      ? 'bg-red-100 text-red-700'
+                                      : qtyToStock < item.quantity
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-green-100 text-green-700'
+                                  }`}>
+                                    {item.deliveredQty === 0
+                                      ? 'Belum terkirim'
+                                      : qtyToStock < item.quantity
+                                      ? `${qtyToStock} ke stok`
+                                      : 'Semua ke stok'}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.invoicePrice)}</TableCell>
+                            <TableCell className="text-right text-gray-500 text-sm">{formatCurrency(item.currentPrice)}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="any"
+                                value={item.returnValue || ''}
+                                onChange={(e) => handleItemReturnValueChange(index, e.target.value)}
+                                className="w-24 text-right"
+                                disabled={!item.selected}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
+                            <TableCell>
+                              <Input
+                                placeholder="Alasan..."
+                                value={item.reason}
+                                onChange={(e) => handleItemReasonChange(index, e.target.value)}
+                                className="w-28"
+                                disabled={!item.selected}
+                              />
+                            </TableCell>
+                          </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detail Retur</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+            {/* Detail Retur — full width, fields in a horizontal grid */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Detail Retur</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
                     name="returnNumber"
@@ -493,7 +494,7 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                           <RadioGroup
                             onValueChange={field.onChange}
                             value={field.value}
-                            className="flex flex-col space-y-2"
+                            className="flex flex-col space-y-2 mt-1"
                           >
                             <div className="flex items-center space-x-2 border rounded-lg p-3">
                               <RadioGroupItem value="credit_note" id="credit_note" />
@@ -529,20 +530,23 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                       <FormItem>
                         <FormLabel>Catatan</FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="Catatan tambahan..." />
+                          <Textarea {...field} placeholder="Catatan tambahan..." className="h-[106px]" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ringkasan</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+            {/* Ringkasan — full width */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Ringkasan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-8">
                   {invoiceWithItems?.client && (
                     <div>
                       <div className="text-sm text-muted-foreground">Pelanggan</div>
@@ -553,24 +557,22 @@ export function ReturnForm({ onSuccess }: ReturnFormProps) {
                     <div className="text-sm text-muted-foreground">Item Dipilih</div>
                     <div className="font-medium">{selectedItems.length} item</div>
                   </div>
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center">
-                      <div className="text-lg font-bold">Total Retur</div>
+                  <div className="ml-auto flex items-center gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Total Retur</div>
                       <div className="text-2xl font-bold text-primary">{formatCurrency(totalAmount)}</div>
                     </div>
+                    <Button 
+                      type="submit" 
+                      size="lg"
+                      disabled={createMutation.isPending || selectedItems.length === 0}
+                    >
+                      {createMutation.isPending ? "Menyimpan..." : "Simpan Retur"}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Button 
-                type="submit" 
-                className="w-full" 
-                size="lg"
-                disabled={createMutation.isPending || selectedItems.length === 0}
-              >
-                {createMutation.isPending ? "Menyimpan..." : "Simpan Retur"}
-              </Button>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </form>
       </Form>

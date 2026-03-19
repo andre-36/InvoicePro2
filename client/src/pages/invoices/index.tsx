@@ -115,10 +115,16 @@ export default function InvoicesPage() {
         description: "Invoice telah di-void.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      let msg = error.message || '';
+      try {
+        const jsonPart = msg.substring(msg.indexOf('{'));
+        const parsed = JSON.parse(jsonPart);
+        msg = parsed.message || parsed.error || msg;
+      } catch {}
       toast({
-        title: "Error",
-        description: `Gagal membatalkan invoice: ${error.message}`,
+        title: "Tidak dapat void invoice",
+        description: msg,
         variant: "destructive",
       });
     }

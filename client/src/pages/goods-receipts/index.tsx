@@ -51,7 +51,7 @@ type GoodsReceipt = {
   hasReturns: boolean;
 };
 
-type GoodsReceiptStatus = 'all' | 'paid' | 'unpaid';
+type GoodsReceiptStatus = 'all' | 'paid' | 'partial' | 'unpaid';
 
 export default function GoodsReceiptsPage() {
   const [, navigate] = useLocation();
@@ -70,6 +70,7 @@ export default function GoodsReceiptsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       toast({
         title: "Goods receipt deleted",
         description: "The goods receipt has been deleted successfully.",
@@ -84,25 +85,6 @@ export default function GoodsReceiptsPage() {
     }
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: string }) => {
-      return apiRequest('PATCH', `/api/goods-receipts/${id}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/goods-receipts'] });
-      toast({
-        title: "Status updated",
-        description: "The goods receipt status has been updated successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update status: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
 
   const filteredGoodsReceipts = goodsReceipts
     ? goodsReceipts.filter(receipt => {
@@ -111,10 +93,9 @@ export default function GoodsReceiptsPage() {
           receipt.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (receipt.supplierDocNumber && receipt.supplierDocNumber.toLowerCase().includes(searchQuery.toLowerCase()));
         
-        // Calculate payment status for filtering
         const total = parseFloat(receipt.totalAmount) || 0;
         const paid = parseFloat(receipt.amountPaid) || 0;
-        const paymentStatus = paid >= total && total > 0 ? 'paid' : 'unpaid';
+        const paymentStatus = (paid >= total && total > 0) ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
         const matchesStatus = statusFilter === 'all' || paymentStatus === statusFilter;
         
         return matchesSearch && matchesStatus;
@@ -125,13 +106,17 @@ export default function GoodsReceiptsPage() {
   const getPaymentStatus = (receipt: GoodsReceipt) => {
     const total = parseFloat(receipt.totalAmount) || 0;
     const paid = parseFloat(receipt.amountPaid) || 0;
-    return paid >= total && total > 0 ? 'paid' : 'unpaid';
+    if (paid >= total && total > 0) return 'paid';
+    if (paid > 0) return 'partial';
+    return 'unpaid';
   };
 
   const getStatusBadge = (receipt: GoodsReceipt) => {
     const paymentStatus = getPaymentStatus(receipt);
     const badge = paymentStatus === 'paid' 
       ? <Badge className="bg-green-500 text-white">Terbayar</Badge>
+      : paymentStatus === 'partial'
+      ? <Badge className="bg-yellow-500 text-white">Terbayar Sebagian</Badge>
       : <Badge variant="destructive">Belum Terbayar</Badge>;
     
     return (
@@ -200,6 +185,7 @@ export default function GoodsReceiptsPage() {
                 <SelectContent>
                   <SelectItem value="all">Semua Status</SelectItem>
                   <SelectItem value="paid">Terbayar</SelectItem>
+                  <SelectItem value="partial">Terbayar Sebagian</SelectItem>
                   <SelectItem value="unpaid">Belum Terbayar</SelectItem>
                 </SelectContent>
               </Select>
@@ -292,26 +278,6 @@ export default function GoodsReceiptsPage() {
                             <DropdownMenuItem onClick={() => navigate(`/goods-receipts/${receipt.id}/edit`)}>
                               <FilePenLine className="mr-2 h-4 w-4" />
                               <span>Edit</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled={receipt.status === 'paid'}>
-                              <Select
-                                onValueChange={(value) => {
-                                  updateStatusMutation.mutate({ id: receipt.id, status: value });
-                                }}
-                                value={receipt.status}
-                              >
-                                <SelectTrigger className="border-none p-0 h-auto font-normal shadow-none">
-                                  <span className="text-sm">Change Status</span>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="draft">Draft</SelectItem>
-                                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                                  <SelectItem value="partial_paid">Partial Paid</SelectItem>
-                                  <SelectItem value="paid">Paid</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                              </Select>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <AlertDialog>

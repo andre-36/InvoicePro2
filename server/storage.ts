@@ -201,12 +201,13 @@ export interface IStorage {
   getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number, dnItemCount?: number): Promise<string>;
   allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
   reverseDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
+  restorePendingDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
   revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote>;
   updateDeliveryNoteItems(deliveryNoteId: number, items: { invoiceItemId: number; deliveredQuantity: number }[]): Promise<void>;
 
   // Quotation methods
   getQuotation(id: number): Promise<Quotation | undefined>;
-  getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: QuotationItem[], client?: Client } | undefined>;
+  getQuotationWithItems(id: number): Promise<{ quotation: Quotation, items: (QuotationItem & { productSku?: string; productCode?: string; unitLabel?: string })[], client?: Client } | undefined>;
   getQuotations(storeId: number): Promise<(Quotation & { clientName: string | null })[]>;
   createQuotation(quotation: InsertQuotation, items: InsertQuotationItem[]): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>, items?: InsertQuotationItem[]): Promise<Quotation>;
@@ -225,6 +226,7 @@ export interface IStorage {
   updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>, items: Array<InsertPurchaseOrderItem & { id?: number, productId: number, quantity: number | string }>): Promise<PurchaseOrder>;
   updatePurchaseOrderStatus(id: number, status: string, deliveredDate?: Date): Promise<PurchaseOrder>;
   receivePurchaseOrderItems(purchaseOrderId: number, items: Array<{ itemId: number, quantityReceived: number }>): Promise<PurchaseOrder>;
+  updatePOReceivedFromGR(purchaseOrderId: number, items: Array<{ purchaseOrderItemId: number, quantityReceived: number }>): Promise<void>;
   deletePurchaseOrder(id: number): Promise<void>;
   getProductPendingPOs(productId: number, storeId: number): Promise<Array<{
     purchaseOrderId: number;
@@ -1924,21 +1926,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, newInvoice.id));
 
-      // Create a transaction record for non-draft invoices
-      if (invoiceData.status !== 'draft') {
-        await tx
-          .insert(transactions)
-          .values({
-            storeId: invoiceData.storeId,
-            type: 'income',
-            date: invoiceData.issueDate,
-            amount: invoiceTotalAmount.toString(),
-            description: `Invoice #${invoiceNumber}`,
-            invoiceId: newInvoice.id,
-            referenceNumber: invoiceNumber,
-          });
-      }
-
       // Return the invoice with the updated totals
       const [updatedInvoice] = await tx
         .select()
@@ -2065,28 +2052,6 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(invoices.id, id))
         .returning();
-
-      // Create a transaction record when changing from draft to active status
-      if (invoice.status === 'draft' && status !== 'draft') {
-        const [existingTransaction] = await tx
-          .select()
-          .from(transactions)
-          .where(eq(transactions.invoiceId, id));
-
-        if (!existingTransaction) {
-          await tx
-            .insert(transactions)
-            .values({
-              storeId: invoice.storeId,
-              type: 'income',
-              date: invoice.issueDate,
-              amount: invoice.totalAmount,
-              description: `Invoice #${invoice.invoiceNumber}`,
-              invoiceId: invoice.id,
-              referenceNumber: invoice.invoiceNumber,
-            });
-        }
-      }
 
       return updatedInvoice;
     });
@@ -2472,10 +2437,10 @@ export class DatabaseStorage implements IStorage {
 
             const remaining = parseFloat(batch.remainingQuantity.toString());
             const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
 
             const deductFromBatch = Math.min(remainingToDeduct, remaining);
-            itemCost += deductFromBatch * baseCost;
+            itemCost += deductFromBatch * capitalCost;
 
             const newReserved = Math.max(0, reserved - deductFromBatch);
             const newRemaining = remaining - deductFromBatch;
@@ -2495,23 +2460,21 @@ export class DatabaseStorage implements IStorage {
 
         totalCost += itemCost;
 
-        const baseQty = parseFloat(item.baseQuantity?.toString() || item.quantity.toString());
-        if (baseQty > 0) {
-          const avgCost = itemCost / baseQty;
-          await tx
-            .update(invoiceItems)
-            .set({ unitCost: avgCost.toString() })
-            .where(eq(invoiceItems.id, item.id));
-        }
+        // Save per-item profit to invoice_items.profit (uses quantity at the invoice unit level)
+        const itemRevenue = itemQty * unitPrice;
+        const itemProfit = itemRevenue - itemCost;
+        await tx
+          .update(invoiceItems)
+          .set({ profit: itemProfit.toString() })
+          .where(eq(invoiceItems.id, item.id));
       }
 
-      // Update invoice profit data
+      // Save total profit to invoices.totalProfit
       const profit = totalRevenue - totalCost;
       await tx
         .update(invoices)
         .set({
-          totalCost: totalCost.toString(),
-          profit: profit.toString(),
+          totalProfit: profit.toString(),
           updatedAt: new Date()
         })
         .where(eq(invoices.id, invoiceId));
@@ -3015,10 +2978,141 @@ export class DatabaseStorage implements IStorage {
             ...item,
             deliveryNoteId: newDeliveryNote.id
           })));
-
       }
 
-      return newDeliveryNote;
+      // FIFO stock deduction at DN creation: deduct remaining and unreserve
+      const storeId = invoice.store_id || invoice.storeId;
+      const dnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, newDeliveryNote.id));
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      for (const dnItem of dnItems) {
+        const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
+        if (!invItem) continue;
+
+        const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
+
+        let baseDeliveredQty = deliveredQty;
+        if (invItem.baseQuantity && invItem.quantity) {
+          const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
+          baseDeliveredQty = deliveredQty * ratio;
+        }
+
+        const unitPrice = parseFloat(invItem.unitPrice.toString());
+        totalRevenue += deliveredQty * unitPrice;
+
+        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
+
+        let stockItems: { productId: number; quantity: number }[] = [];
+        if (product && product.productType === 'bundle') {
+          const components = await tx
+            .select()
+            .from(productBundleComponents)
+            .where(eq(productBundleComponents.bundleProductId, product.id));
+          for (const comp of components) {
+            stockItems.push({
+              productId: comp.componentProductId,
+              quantity: parseFloat(comp.quantity) * baseDeliveredQty
+            });
+          }
+        } else {
+          stockItems.push({ productId: invItem.productId, quantity: baseDeliveredQty });
+        }
+
+        for (const { productId: stockProductId, quantity: qtyToAllocate } of stockItems) {
+          const availableBatches = await tx
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.productId, stockProductId),
+                eq(productBatches.storeId, storeId),
+                gt(productBatches.remainingQuantity, 0)
+              )
+            )
+            .orderBy(productBatches.purchaseDate);
+
+          let remainingToAllocate = qtyToAllocate;
+
+          for (const batch of availableBatches) {
+            if (remainingToAllocate <= 0) break;
+
+            const remaining = parseFloat(batch.remainingQuantity.toString());
+            const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
+
+            const quantityFromBatch = Math.min(remainingToAllocate, remaining);
+            totalCost += quantityFromBatch * capitalCost;
+
+            const newRemaining = remaining - quantityFromBatch;
+            const reservedReduction = Math.min(reserved, quantityFromBatch);
+            const newReserved = reserved - reservedReduction;
+
+            await tx
+              .update(productBatches)
+              .set({
+                remainingQuantity: newRemaining.toString(),
+                reservedQuantity: Math.max(0, newReserved).toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(productBatches.id, batch.id));
+
+            remainingToAllocate -= quantityFromBatch;
+          }
+
+          if (remainingToAllocate > 0) {
+            const anyBatch = await tx
+              .select()
+              .from(productBatches)
+              .where(
+                and(
+                  eq(productBatches.productId, stockProductId),
+                  eq(productBatches.storeId, storeId)
+                )
+              )
+              .orderBy(desc(productBatches.purchaseDate))
+              .limit(1);
+
+            if (anyBatch.length > 0) {
+              const batch = anyBatch[0];
+              const currentRemaining = parseFloat(batch.remainingQuantity.toString());
+              await tx
+                .update(productBatches)
+                .set({
+                  remainingQuantity: (currentRemaining - remainingToAllocate).toString(),
+                  updatedAt: new Date()
+                })
+                .where(eq(productBatches.id, batch.id));
+            } else {
+              const today = new Date().toISOString().split('T')[0];
+              await tx.insert(productBatches).values({
+                productId: stockProductId,
+                storeId: storeId,
+                batchNumber: `NEG-${stockProductId}-${today}`,
+                purchaseDate: today,
+                capitalCost: '0',
+                initialQuantity: '0',
+                remainingQuantity: (-remainingToAllocate).toString(),
+                reservedQuantity: '0',
+                notes: 'Negative stock from overselling'
+              });
+            }
+          }
+        }
+      }
+
+      // Store cost and profit on the delivery note at creation
+      const profit = totalRevenue - totalCost;
+      await tx
+        .update(deliveryNotes)
+        .set({
+          totalCost: totalCost.toString(),
+          profit: profit.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(deliveryNotes.id, newDeliveryNote.id));
+
+      return { ...newDeliveryNote, totalCost: totalCost.toString(), profit: profit.toString() };
     });
   }
 
@@ -3042,10 +3136,28 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Delivery note with ID ${id} not found`);
     }
 
-    // If already delivered: reverse the stock allocation first (restore remainingQuantity to batches)
-    // This runs in its own transaction inside reverseDeliveryNoteStock
-    if (deliveryNote.status === 'delivered') {
-      await this.reverseDeliveryNoteStock(id);
+    // Stock was deducted at DN creation — restore it if pending (goods not yet delivered)
+    if (deliveryNote.status === 'pending') {
+      await this.restorePendingDeliveryNoteStock(id);
+    } else if (deliveryNote.status === 'delivered') {
+      // Delivered goods can't be returned to stock; just recalculate invoice profit
+      const remainingDNs = await db
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered'),
+            not(eq(deliveryNotes.id, id))
+          )
+        );
+      const newInvoiceProfit = remainingDNs.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await db
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     }
 
     // Delete items and the delivery note record
@@ -3095,154 +3207,26 @@ export class DatabaseStorage implements IStorage {
 
   async allocateStockOnDelivery(deliveryNoteId: number): Promise<void> {
     return withTransaction(async (tx) => {
-      // Get delivery note with items
       const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
       if (!deliveryNote) {
         throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
       }
 
-      // Get delivery note items
-      const dnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
-      
-      // Get the invoice info
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
-      if (!invoice) {
-        throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
-      }
+      // Stock was already deducted at DN creation time.
+      // Here we only update invoice total profit for financial recognition.
+      const allDNsForInvoice = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(eq(deliveryNotes.invoiceId, deliveryNote.invoiceId));
 
-      let totalCost = 0;
-      let totalRevenue = 0;
+      const invoiceTotalProfit = allDNsForInvoice
+        .filter(dn => dn.status === 'delivered' || dn.id === deliveryNoteId)
+        .reduce((sum, dn) => sum + parseFloat(dn.profit?.toString() || '0'), 0);
 
-      for (const dnItem of dnItems) {
-        const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
-        if (!invItem) continue;
-
-        const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
-        
-        let baseDeliveredQty = deliveredQty;
-        if (invItem.baseQuantity && invItem.quantity) {
-          const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
-          baseDeliveredQty = deliveredQty * ratio;
-        }
-
-        const unitPrice = parseFloat(invItem.unitPrice.toString());
-        totalRevenue += deliveredQty * unitPrice;
-
-        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
-        
-        let stockItems: { productId: number; quantity: number }[] = [];
-        if (product && product.productType === 'bundle') {
-          const components = await tx
-            .select()
-            .from(productBundleComponents)
-            .where(eq(productBundleComponents.bundleProductId, product.id));
-          for (const comp of components) {
-            stockItems.push({
-              productId: comp.componentProductId,
-              quantity: parseFloat(comp.quantity) * baseDeliveredQty
-            });
-          }
-        } else {
-          stockItems.push({ productId: invItem.productId, quantity: baseDeliveredQty });
-        }
-
-        for (const { productId: stockProductId, quantity: qtyToAllocate } of stockItems) {
-          const availableBatches = await tx
-            .select()
-            .from(productBatches)
-            .where(
-              and(
-                eq(productBatches.productId, stockProductId),
-                eq(productBatches.storeId, invoice.storeId),
-                gt(productBatches.remainingQuantity, 0)
-              )
-            )
-            .orderBy(productBatches.purchaseDate);
-
-          let remainingToAllocate = qtyToAllocate;
-
-          for (const batch of availableBatches) {
-            if (remainingToAllocate <= 0) break;
-
-            const remaining = parseFloat(batch.remainingQuantity.toString());
-            const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
-            const baseCost = parseFloat(batch.baseCost?.toString() || batch.cost?.toString() || '0');
-            
-            const quantityFromBatch = Math.min(remainingToAllocate, remaining);
-
-            totalCost += quantityFromBatch * baseCost;
-
-            const newRemaining = remaining - quantityFromBatch;
-            const reservedReduction = Math.min(reserved, quantityFromBatch);
-            const newReserved = reserved - reservedReduction;
-
-            await tx
-              .update(productBatches)
-              .set({
-                remainingQuantity: newRemaining.toString(),
-                reservedQuantity: Math.max(0, newReserved).toString(),
-                updatedAt: new Date()
-              })
-              .where(eq(productBatches.id, batch.id));
-
-            remainingToAllocate -= quantityFromBatch;
-          }
-
-          if (remainingToAllocate > 0) {
-            const anyBatch = await tx
-              .select()
-              .from(productBatches)
-              .where(
-                and(
-                  eq(productBatches.productId, stockProductId),
-                  eq(productBatches.storeId, invoice.storeId)
-                )
-              )
-              .orderBy(desc(productBatches.purchaseDate))
-              .limit(1);
-
-            if (anyBatch.length > 0) {
-              const batch = anyBatch[0];
-              const currentRemaining = parseFloat(batch.remainingQuantity.toString());
-              const newRemaining = currentRemaining - remainingToAllocate;
-
-              await tx
-                .update(productBatches)
-                .set({
-                  remainingQuantity: newRemaining.toString(),
-                  updatedAt: new Date()
-                })
-                .where(eq(productBatches.id, batch.id));
-            } else {
-              const today = new Date().toISOString().split('T')[0];
-              await tx.insert(productBatches).values({
-                productId: stockProductId,
-                storeId: invoice.storeId,
-                batchNumber: `NEG-${stockProductId}-${today}`,
-                purchaseDate: today,
-                capitalCost: '0',
-                cost: '0',
-                baseCost: '0',
-                initialQuantity: '0',
-                remainingQuantity: (-remainingToAllocate).toString(),
-                reservedQuantity: '0',
-                notes: 'Negative stock from overselling'
-              });
-            }
-          }
-        }
-      }
-
-      // Update delivery note with cost and profit
-      const profit = totalRevenue - totalCost;
       await tx
-        .update(deliveryNotes)
-        .set({
-          totalCost: totalCost.toString(),
-          profit: profit.toString(),
-          updatedAt: new Date()
-        })
-        .where(eq(deliveryNotes.id, deliveryNoteId));
+        .update(invoices)
+        .set({ totalProfit: invoiceTotalProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -3254,16 +3238,56 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
       }
 
-      // Only reverse if profit was calculated (meaning stock was actually allocated)
       if (deliveryNote.profit === null && deliveryNote.totalCost === null) {
         console.log(`Delivery note ${deliveryNoteId} has no allocated stock to reverse`);
         return;
       }
 
-      // Get delivery note items
+      // For delivered DNs: do NOT restore stock (goods already left the warehouse).
+      // Only clear the financial data (cost/profit) and recalculate invoice profit.
+
+      await tx
+        .update(deliveryNotes)
+        .set({
+          totalCost: null,
+          profit: null,
+          updatedAt: new Date()
+        })
+        .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      // Recalculate invoice total profit from remaining delivered delivery notes
+      const remainingDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await tx
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
+    });
+  }
+
+  async restorePendingDeliveryNoteStock(deliveryNoteId: number): Promise<void> {
+    return withTransaction(async (tx) => {
+      const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
+      if (!deliveryNote) {
+        throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
+      }
+
+      if (deliveryNote.profit === null && deliveryNote.totalCost === null) {
+        return;
+      }
+
       const dnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
-      
-      // Get the invoice info
+
       const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
       if (!invoice) {
         throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
@@ -3274,7 +3298,7 @@ export class DatabaseStorage implements IStorage {
         if (!invItem) continue;
 
         const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
-        
+
         let baseDeliveredQty = deliveredQty;
         if (invItem.baseQuantity && invItem.quantity) {
           const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
@@ -3282,7 +3306,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
-        
+
         let stockItems: { productId: number; quantity: number }[] = [];
         if (product && product.productType === 'bundle') {
           const components = await tx
@@ -3318,14 +3342,16 @@ export class DatabaseStorage implements IStorage {
 
             const totalQty = parseFloat(batch.initialQuantity.toString());
             const remainingQty = parseFloat(batch.remainingQuantity.toString());
-            
+            const reservedQty = parseFloat(batch.reservedQuantity?.toString() || '0');
+
             const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
-            
+
             if (canRestore > 0) {
               await tx
                 .update(productBatches)
                 .set({
                   remainingQuantity: (remainingQty + canRestore).toString(),
+                  reservedQuantity: (reservedQty + canRestore).toString(),
                   updatedAt: new Date()
                 })
                 .where(eq(productBatches.id, batch.id));
@@ -3336,7 +3362,6 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Clear the profit and cost on the delivery note
       await tx
         .update(deliveryNotes)
         .set({
@@ -3345,6 +3370,23 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
+
+      const remainingDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered')
+          )
+        );
+      const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await tx
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
     });
   }
 
@@ -3359,10 +3401,26 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Can only revert delivered delivery notes. Current status: ${deliveryNote.status}`);
       }
 
-      // Reverse the stock allocation first
-      await this.reverseDeliveryNoteStock(deliveryNoteId);
+      // Stock was already deducted at DN creation — do NOT restore it.
+      // Only recalculate invoice profit (remove this DN's profit from delivered total).
+      const remainingDeliveredNotes = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, deliveryNote.invoiceId),
+            eq(deliveryNotes.status, 'delivered'),
+            not(eq(deliveryNotes.id, deliveryNoteId))
+          )
+        );
+      const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
+        return sum + parseFloat(dn.profit?.toString() || '0');
+      }, 0);
+      await tx
+        .update(invoices)
+        .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
+        .where(eq(invoices.id, deliveryNote.invoiceId));
 
-      // Update status to pending
       const [updated] = await tx
         .update(deliveryNotes)
         .set({
@@ -3443,10 +3501,49 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Delete existing items
-      await tx.delete(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+      // Step 1: Restore stock from old items (reverse the FIFO deduction done at DN creation)
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
+      if (!invoice) throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
 
-      // Insert new items
+      for (const oldDnItem of currentDnItems) {
+        const [oldInvItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, oldDnItem.invoiceItemId));
+        if (!oldInvItem) continue;
+
+        const oldDeliveredQty = parseFloat(oldDnItem.deliveredQuantity.toString());
+        let oldBaseQty = oldDeliveredQty;
+        if (oldInvItem.baseQuantity && oldInvItem.quantity) {
+          const ratio = parseFloat(oldInvItem.baseQuantity.toString()) / parseFloat(oldInvItem.quantity.toString());
+          oldBaseQty = oldDeliveredQty * ratio;
+        }
+
+        const [oldProduct] = await tx.select().from(products).where(eq(products.id, oldInvItem.productId));
+        let oldStockItems: { productId: number; quantity: number }[] = [];
+        if (oldProduct && oldProduct.productType === 'bundle') {
+          const components = await tx.select().from(productBundleComponents).where(eq(productBundleComponents.bundleProductId, oldProduct.id));
+          for (const comp of components) { oldStockItems.push({ productId: comp.componentProductId, quantity: parseFloat(comp.quantity) * oldBaseQty }); }
+        } else {
+          oldStockItems.push({ productId: oldInvItem.productId, quantity: oldBaseQty });
+        }
+
+        for (const { productId: stockProductId, quantity: qtyToRestore } of oldStockItems) {
+          const batches = await tx.select().from(productBatches).where(and(eq(productBatches.productId, stockProductId), eq(productBatches.storeId, invoice.storeId))).orderBy(desc(productBatches.purchaseDate));
+          let remainingToRestore = qtyToRestore;
+          for (const batch of batches) {
+            if (remainingToRestore <= 0) break;
+            const totalQty = parseFloat(batch.initialQuantity.toString());
+            const remainingQty = parseFloat(batch.remainingQuantity.toString());
+            const reservedQty = parseFloat(batch.reservedQuantity?.toString() || '0');
+            const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
+            if (canRestore > 0) {
+              await tx.update(productBatches).set({ remainingQuantity: (remainingQty + canRestore).toString(), reservedQuantity: (reservedQty + canRestore).toString(), updatedAt: new Date() }).where(eq(productBatches.id, batch.id));
+              remainingToRestore -= canRestore;
+            }
+          }
+        }
+      }
+
+      // Step 2: Delete existing items and insert new items
+      await tx.delete(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
       for (const item of validItems) {
         await tx.insert(deliveryNoteItems).values({
           deliveryNoteId,
@@ -3454,6 +3551,64 @@ export class DatabaseStorage implements IStorage {
           deliveredQuantity: item.deliveredQuantity.toString()
         });
       }
+
+      // Step 3: Re-deduct stock with new items (FIFO) and recalculate cost/profit
+      const newDnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      for (const dnItem of newDnItems) {
+        const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
+        if (!invItem) continue;
+
+        const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
+        let baseDeliveredQty = deliveredQty;
+        if (invItem.baseQuantity && invItem.quantity) {
+          const ratio = parseFloat(invItem.baseQuantity.toString()) / parseFloat(invItem.quantity.toString());
+          baseDeliveredQty = deliveredQty * ratio;
+        }
+
+        const unitPrice = parseFloat(invItem.unitPrice.toString());
+        totalRevenue += deliveredQty * unitPrice;
+
+        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
+        let stockItemsList: { productId: number; quantity: number }[] = [];
+        if (product && product.productType === 'bundle') {
+          const components = await tx.select().from(productBundleComponents).where(eq(productBundleComponents.bundleProductId, product.id));
+          for (const comp of components) { stockItemsList.push({ productId: comp.componentProductId, quantity: parseFloat(comp.quantity) * baseDeliveredQty }); }
+        } else {
+          stockItemsList.push({ productId: invItem.productId, quantity: baseDeliveredQty });
+        }
+
+        for (const { productId: stockProductId, quantity: qtyToAllocate } of stockItemsList) {
+          const availableBatches = await tx.select().from(productBatches).where(and(eq(productBatches.productId, stockProductId), eq(productBatches.storeId, invoice.storeId), gt(productBatches.remainingQuantity, 0))).orderBy(productBatches.purchaseDate);
+          let remainingToAllocate = qtyToAllocate;
+          for (const batch of availableBatches) {
+            if (remainingToAllocate <= 0) break;
+            const remaining = parseFloat(batch.remainingQuantity.toString());
+            const reserved = parseFloat(batch.reservedQuantity?.toString() || '0');
+            const capitalCost = parseFloat(batch.capitalCost?.toString() || '0');
+            const quantityFromBatch = Math.min(remainingToAllocate, remaining);
+            totalCost += quantityFromBatch * capitalCost;
+            const newRemaining = remaining - quantityFromBatch;
+            const reservedReduction = Math.min(reserved, quantityFromBatch);
+            const newReserved = reserved - reservedReduction;
+            await tx.update(productBatches).set({ remainingQuantity: newRemaining.toString(), reservedQuantity: Math.max(0, newReserved).toString(), updatedAt: new Date() }).where(eq(productBatches.id, batch.id));
+            remainingToAllocate -= quantityFromBatch;
+          }
+          if (remainingToAllocate > 0) {
+            const anyBatch = await tx.select().from(productBatches).where(and(eq(productBatches.productId, stockProductId), eq(productBatches.storeId, invoice.storeId))).orderBy(desc(productBatches.purchaseDate)).limit(1);
+            if (anyBatch.length > 0) {
+              const batch = anyBatch[0];
+              const currentRemaining = parseFloat(batch.remainingQuantity.toString());
+              await tx.update(productBatches).set({ remainingQuantity: (currentRemaining - remainingToAllocate).toString(), updatedAt: new Date() }).where(eq(productBatches.id, batch.id));
+            }
+          }
+        }
+      }
+
+      const newProfit = totalRevenue - totalCost;
+      await tx.update(deliveryNotes).set({ totalCost: totalCost.toString(), profit: newProfit.toString(), updatedAt: new Date() }).where(eq(deliveryNotes.id, deliveryNoteId));
     });
   }
 
@@ -3582,6 +3737,9 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (items) {
+        const oldItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
+        await this.reversePOReceivedFromGR(tx, oldItems);
+
         await tx.delete(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
 
         const hasReturns = items.some(item => parseFloat(String(item.returnQuantity || 0)) > 0);
@@ -3595,10 +3753,68 @@ export class DatabaseStorage implements IStorage {
         }
 
         await tx.update(goodsReceipts).set({ hasReturns }).where(eq(goodsReceipts.id, id));
+
+        await this.applyPOReceivedFromGR(tx, items);
       }
 
       return updatedReceipt;
     });
+  }
+
+  private async applyPOReceivedFromGR(tx: any, grItems: any[]): Promise<void> {
+    const poItemsMap = new Map<number, Array<{ purchaseOrderItemId: number, quantityReceived: number }>>();
+    for (const item of grItems) {
+      const poId = item.purchaseOrderId;
+      const poItemId = item.purchaseOrderItemId;
+      if (poId && poItemId) {
+        const existing = poItemsMap.get(poId) || [];
+        existing.push({
+          purchaseOrderItemId: poItemId,
+          quantityReceived: parseFloat(String(item.quantity || 0)),
+        });
+        poItemsMap.set(poId, existing);
+      }
+    }
+
+    for (const [poId, items] of poItemsMap.entries()) {
+      const [purchaseOrder] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!purchaseOrder) continue;
+
+      for (const item of items) {
+        const [poItem] = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+        if (!poItem || poItem.purchaseOrderId !== poId) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.min(
+          currentReceived + item.quantityReceived,
+          parseFloat(poItem.quantity)
+        );
+
+        await tx.update(purchaseOrderItems)
+          .set({ receivedQuantity: newReceivedQuantity.toString(), updatedAt: new Date() })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+      const allFullyReceived = allItems.every((item: any) => parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity));
+      const anyReceived = allItems.some((item: any) => parseFloat(item.receivedQuantity || '0') > 0);
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'pending';
+      }
+
+      const updateData: any = { status: newStatus as any, updatedAt: new Date() };
+      if (newStatus === 'received') updateData.deliveredDate = new Date();
+
+      await tx.update(purchaseOrders)
+        .set(updateData)
+        .where(eq(purchaseOrders.id, poId));
+    }
   }
 
   async updateGoodsReceiptStatus(id: number, status: string): Promise<GoodsReceipt> {
@@ -3677,7 +3893,17 @@ export class DatabaseStorage implements IStorage {
         await this.reverseGoodsReceiptStock(tx, id);
       }
 
-      // Delete payments first
+      // Reverse PO received quantities for linked items
+      const grItems = await tx.select().from(goodsReceiptItems).where(eq(goodsReceiptItems.goodsReceiptId, id));
+      await this.reversePOReceivedFromGR(tx, grItems);
+
+      // Delete transactions linked to GR payments first
+      const grPayments = await tx.select({ id: goodsReceiptPayments.id }).from(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id));
+      for (const payment of grPayments) {
+        await tx.delete(transactions).where(eq(transactions.goodsReceiptPaymentId, payment.id));
+      }
+
+      // Delete payments
       await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.goodsReceiptId, id));
       
       // Delete items
@@ -3686,6 +3912,54 @@ export class DatabaseStorage implements IStorage {
       // Delete the receipt
       await tx.delete(goodsReceipts).where(eq(goodsReceipts.id, id));
     });
+  }
+
+  private async reversePOReceivedFromGR(tx: any, grItems: any[]): Promise<void> {
+    const poItemsMap = new Map<number, Array<{ purchaseOrderItemId: number, quantityToReverse: number }>>();
+    for (const item of grItems) {
+      if (item.purchaseOrderId && item.purchaseOrderItemId) {
+        const existing = poItemsMap.get(item.purchaseOrderId) || [];
+        existing.push({
+          purchaseOrderItemId: item.purchaseOrderItemId,
+          quantityToReverse: parseFloat(String(item.quantity || 0)),
+        });
+        poItemsMap.set(item.purchaseOrderId, existing);
+      }
+    }
+
+    for (const [poId, items] of poItemsMap.entries()) {
+      const [purchaseOrder] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (!purchaseOrder) continue;
+
+      for (const item of items) {
+        const [poItem] = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+        if (!poItem || poItem.purchaseOrderId !== poId) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.max(0, currentReceived - item.quantityToReverse);
+
+        await tx.update(purchaseOrderItems)
+          .set({ receivedQuantity: newReceivedQuantity.toString(), updatedAt: new Date() })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+      const allFullyReceived = allItems.every((item: any) => parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity));
+      const anyReceived = allItems.some((item: any) => parseFloat(item.receivedQuantity || '0') > 0);
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'pending';
+      }
+
+      await tx.update(purchaseOrders)
+        .set({ status: newStatus as any, updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, poId));
+    }
   }
 
   async getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string> {
@@ -3793,21 +4067,6 @@ export class DatabaseStorage implements IStorage {
 
       await tx.update(goodsReceipts).set({ amountPaid: String(totalPaid), status: newStatus, updatedAt: new Date() }).where(eq(goodsReceipts.id, payment.goodsReceiptId));
 
-      // Create expense transaction for this payment
-      const paymentDateObj = new Date(payment.paymentDate || new Date());
-      const txData: any = {
-        storeId: receipt.storeId,
-        type: 'expense',
-        amount: payment.amount.toString(),
-        description: `Pembayaran GR ${receipt.receiptNumber}`,
-        date: paymentDateObj.toISOString().split('T')[0],
-        goodsReceiptId: payment.goodsReceiptId,
-      };
-      if (payment.cashAccountId) {
-        txData.accountId = payment.cashAccountId;
-      }
-      await tx.insert(transactions).values(txData);
-
       return newPayment;
     });
   }
@@ -3846,39 +4105,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async deleteGoodsReceiptPayment(id: number, deleteTransaction: boolean = true): Promise<void> {
+  async deleteGoodsReceiptPayment(id: number): Promise<void> {
     await withTransaction(async (tx) => {
       const [payment] = await tx.select().from(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
       if (!payment) return;
 
-      // Delete associated expense transaction using payment date as additional identifier
       const [receipt] = await tx.select().from(goodsReceipts).where(eq(goodsReceipts.id, payment.goodsReceiptId));
-      if (receipt && deleteTransaction) {
-        const paymentAmount = parseFloat(String(payment.amount));
-        const paymentDate = payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : null;
-        
-        // Find transaction matching amount AND date for more precise deletion
-        const expenseTransactions = await tx
-          .select()
-          .from(transactions)
-          .where(
-            and(
-              eq(transactions.storeId, receipt.storeId),
-              eq(transactions.type, 'expense'),
-              eq(transactions.goodsReceiptId, payment.goodsReceiptId)
-            )
-          );
-        
-        for (const txn of expenseTransactions) {
-          const txnAmount = parseFloat(String(txn.amount));
-          const txnDate = txn.date;
-          // Match by amount and date for precise deletion
-          if (Math.abs(txnAmount - paymentAmount) < 0.01 && (!paymentDate || txnDate === paymentDate)) {
-            await tx.delete(transactions).where(eq(transactions.id, txn.id));
-            break; // Only delete one matching transaction
-          }
-        }
-      }
 
       await tx.delete(goodsReceiptPayments).where(eq(goodsReceiptPayments.id, id));
 
@@ -3910,18 +4142,60 @@ export class DatabaseStorage implements IStorage {
     return quotation;
   }
 
-  async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: QuotationItem[]; client?: Client } | undefined> {
+  async getQuotationWithItems(id: number): Promise<{ quotation: Quotation; items: (QuotationItem & { productSku?: string; productCode?: string; unitLabel?: string })[]; client?: Client } | undefined> {
     const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
 
     if (!quotation) {
       return undefined;
     }
 
-    const items = await db
-      .select()
+    const enrichedItems = await db
+      .select({
+        id: quotationItems.id,
+        quotationId: quotationItems.quotationId,
+        productId: quotationItems.productId,
+        productUnitId: quotationItems.productUnitId,
+        description: quotationItems.description,
+        quantity: quotationItems.quantity,
+        baseQuantity: quotationItems.baseQuantity,
+        unitPrice: quotationItems.unitPrice,
+        taxRate: quotationItems.taxRate,
+        taxAmount: quotationItems.taxAmount,
+        discount: quotationItems.discount,
+        subtotal: quotationItems.subtotal,
+        totalAmount: quotationItems.totalAmount,
+        createdAt: quotationItems.createdAt,
+        updatedAt: quotationItems.updatedAt,
+        productSku: products.sku,
+        productBaseUnit: products.unit,
+        selectedUnitLabel: productUnits.unitLabel,
+      })
       .from(quotationItems)
+      .leftJoin(products, eq(quotationItems.productId, products.id))
+      .leftJoin(productUnits, eq(quotationItems.productUnitId, productUnits.id))
       .where(eq(quotationItems.quotationId, id))
       .orderBy(quotationItems.id);
+
+    const items = enrichedItems.map(item => ({
+      id: item.id,
+      quotationId: item.quotationId,
+      productId: item.productId,
+      productUnitId: item.productUnitId,
+      description: item.description,
+      quantity: item.quantity,
+      baseQuantity: item.baseQuantity,
+      unitPrice: item.unitPrice,
+      taxRate: item.taxRate,
+      taxAmount: item.taxAmount,
+      discount: item.discount,
+      subtotal: item.subtotal,
+      totalAmount: item.totalAmount,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      productCode: item.productSku || undefined,
+      productSku: item.productSku || undefined,
+      unitLabel: item.selectedUnitLabel || item.productBaseUnit || undefined,
+    }));
 
     let client;
     if (quotation.clientId) {
@@ -4083,6 +4357,7 @@ export class DatabaseStorage implements IStorage {
           taxRate: quotation.taxRate,
           taxAmount: quotation.taxAmount,
           discount: quotation.discount,
+          shipping: quotation.shipping,
           totalAmount: quotation.totalAmount,
           paperSize: quotation.paperSize,
           notes: quotation.notes,
@@ -4180,10 +4455,15 @@ export class DatabaseStorage implements IStorage {
     for (const po of pos) {
       const items = await db
         .select({
+          id: purchaseOrderItems.id,
           productId: purchaseOrderItems.productId,
           description: purchaseOrderItems.description,
           quantity: purchaseOrderItems.quantity,
           unitCost: purchaseOrderItems.unitCost,
+          baseCost: purchaseOrderItems.baseCost,
+          baseQuantity: purchaseOrderItems.baseQuantity,
+          productUnitId: purchaseOrderItems.productUnitId,
+          receivedQuantity: purchaseOrderItems.receivedQuantity,
         })
         .from(purchaseOrderItems)
         .where(eq(purchaseOrderItems.purchaseOrderId, po.id));
@@ -4191,10 +4471,15 @@ export class DatabaseStorage implements IStorage {
       result.push({
         ...po,
         items: items.map(item => ({
+          id: item.id,
           productId: item.productId,
           description: item.description,
           quantity: item.quantity,
           unitCost: item.unitCost,
+          baseCost: item.baseCost,
+          baseQuantity: item.baseQuantity,
+          productUnitId: item.productUnitId,
+          receivedQuantity: item.receivedQuantity || '0',
         })),
       });
     }
@@ -4488,17 +4773,92 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async updatePOReceivedFromGR(purchaseOrderId: number, items: Array<{ purchaseOrderItemId: number, quantityReceived: number }>): Promise<void> {
+    return withTransaction(async (tx) => {
+      const [purchaseOrder] = await tx
+        .select()
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.id, purchaseOrderId));
+
+      if (!purchaseOrder) return;
+
+      for (const item of items) {
+        const [poItem] = await tx
+          .select()
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+
+        if (!poItem || poItem.purchaseOrderId !== purchaseOrderId) continue;
+
+        const currentReceived = parseFloat(poItem.receivedQuantity || '0');
+        const newReceivedQuantity = Math.min(
+          currentReceived + item.quantityReceived,
+          parseFloat(poItem.quantity)
+        );
+
+        await tx
+          .update(purchaseOrderItems)
+          .set({
+            receivedQuantity: newReceivedQuantity.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId));
+      }
+
+      const allItems = await tx
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+
+      const allFullyReceived = allItems.every(item =>
+        parseFloat(item.receivedQuantity || '0') >= parseFloat(item.quantity)
+      );
+
+      const anyReceived = allItems.some(item =>
+        parseFloat(item.receivedQuantity || '0') > 0
+      );
+
+      let newStatus: string;
+      if (allFullyReceived) {
+        newStatus = 'received';
+      } else if (anyReceived) {
+        newStatus = 'partial';
+      } else {
+        newStatus = purchaseOrder.status;
+      }
+
+      const updateData: any = {
+        status: newStatus as any,
+        updatedAt: new Date()
+      };
+
+      if (newStatus === 'received') {
+        updateData.deliveredDate = new Date();
+      }
+
+      await tx
+        .update(purchaseOrders)
+        .set(updateData)
+        .where(eq(purchaseOrders.id, purchaseOrderId));
+    });
+  }
+
   async deletePurchaseOrder(id: number): Promise<void> {
     return withTransaction(async (tx) => {
-      // Delete purchase order items (cascading)
-      await tx
-        .delete(purchaseOrderItems)
-        .where(eq(purchaseOrderItems.purchaseOrderId, id));
+      // Delete transactions linked to PO payments first
+      const poPayments = await tx.select({ id: purchaseOrderPayments.id }).from(purchaseOrderPayments).where(eq(purchaseOrderPayments.purchaseOrderId, id));
+      for (const payment of poPayments) {
+        await tx.delete(transactions).where(eq(transactions.purchaseOrderPaymentId, payment.id));
+      }
+
+      // Delete PO payments
+      await tx.delete(purchaseOrderPayments).where(eq(purchaseOrderPayments.purchaseOrderId, id));
+
+      // Delete purchase order items
+      await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
 
       // Delete the purchase order
-      await tx
-        .delete(purchaseOrders)
-        .where(eq(purchaseOrders.id, id));
+      await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
     });
   }
 
@@ -5543,28 +5903,56 @@ export class DatabaseStorage implements IStorage {
         AND issue_date <= ${endStr}
     `);
 
-    // Get other income from transactions
+    // Get other income from transactions (exclude invoice payment transactions to avoid double counting)
     const otherIncomeResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as other_income
       FROM ${transactions}
       WHERE store_id = ${storeId}
         AND type = 'income'
         AND category != 'Sales'
+        AND invoice_payment_id IS NULL
         AND date >= ${startStr}
         AND date <= ${endStr}
     `);
 
-    // Get total COGS from invoices
+    // Get total COGS from paid invoices:
+    // For self_pickup: COGS = total_amount - total_profit (profit saved at payment time)
+    // For delivery: COGS = SUM(delivery_notes.total_cost) for delivered notes
     const cogsResult = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(iib.quantity::numeric * iib.capital_cost::numeric), 0) as total_cogs
-      FROM ${invoiceItemBatches} iib
-      JOIN ${invoiceItems} ii ON iib.invoice_item_id = ii.id
-      JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE i.store_id = ${storeId}
-        AND i.status = 'paid'
-        AND i.issue_date >= ${startStr}
-        AND i.issue_date <= ${endStr}
+        COALESCE(
+          -- Self-pickup: cost = revenue - profit (stored in invoices.total_profit when paid)
+          (SELECT SUM((i.total_amount - COALESCE(i.total_profit, 0))::numeric)
+           FROM ${invoices} i
+           WHERE i.store_id = ${storeId}
+             AND i.delivery_type = 'self_pickup'
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND i.total_profit IS NOT NULL AND i.total_profit != 0),
+        0) +
+        COALESCE(
+          -- Delivery: cost from delivered delivery notes (total_cost set by FIFO allocation)
+          (SELECT SUM(dn.total_cost::numeric)
+           FROM ${deliveryNotes} dn
+           JOIN ${invoices} i ON i.id = dn.invoice_id
+           WHERE i.store_id = ${storeId}
+             AND i.status = 'paid'
+             AND i.issue_date >= ${startStr}
+             AND i.issue_date <= ${endStr}
+             AND dn.status = 'delivered'
+             AND dn.profit IS NOT NULL),
+        0) as total_cogs
+    `);
+
+    // Get return cost adjustment (batches created from returns in the period)
+    const returnCostResult = await db.execute(sql`
+      SELECT COALESCE(SUM(pb.initial_quantity::numeric * pb.capital_cost::numeric), 0) as return_cost
+      FROM ${productBatches} pb
+      WHERE pb.store_id = ${storeId}
+        AND pb.batch_number LIKE 'RTN-%'
+        AND pb.purchase_date >= ${startStr}
+        AND pb.purchase_date <= ${endStr}
     `);
 
     // Get inventory values
@@ -5577,12 +5965,13 @@ export class DatabaseStorage implements IStorage {
       WHERE pb.store_id = ${storeId}
     `);
 
-    // Get operating expenses
+    // Get operating expenses (exclude PO prepaid payments — those are already in COGS via product batches purchases)
     const operatingExpensesResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as operating_expenses
       FROM ${transactions}
       WHERE store_id = ${storeId}
         AND type = 'expense'
+        AND purchase_order_payment_id IS NULL
         AND date >= ${startStr}
         AND date <= ${endStr}
     `);
@@ -5594,7 +5983,9 @@ export class DatabaseStorage implements IStorage {
     const beginningInventory = parseFloat(inventoryResult[0]?.beginning_inventory || '0');
     const purchases = parseFloat(inventoryResult[0]?.purchases || '0');
     const endingInventory = parseFloat(inventoryResult[0]?.ending_inventory || '0');
-    const totalCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+    const grossCOGS = parseFloat(cogsResult[0]?.total_cogs || '0');
+    const returnCost = parseFloat(returnCostResult[0]?.return_cost || '0');
+    const totalCOGS = grossCOGS - returnCost;
 
     const operatingExpenses = parseFloat(operatingExpensesResult[0]?.operating_expenses || '0');
     const otherExpenses = 0; // Can be expanded later
@@ -5615,6 +6006,7 @@ export class DatabaseStorage implements IStorage {
         beginningInventory,
         purchases,
         endingInventory,
+        returnCost,
         totalCOGS
       },
       expenses: {
@@ -5884,9 +6276,9 @@ export class DatabaseStorage implements IStorage {
         p.id as product_id,
         p.name as product_name,
         pb.batch_number,
-        COALESCE(pb.base_cost, pb.cost) as capital_cost,
+        pb.capital_cost as capital_cost,
         pb.purchase_date,
-        (pb.quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
+        (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) as sold_quantity,
         COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) as avg_selling_price,
         CASE 
           WHEN COALESCE(pds.cost, 0) > 0 
@@ -5894,10 +6286,10 @@ export class DatabaseStorage implements IStorage {
           ELSE 0 
         END as profit_margin,
         CASE 
-          WHEN (pb.quantity::numeric - pb.remaining_quantity::numeric) > 0 
+          WHEN (pb.initial_quantity::numeric - pb.remaining_quantity::numeric) > 0 
           THEN (
-            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.quantity::numeric - pb.remaining_quantity::numeric)) -
-            (COALESCE(pb.base_cost, pb.cost)::numeric * (pb.quantity::numeric - pb.remaining_quantity::numeric))
+            (COALESCE(pds.revenue / NULLIF(pds.delivered_qty, 0), p.price::numeric) * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric)) -
+            (pb.capital_cost::numeric * (pb.initial_quantity::numeric - pb.remaining_quantity::numeric))
           )
           ELSE 0 
         END as total_profit
@@ -6327,6 +6719,17 @@ export class DatabaseStorage implements IStorage {
       // If return is completed (e.g., refund type), create batches for returned items
       if (returnData.status === 'completed') {
         await this.createBatchesForReturn(tx, newReturn, items);
+
+        if (returnData.returnType === 'refund' || returnData.returnType === 'immediate_refund') {
+          await tx.insert(transactions).values({
+            storeId: newReturn.storeId,
+            type: 'expense',
+            amount: newReturn.totalAmount.toString(),
+            description: `Refund Retur ${newReturn.returnNumber}`,
+            date: new Date().toISOString().split('T')[0],
+            returnId: newReturn.id
+          });
+        }
       }
 
       return newReturn;
@@ -6479,7 +6882,6 @@ export class DatabaseStorage implements IStorage {
         const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, id));
         await this.createBatchesForReturn(tx, updated, items);
 
-        // If this is a refund (not credit note), create expense transaction
         if (existingReturn.returnType === 'refund' || existingReturn.returnType === 'immediate_refund') {
           await tx.insert(transactions).values({
             storeId: existingReturn.storeId,
@@ -6492,20 +6894,41 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      if (previousStatus === 'completed' && status !== 'completed' && existingReturn) {
+        await tx.delete(transactions).where(eq(transactions.returnId, id));
+
+        if (existingReturn.returnNumber) {
+          await tx.delete(productBatches).where(
+            eq(productBatches.batchNumber, existingReturn.returnNumber)
+          );
+        }
+      }
+
       return updated;
     });
   }
 
   async deleteReturn(id: number): Promise<void> {
-    // Check if return has usages before deleting
-    const [existingReturn] = await db.select().from(returns).where(eq(returns.id, id));
-    if (existingReturn && parseFloat(existingReturn.usedAmount || '0') > 0) {
-      throw new Error("Cannot delete return with existing usages");
-    }
-    
-    await db.delete(returnItems).where(eq(returnItems.returnId, id));
-    await db.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
-    await db.delete(returns).where(eq(returns.id, id));
+    await withTransaction(async (tx) => {
+      const [existingReturn] = await tx.select().from(returns).where(eq(returns.id, id));
+      if (!existingReturn) return;
+
+      if (parseFloat(existingReturn.usedAmount || '0') > 0) {
+        throw new Error("Cannot delete return with existing usages");
+      }
+
+      await tx.delete(transactions).where(eq(transactions.returnId, id));
+
+      if (existingReturn.status === 'completed' && existingReturn.returnNumber) {
+        await tx.delete(productBatches).where(
+          eq(productBatches.batchNumber, existingReturn.returnNumber)
+        );
+      }
+
+      await tx.delete(returnItems).where(eq(returnItems.returnId, id));
+      await tx.delete(creditNoteUsages).where(eq(creditNoteUsages.returnId, id));
+      await tx.delete(returns).where(eq(returns.id, id));
+    });
   }
 
   async getNextReturnNumber(returnDate?: Date): Promise<string> {

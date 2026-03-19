@@ -428,27 +428,6 @@ export default function PurchaseOrderDetailPage({
     }
   });
 
-  // Update purchase order status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: string) => {
-      return apiRequest('PATCH', `/api/purchase-orders/${id}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders', id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
-      toast({
-        title: "Status updated",
-        description: "The purchase order status has been updated successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update status: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
 
   // Create payment mutation
   const createPaymentMutation = useMutation({
@@ -626,6 +605,11 @@ export default function PurchaseOrderDetailPage({
         
         <div className="flex flex-wrap items-center gap-2">
           {getStatusBadge(purchaseOrder.status)}
+          {purchaseOrder.isPrepaid && (
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+              Prepaid
+            </Badge>
+          )}
           
           <Button onClick={() => navigate(`/purchase-orders/${id}/edit`)} variant="outline">
             <Edit className="mr-2 h-4 w-4" />

@@ -52,6 +52,7 @@ type QuotationWithItems = {
     taxRate: string;
     taxAmount: string;
     discount: string;
+    shipping: string;
     totalAmount: string;
     notes: string;
     convertedToInvoiceId?: number;
@@ -68,6 +69,9 @@ type QuotationWithItems = {
     discount: string;
     subtotal: string;
     totalAmount: string;
+    productSku?: string;
+    productCode?: string;
+    unitLabel?: string;
   }>;
   client?: {
     id: number;
@@ -261,6 +265,14 @@ export default function QuotationDetailPage({
       }
     }
     logPrint('quotation', quotation.id, quotation.quotationNumber, `Mencetak Penawaran ${quotation.quotationNumber}`);
+    const logoImg = document.querySelector('.print-only .print-logo-image') as HTMLImageElement | null;
+    if (logoImg && !logoImg.complete) {
+      await new Promise<void>((resolve) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => resolve();
+        setTimeout(resolve, 3000);
+      });
+    }
     window.print();
   };
 
@@ -377,13 +389,13 @@ export default function QuotationDetailPage({
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).productCode || (item as any).productSku || '-'}</td>
-                  <td style={{ textAlign: 'left' }}>{item.description}</td>
-                  <td style={{ textAlign: 'center' }}>{item.quantity}</td>
-                  <td style={{ textAlign: 'center' }}>{(item as any).unitLabel || '-'}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.unitPrice))}</td>
-                  <td style={{ textAlign: 'center' }}>{formatCurrency(parseFloat(item.totalAmount))}</td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{index + 1}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip" style={{ fontSize: '7pt' }}>{item.productCode || item.productSku || '-'}</div></td>
+                  <td style={{ textAlign: 'left' }}><div className="print-cell-clip">{item.description}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.quantity}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{item.unitLabel || '-'}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrency(parseFloat(item.unitPrice))}</div></td>
+                  <td style={{ textAlign: 'center' }}><div className="print-cell-clip">{formatCurrency(parseFloat(item.totalAmount))}</div></td>
                 </tr>
               ))}
             </tbody>
@@ -406,14 +418,22 @@ export default function QuotationDetailPage({
             </div>
             
             <div className="print-footer-right">
-              <div className="print-total-row">
-                <span className="print-total-label">Subtotal</span>
-                <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
-              </div>
+              {(parseFloat(quotation.discount || '0') > 0 || parseFloat(quotation.shipping || '0') > 0) && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Subtotal</span>
+                  <span className="print-total-value">{formatCurrency(parseFloat(quotation.subtotal))}</span>
+                </div>
+              )}
               {parseFloat(quotation.discount || '0') > 0 && (
                 <div className="print-total-row">
                   <span className="print-total-label">Discount</span>
                   <span className="print-total-value">-{formatCurrency(parseFloat(quotation.discount))}</span>
+                </div>
+              )}
+              {parseFloat(quotation.shipping || '0') > 0 && (
+                <div className="print-total-row">
+                  <span className="print-total-label">Ongkos Kirim</span>
+                  <span className="print-total-value">+{formatCurrency(parseFloat(quotation.shipping))}</span>
                 </div>
               )}
               <div className="print-total-row print-total-final" style={{ backgroundColor: '#e8e8e8' }}>
@@ -607,6 +627,12 @@ export default function QuotationDetailPage({
                   <div className="flex justify-between text-green-600">
                     <span>Discount:</span>
                     <span data-testid="text-discount">-{formatCurrency(parseFloat(quotation.discount))}</span>
+                  </div>
+                )}
+                {parseFloat(quotation.shipping || '0') > 0 && (
+                  <div className="flex justify-between">
+                    <span>Ongkos Kirim:</span>
+                    <span data-testid="text-shipping">+{formatCurrency(parseFloat(quotation.shipping))}</span>
                   </div>
                 )}
                 <Separator />
