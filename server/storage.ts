@@ -179,7 +179,7 @@ export interface IStorage {
   
   // Self pickup stock deduction (when self_pickup invoice is paid)
   deductStockForSelfPickup(invoiceId: number): Promise<void>;
-  returnStockFromSelfPickup(invoiceId: number): Promise<void>;
+  returnStockFromSelfPickup(invoiceId: number, tx?: any): Promise<void>;
 
   // Purchase order payment methods (for prepaid POs)
   getPurchaseOrderPayment(paymentId: number): Promise<PurchaseOrderPayment | undefined>;
@@ -202,7 +202,7 @@ export interface IStorage {
   getNextDeliveryNoteNumber(deliveryDate?: Date, invoiceId?: number, dnItemCount?: number): Promise<string>;
   allocateStockOnDelivery(deliveryNoteId: number): Promise<void>;
   reverseDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
-  restorePendingDeliveryNoteStock(deliveryNoteId: number): Promise<void>;
+  restorePendingDeliveryNoteStock(deliveryNoteId: number, tx?: any): Promise<void>;
   revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote>;
   updateDeliveryNoteItems(deliveryNoteId: number, items: { invoiceItemId: number; deliveredQuantity: number }[]): Promise<void>;
 
@@ -1092,7 +1092,7 @@ export class DatabaseStorage implements IStorage {
         COUNT(*) as sales_count
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+      WHERE ii.product_id = ${productId} AND i.status NOT IN ('draft', 'void', 'cancelled')
     `);
 
     const totalSales = parseInt(salesResult[0]?.total_sales?.toString() || '0');
@@ -1119,7 +1119,7 @@ export class DatabaseStorage implements IStorage {
         COALESCE(SUM(CAST(ii.quantity AS DECIMAL)), 0) as total_qty
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+      WHERE ii.product_id = ${productId} AND i.status NOT IN ('draft', 'void', 'cancelled')
         AND i.issue_date IS NOT NULL
     `);
     const monthCount = parseInt(monthlyResult[0]?.month_count?.toString() || '1') || 1;
@@ -1144,7 +1144,7 @@ export class DatabaseStorage implements IStorage {
       SELECT COUNT(*) as total
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
-      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+      WHERE ii.product_id = ${productId} AND i.status NOT IN ('draft', 'void', 'cancelled')
     `);
     const total = parseInt((countResult[0] as any)?.total?.toString() || '0');
 
@@ -1162,7 +1162,7 @@ export class DatabaseStorage implements IStorage {
       FROM ${invoiceItems} ii
       JOIN ${invoices} i ON ii.invoice_id = i.id
       LEFT JOIN ${clients} c ON i.client_id = c.id
-      WHERE ii.product_id = ${productId} AND i.status != 'draft'
+      WHERE ii.product_id = ${productId} AND i.status NOT IN ('draft', 'void', 'cancelled')
       ORDER BY i.issue_date DESC
     `;
 
@@ -2057,26 +2057,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async voidInvoice(id: number): Promise<Invoice> {
-    const [invoice] = await db
-      .select()
-      .from(invoices)
-      .where(eq(invoices.id, id));
+    return withTransaction(async (tx) => {
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, id));
 
-    if (!invoice) {
-      throw new Error(`Invoice with ID ${id} not found`);
-    }
+      if (!invoice) {
+        throw new Error(`Invoice with ID ${id} not found`);
+      }
 
-    const [updatedInvoice] = await db
-      .update(invoices)
-      .set({ 
-        isVoided: true,
-        status: 'void' as any,
-        updatedAt: new Date()
-      })
-      .where(eq(invoices.id, id))
-      .returning();
+      // 1. Restore stock if self_pickup
+      if (invoice.deliveryType === 'self_pickup') {
+        // This handles both stock return and profit data reset
+        await this.returnStockFromSelfPickup(id, tx);
+      }
 
-    return updatedInvoice;
+      // 2. Restore stock for all delivery notes
+      const dns = await tx
+        .select()
+        .from(deliveryNotes)
+        .where(
+          and(
+            eq(deliveryNotes.invoiceId, id),
+            not(eq(deliveryNotes.status, 'cancelled'))
+          )
+        );
+
+      for (const dn of dns) {
+        // This restores stock to batches and resets DN profit data
+        await this.restorePendingDeliveryNoteStock(dn.id, tx);
+        // Mark DN as cancelled
+        await tx
+          .update(deliveryNotes)
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(eq(deliveryNotes.id, dn.id));
+      }
+
+      // 3. Void the invoice
+      const [updatedInvoice] = await tx
+        .update(invoices)
+        .set({ 
+          isVoided: true,
+          status: 'void' as any,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, id))
+        .returning();
+
+      return updatedInvoice;
+    });
   }
 
   async deleteInvoice(id: number): Promise<void> {
@@ -2480,15 +2510,15 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async returnStockFromSelfPickup(invoiceId: number): Promise<void> {
-    return withTransaction(async (tx) => {
+  async returnStockFromSelfPickup(invoiceId: number, tx?: any): Promise<void> {
+    const action = async (transaction: any) => {
       // Get the invoice
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+      const [invoice] = await transaction.select().from(invoices).where(eq(invoices.id, invoiceId));
       if (!invoice) {
         throw new Error(`Invoice with ID ${invoiceId} not found`);
       }
 
-      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+      const items = await transaction.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
 
       // For each item, return stock by creating adjustment batches (similar to returns)
       for (const item of items) {
@@ -2498,7 +2528,7 @@ export class DatabaseStorage implements IStorage {
         const unitCost = parseFloat(item.unitCost?.toString() || '0');
 
         // Create a new batch for the returned stock
-        await tx.insert(productBatches).values({
+        await transaction.insert(productBatches).values({
           productId: item.productId,
           storeId: invoice.storeId,
           batchNumber: `PICKUP-RETURN-INV-${invoice.invoiceNumber}`,
@@ -2510,7 +2540,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Reset invoice profit data
-      await tx
+      await transaction
         .update(invoices)
         .set({
           totalCost: '0',
@@ -2518,7 +2548,10 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(invoices.id, invoiceId));
-    });
+    };
+
+    if (tx) return action(tx);
+    return withTransaction(action);
   }
 
   // Purchase order payment methods (for prepaid POs)
@@ -3274,9 +3307,9 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async restorePendingDeliveryNoteStock(deliveryNoteId: number): Promise<void> {
-    return withTransaction(async (tx) => {
-      const [deliveryNote] = await tx.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
+  async restorePendingDeliveryNoteStock(deliveryNoteId: number, tx?: any): Promise<void> {
+    const action = async (transaction: any) => {
+      const [deliveryNote] = await transaction.select().from(deliveryNotes).where(eq(deliveryNotes.id, deliveryNoteId));
       if (!deliveryNote) {
         throw new Error(`Delivery note with ID ${deliveryNoteId} not found`);
       }
@@ -3285,15 +3318,15 @@ export class DatabaseStorage implements IStorage {
         return;
       }
 
-      const dnItems = await tx.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
+      const dnItems = await transaction.select().from(deliveryNoteItems).where(eq(deliveryNoteItems.deliveryNoteId, deliveryNoteId));
 
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
+      const [invoice] = await transaction.select().from(invoices).where(eq(invoices.id, deliveryNote.invoiceId));
       if (!invoice) {
         throw new Error(`Invoice with ID ${deliveryNote.invoiceId} not found`);
       }
 
       for (const dnItem of dnItems) {
-        const [invItem] = await tx.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
+        const [invItem] = await transaction.select().from(invoiceItems).where(eq(invoiceItems.id, dnItem.invoiceItemId));
         if (!invItem) continue;
 
         const deliveredQty = parseFloat(dnItem.deliveredQuantity.toString());
@@ -3304,11 +3337,11 @@ export class DatabaseStorage implements IStorage {
           baseDeliveredQty = deliveredQty * ratio;
         }
 
-        const [product] = await tx.select().from(products).where(eq(products.id, invItem.productId));
+        const [product] = await transaction.select().from(products).where(eq(products.id, invItem.productId));
 
         let stockItems: { productId: number; quantity: number }[] = [];
         if (product && product.productType === 'bundle') {
-          const components = await tx
+          const components = await transaction
             .select()
             .from(productBundleComponents)
             .where(eq(productBundleComponents.bundleProductId, product.id));
@@ -3323,7 +3356,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         for (const { productId: stockProductId, quantity: qtyToRestore } of stockItems) {
-          const batches = await tx
+          const batches = await transaction
             .select()
             .from(productBatches)
             .where(
@@ -3346,7 +3379,7 @@ export class DatabaseStorage implements IStorage {
             const canRestore = Math.min(remainingToRestore, totalQty - remainingQty);
 
             if (canRestore > 0) {
-              await tx
+              await transaction
                 .update(productBatches)
                 .set({
                   remainingQuantity: (remainingQty + canRestore).toString(),
@@ -3361,7 +3394,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      await tx
+      await transaction
         .update(deliveryNotes)
         .set({
           totalCost: null,
@@ -3370,7 +3403,7 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(deliveryNotes.id, deliveryNoteId));
 
-      const remainingDeliveredNotes = await tx
+      const remainingDeliveredNotes = await transaction
         .select()
         .from(deliveryNotes)
         .where(
@@ -3382,11 +3415,14 @@ export class DatabaseStorage implements IStorage {
       const newInvoiceProfit = remainingDeliveredNotes.reduce((sum, dn) => {
         return sum + parseFloat(dn.profit?.toString() || '0');
       }, 0);
-      await tx
+      await transaction
         .update(invoices)
         .set({ totalProfit: newInvoiceProfit.toString(), updatedAt: new Date() })
         .where(eq(invoices.id, deliveryNote.invoiceId));
-    });
+    };
+
+    if (tx) return action(tx);
+    return withTransaction(action);
   }
 
   async revertDeliveryNoteToPending(deliveryNoteId: number): Promise<DeliveryNote> {
