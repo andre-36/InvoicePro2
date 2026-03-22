@@ -780,6 +780,7 @@ export const paymentTermsConfig = pgTable("payment_terms_config", {
 // Import/Export Logs
 export const importExportLogs = pgTable("import_export_logs", {
   id: serial("id").primaryKey(),
+  storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
   type: varchar("type", { length: 20 }).notNull(), // import or export
   entityType: varchar("entity_type", { length: 50 }).notNull(), // products, clients, etc.
@@ -789,6 +790,11 @@ export const importExportLogs = pgTable("import_export_logs", {
   errorDetails: text("error_details"),
   completedAt: timestamp("completed_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
+  return {
+    storeIdIdx: index("import_export_logs_store_id_idx").on(table.storeId),
+    userIdIdx: index("import_export_logs_user_id_idx").on(table.userId)
+  };
 });
 
 // Returns/Credit Notes enums and tables

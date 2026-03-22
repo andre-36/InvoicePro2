@@ -333,7 +333,7 @@ export interface IStorage {
 
   // Import/Export methods
   createImportExportLog(log: InsertImportExportLog): Promise<ImportExportLog>;
-  getImportExportLogs(userId: number): Promise<ImportExportLog[]>;
+  getImportExportLogs(storeId: number): Promise<ImportExportLog[]>;
 
   // Goods Receipt methods
   getGoodsReceipt(id: number): Promise<GoodsReceipt | undefined>;
@@ -344,7 +344,7 @@ export interface IStorage {
   updateGoodsReceipt(id: number, goodsReceipt: Partial<InsertGoodsReceipt>, items?: Array<InsertGoodsReceiptItem & { id?: number, productId: number }>): Promise<GoodsReceipt>;
   updateGoodsReceiptStatus(id: number, status: string): Promise<GoodsReceipt>;
   deleteGoodsReceipt(id: number): Promise<void>;
-  getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string>;
+  getNextGoodsReceiptNumber(storeId: number, receiptDate?: Date): Promise<string>;
 
   // Goods Receipt Item methods
   updateGoodsReceiptItem(id: number, item: Partial<InsertGoodsReceiptItem>): Promise<GoodsReceiptItem>;
@@ -585,13 +585,19 @@ export type BundleComponentSales = {
 };
 
 // Helper function to generate unique numbers with retry logic for concurrency
-async function generateNextNumber(prefix: string, yearMonth: string, table: any, column: any, tx: any): Promise<string> {
+async function generateNextNumber(prefix: string, yearMonth: string, table: any, column: any, tx: any, storeId?: number): Promise<string> {
   // Find the highest number for this year-month using the transaction
   const yearMonthPrefix = `${prefix}-${yearMonth}-`;
+  
+  const conditions = [sql`${column} LIKE ${yearMonthPrefix + '%'}`];
+  if (storeId !== undefined) {
+    conditions.push(eq(table.storeId, storeId));
+  }
+
   const result = await tx
     .select({ number: column })
     .from(table)
-    .where(sql`${column} LIKE ${yearMonthPrefix + '%'}`)
+    .where(and(...conditions))
     .orderBy(sql`${column} DESC`)
     .limit(1);
 
@@ -3997,12 +4003,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getNextGoodsReceiptNumber(receiptDate?: Date): Promise<string> {
+  async getNextGoodsReceiptNumber(storeId: number, receiptDate?: Date): Promise<string> {
     const date = receiptDate || new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const yearMonth = year + month;
-    return generateNextNumber("GR", yearMonth, goodsReceipts, goodsReceipts.receiptNumber, db);
+    return generateNextNumber("GR", yearMonth, goodsReceipts, goodsReceipts.receiptNumber, db, storeId);
   }
 
   async updateGoodsReceiptItem(id: number, itemData: Partial<InsertGoodsReceiptItem>): Promise<GoodsReceiptItem> {
@@ -5544,11 +5550,11 @@ export class DatabaseStorage implements IStorage {
     return newLog;
   }
 
-  async getImportExportLogs(userId: number): Promise<ImportExportLog[]> {
+  async getImportExportLogs(storeId: number): Promise<ImportExportLog[]> {
     return db
       .select()
       .from(importExportLogs)
-      .where(eq(importExportLogs.userId, userId))
+      .where(eq(importExportLogs.storeId, storeId))
       .orderBy(desc(importExportLogs.completedAt));
   }
 
@@ -7101,13 +7107,12 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getActivityLogs(filters?: { storeId?: number; userId?: number; action?: string; entity?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ logs: ActivityLog[]; total: number }> {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 50;
+  async getActivityLogs(filters: { storeId: number; userId?: number; action?: string; entity?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ logs: ActivityLog[]; total: number }> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [];
-    if (filters?.storeId) conditions.push(eq(activityLogs.storeId, filters.storeId));
+    const conditions: any[] = [eq(activityLogs.storeId, filters.storeId)];
     if (filters?.userId) conditions.push(eq(activityLogs.userId, filters.userId));
     if (filters?.action) conditions.push(eq(activityLogs.action, filters.action));
     if (filters?.entity) conditions.push(eq(activityLogs.entity, filters.entity));

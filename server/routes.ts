@@ -4116,10 +4116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Fallback route without storeId - uses default store 1
+  // Fallback route without storeId - uses user's store
   app.get("/api/purchase-orders", requireAuth, async (req, res) => {
     try {
-      const purchaseOrders = await storage.getPurchaseOrdersWithItems(1);
+      const storeId = req.user?.storeId || 1;
+      const purchaseOrders = await storage.getPurchaseOrdersWithItems(storeId);
       res.json(purchaseOrders);
     } catch (error) {
       console.error("Error getting purchase orders:", error);
@@ -4348,11 +4349,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Purchase Order Payment routes (for prepaid POs)
   app.get(
-    "/api/purchase-orders/:purchaseOrderId/payments",
+    "/api/stores/:storeId/purchase-orders/:purchaseOrderId/payments",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const purchaseOrderId = parseInt(req.params.purchaseOrderId);
+        // We could verify if PO belongs to storeId here
         const payments =
           await storage.getPurchaseOrderPayments(purchaseOrderId);
         res.json(payments);
@@ -4364,10 +4367,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get(
-    "/api/purchase-orders/:purchaseOrderId/paid-amount",
+    "/api/stores/:storeId/purchase-orders/:purchaseOrderId/paid-amount",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const purchaseOrderId = parseInt(req.params.purchaseOrderId);
         const paidAmount =
           await storage.getPurchaseOrderPaidAmount(purchaseOrderId);
@@ -4380,10 +4384,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.post(
-    "/api/purchase-orders/:purchaseOrderId/payments",
+    "/api/stores/:storeId/purchase-orders/:purchaseOrderId/payments",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const purchaseOrderId = parseInt(req.params.purchaseOrderId);
 
         const validatedData = validateRequestBody(
@@ -4440,10 +4445,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.put(
-    "/api/purchase-orders/:purchaseOrderId/payments/:paymentId",
+    "/api/stores/:storeId/purchase-orders/:purchaseOrderId/payments/:paymentId",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
+        const purchaseOrderId = parseInt(req.params.purchaseOrderId);
         const paymentId = parseInt(req.params.paymentId);
 
         const validatedData = validateRequestBody(
@@ -4466,10 +4473,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.delete(
-    "/api/purchase-orders/:purchaseOrderId/payments/:paymentId",
+    "/api/stores/:storeId/purchase-orders/:purchaseOrderId/payments/:paymentId",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
+        const purchaseOrderId = parseInt(req.params.purchaseOrderId);
         const paymentId = parseInt(req.params.paymentId);
 
         // Delete the corresponding transaction first
@@ -4502,6 +4511,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  app.get("/api/stores/:storeId/goods-receipts/next-number", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.storeId);
+      const receiptDate = req.query.receiptDate
+        ? new Date(req.query.receiptDate as string)
+        : new Date();
+      
+      const nextNumber = await storage.getNextGoodsReceiptNumber(storeId, receiptDate);
+      res.json({ receiptNumber: nextNumber });
+    } catch (error) {
+      console.error("Error getting next goods receipt number:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.get(
     "/api/stores/:storeId/goods-receipts/pending-returns",
     requireAuth,
@@ -4521,10 +4545,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Fallback route without storeId - uses default store 1
+  // Fallback route without storeId - uses user's store
   app.get("/api/goods-receipts", requireAuth, async (req, res) => {
     try {
-      const goodsReceipts = await storage.getGoodsReceipts(1);
+      const storeId = req.user?.storeId || 1;
+      const goodsReceipts = await storage.getGoodsReceipts(storeId);
       res.json(goodsReceipts);
     } catch (error) {
       console.error("Error getting goods receipts:", error);
@@ -4890,10 +4915,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Goods Receipt Payment routes
   app.get(
-    "/api/goods-receipts/:goodsReceiptId/payments",
+    "/api/stores/:storeId/goods-receipts/:goodsReceiptId/payments",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const goodsReceiptId = parseInt(req.params.goodsReceiptId);
         const payments = await storage.getGoodsReceiptPayments(goodsReceiptId);
         res.json(payments);
@@ -4905,10 +4931,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.post(
-    "/api/goods-receipts/:goodsReceiptId/payments",
+    "/api/stores/:storeId/goods-receipts/:goodsReceiptId/payments",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const goodsReceiptId = parseInt(req.params.goodsReceiptId);
         const schema = z.object({
           paymentDate: z.string(),
@@ -4977,10 +5004,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.put(
-    "/api/goods-receipts/:goodsReceiptId/payments/:paymentId",
+    "/api/stores/:storeId/goods-receipts/:goodsReceiptId/payments/:paymentId",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
+        const goodsReceiptId = parseInt(req.params.goodsReceiptId);
         const paymentId = parseInt(req.params.paymentId);
         const schema = z.object({
           paymentDate: z.string().optional(),
@@ -5007,10 +5036,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.delete(
-    "/api/goods-receipts/:goodsReceiptId/payments/:paymentId",
+    "/api/stores/:storeId/goods-receipts/:goodsReceiptId/payments/:paymentId",
     requireAuth,
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
+        const goodsReceiptId = parseInt(req.params.goodsReceiptId);
         const paymentId = parseInt(req.params.paymentId);
 
         // Delete the corresponding transaction first
@@ -7527,7 +7558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cash-accounts", requireAuth, async (req, res) => {
     try {
-      const storeId = 1; // Default store
+      const storeId = req.user?.storeId || 1;
       const accounts = await storage.getCashAccountsWithBalance(storeId);
       res.json(accounts);
     } catch (error) {
@@ -7693,12 +7724,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Error handling middleware
   // Activity Log endpoints
   app.get(
-    "/api/activity-logs",
+    "/api/stores/:storeId/activity-logs",
     requirePermission("activity_log.view"),
     async (req, res) => {
       try {
+        const storeId = parseInt(req.params.storeId);
         const {
-          storeId,
           userId,
           action,
           entity,
@@ -7707,8 +7738,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           page,
           limit,
         } = req.query;
+
         const result = await storage.getActivityLogs({
-          storeId: storeId ? parseInt(storeId as string) : undefined,
+          storeId,
+          userId: userId ? parseInt(userId as string) : undefined,
+          action: (action as string) || undefined,
+          entity: (entity as string) || undefined,
+          dateFrom: (dateFrom as string) || undefined,
+          dateTo: (dateTo as string) || undefined,
+          page: page ? parseInt(page as string) : 1,
+          limit: limit ? parseInt(limit as string) : 50,
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error getting activity logs:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/activity-logs",
+    requirePermission("activity_log.view"),
+    async (req, res) => {
+      try {
+        const {
+          userId,
+          action,
+          entity,
+          dateFrom,
+          dateTo,
+          page,
+          limit,
+        } = req.query;
+
+        // Force storeId from user if not provided or if user is staff
+        let storeId = req.query.storeId ? parseInt(req.query.storeId as string) : (req.user?.storeId || 1);
+        
+        const result = await storage.getActivityLogs({
+          storeId,
           userId: userId ? parseInt(userId as string) : undefined,
           action: (action as string) || undefined,
           entity: (entity as string) || undefined,
