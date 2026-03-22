@@ -33,9 +33,9 @@ COPY drizzle.config.ts ./
 COPY shared ./shared
 COPY migrations ./migrations
 
-# Copy entrypoint script
+# Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 # Expose the application port
 EXPOSE 5000
