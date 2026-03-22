@@ -1145,6 +1145,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/stores/:id/identity", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.id);
+      const validatedData = validateRequestBody(
+        updateStoreIdentitySchema,
+        req,
+        res,
+      );
+      if (!validatedData) return;
+
+      const updatedStore = await storage.updateStore(storeId, validatedData);
+      res.json(updatedStore);
+    } catch (error) {
+      console.error("Error updating store identity:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/stores/:id/notes", requireAuth, async (req, res) => {
+    try {
+      const storeId = parseInt(req.params.id);
+      const schema = z.object({
+        quotationNotes: z.string().optional().nullable(),
+        invoiceNotes: z.string().optional().nullable(),
+        deliveryNoteNotes: z.string().optional().nullable(),
+        defaultNotes: z.string().optional().nullable(),
+      });
+
+      const validatedData = schema.parse(req.body);
+      const updatedStore = await storage.updateStore(storeId, validatedData);
+      res.json(updatedStore);
+    } catch (error) {
+      console.error("Error updating store notes:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   app.patch("/api/stores/:id", requireAuth, async (req, res) => {
     try {
       const storeId = parseInt(req.params.id);
@@ -1495,13 +1532,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertClientSchema, req, res);
       if (!validatedData) return;
 
-      // Add default storeId if not provided
-      const clientData = {
-        ...validatedData,
-        storeId: validatedData.storeId || 1,
-      };
+      // Inject storeId from session if not provided
+      if (!validatedData.storeId) {
+        const currentUser = req.user as any;
+        if (currentUser.storeId) {
+          validatedData.storeId = currentUser.storeId;
+        } else {
+          // Default to 1 as fallback if no storeId in user session
+          validatedData.storeId = 1;
+        }
+      }
 
-      const newClient = await storage.createClient(clientData);
+      const newClient = await storage.createClient(validatedData as any);
       res.status(201).json(newClient);
     } catch (error) {
       console.error("Error creating client:", error);
@@ -1592,13 +1634,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertSupplierSchema, req, res);
       if (!validatedData) return;
 
-      // Add default storeId if not provided
-      const supplierData = {
-        ...validatedData,
-        storeId: validatedData.storeId || 1,
-      };
+      // Inject storeId from session if not provided
+      if (!validatedData.storeId) {
+        const currentUser = req.user as any;
+        if (currentUser.storeId) {
+          validatedData.storeId = currentUser.storeId;
+        } else {
+          // Default to 1 as fallback
+          validatedData.storeId = 1;
+        }
+      }
 
-      const newSupplier = await storage.createSupplier(supplierData);
+      const newSupplier = await storage.createSupplier(validatedData as any);
       res.status(201).json(newSupplier);
     } catch (error) {
       console.error("Error creating supplier:", error);
@@ -1658,6 +1705,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get(
+    "/api/stores/:storeId/categories",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const categories = await storage.getCategories(storeId);
+        res.json(categories);
+      } catch (error) {
+        console.error("Error getting categories by store:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
   app.get("/api/categories/:id", requireAuth, async (req, res) => {
     try {
       const categoryId = parseInt(req.params.id);
@@ -1696,6 +1758,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Server error" });
     }
   });
+
+  app.post(
+    "/api/stores/:storeId/categories",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const validatedData = validateRequestBody(insertCategorySchema, req, res);
+        if (!validatedData) return;
+
+        validatedData.storeId = storeId;
+
+        const newCategory = await storage.createCategory(validatedData as any);
+        res.status(201).json(newCategory);
+      } catch (error) {
+        console.error("Error creating category by store:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
   app.put("/api/categories/:id", requireAuth, async (req, res) => {
     try {
@@ -7424,7 +7506,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res,
       );
       if (!validatedData) return;
-      const newCategory = await storage.createInflowCategory(validatedData);
+      // Inject storeId if not provided
+      if (!validatedData.storeId) {
+        const currentUser = req.user as any;
+        if (currentUser.storeId) {
+          validatedData.storeId = currentUser.storeId;
+        } else {
+          return res.status(400).json({ error: "Store ID is required" });
+        }
+      }
+
+      const newCategory = await storage.createInflowCategory(validatedData as any);
       res.status(201).json(newCategory);
     } catch (error) {
       console.error("Error creating inflow category:", error);
@@ -7501,7 +7593,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res,
       );
       if (!validatedData) return;
-      const newCategory = await storage.createOutflowCategory(validatedData);
+      // Inject storeId if not provided
+      if (!validatedData.storeId) {
+        const currentUser = req.user as any;
+        if (currentUser.storeId) {
+          validatedData.storeId = currentUser.storeId;
+        } else {
+          return res.status(400).json({ error: "Store ID is required" });
+        }
+      }
+
+      const newCategory = await storage.createOutflowCategory(validatedData as any);
       res.status(201).json(newCategory);
     } catch (error) {
       console.error("Error creating outflow category:", error);

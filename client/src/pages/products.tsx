@@ -172,7 +172,7 @@ export default function ProductsPage() {
   });
   
   const { data: categories } = useQuery<Category[]>({
-    queryKey: ['/api/categories'],
+    queryKey: [`/api/stores/${currentStoreId}/categories`],
   });
 
   const { data: currentUser } = useQuery<UserData>({

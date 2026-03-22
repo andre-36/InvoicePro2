@@ -48,11 +48,11 @@ const profileSchema = z.object({
 
 // Company settings schema
 const companySchema = z.object({
-  companyName: z.string().min(2, "Company name is required"),
-  companyTagline: z.string().optional(),
-  companyAddress: z.string().optional(),
-  companyPhone: z.string().optional(),
-  companyEmail: z.string().email("Please enter a valid email").optional().or(z.literal("")),
+  name: z.string().min(2, "Company name is required"),
+  tagline: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
   taxNumber: z.string().optional(),
   defaultTaxRate: z.string().optional(),
   logoUrl: z.string().optional(),
@@ -420,7 +420,7 @@ export default function SettingsPage() {
 
   // Fetch categories
   const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
-    queryKey: ['/api/categories'],
+    queryKey: [`/api/stores/${currentStoreId}/categories`],
   });
 
   // Fetch inflow categories
@@ -493,11 +493,11 @@ export default function SettingsPage() {
   const companyForm = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
-      companyName: "",
-      companyTagline: "",
-      companyAddress: "",
-      companyPhone: "",
-      companyEmail: "",
+      name: "",
+      tagline: "",
+      address: "",
+      phone: "",
+      email: "",
       taxNumber: "",
       defaultTaxRate: "11",
       logoUrl: "",
@@ -858,11 +858,11 @@ export default function SettingsPage() {
       if (id) {
         return apiRequest('PUT', `/api/categories/${id}`, data);
       } else {
-        return apiRequest('POST', '/api/categories', data);
+        return apiRequest('POST', `/api/stores/${currentStoreId}/categories`, data);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/categories`] });
       setIsCategoryDialogOpen(false);
       setEditingCategory(null);
       categoryForm.reset();
@@ -887,7 +887,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/categories/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/categories`] });
       setDeletingCategory(null);
       toast({
         title: "Category deleted",
@@ -1151,11 +1151,11 @@ export default function SettingsPage() {
   useEffect(() => {
     if (storeData) {
       companyForm.reset({
-        companyName: storeData.name || "",
-        companyTagline: storeData.tagline || "",
-        companyAddress: storeData.address || "",
-        companyPhone: storeData.phone || "",
-        companyEmail: storeData.email || "",
+        name: storeData.name || "",
+        tagline: storeData.tagline || "",
+        address: storeData.address || "",
+        phone: storeData.phone || "",
+        email: storeData.email || "",
         taxNumber: storeData.taxNumber || "",
         defaultTaxRate: storeData.defaultTaxRate || "11",
         logoUrl: storeData.logoUrl || "",
@@ -1741,7 +1741,7 @@ export default function SettingsPage() {
                 <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="space-y-6">
                   <FormField
                     control={companyForm.control}
-                    name="companyName"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Company Name *</FormLabel>
@@ -1755,7 +1755,7 @@ export default function SettingsPage() {
 
                   <FormField
                     control={companyForm.control}
-                    name="companyTagline"
+                    name="tagline"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tagline / Subtitle</FormLabel>
@@ -1902,7 +1902,7 @@ export default function SettingsPage() {
 
                   <FormField
                     control={companyForm.control}
-                    name="companyAddress"
+                    name="address"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Address</FormLabel>
@@ -1917,7 +1917,7 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={companyForm.control}
-                      name="companyPhone"
+                      name="phone"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Phone</FormLabel>
@@ -1931,7 +1931,7 @@ export default function SettingsPage() {
 
                     <FormField
                       control={companyForm.control}
-                      name="companyEmail"
+                      name="email"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Email</FormLabel>
