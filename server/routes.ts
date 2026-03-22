@@ -43,7 +43,7 @@ import {
   insertStockAdjustmentSchema,
   loginSchema,
   updateUserProfileSchema,
-  updateUserCompanySchema,
+  updateStoreIdentitySchema,
   updateUserPaymentSchema,
 } from "../shared/schema";
 // Import InvoiceItem type from schema
@@ -93,33 +93,6 @@ function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
-// Seed default owner if no users exist
-async function seedDefaultOwner(): Promise<void> {
-  try {
-    const allUsers = await storage.getAllUsers();
-    if (allUsers.length === 0) {
-      console.log("No users found. Creating default owner account...");
-      const hashedPassword = hashPassword("admin123");
-      await storage.createUser({
-        username: "admin",
-        password: hashedPassword,
-        fullName: "Administrator",
-        email: "admin@example.com",
-        role: "owner",
-        storeId: null,
-        phone: null,
-        permissions: [],
-        isActive: true,
-      });
-      console.log(
-        "Default owner created: username='admin', password='admin123'",
-      );
-    }
-  } catch (error) {
-    console.error("Error seeding default owner:", error);
-  }
-}
-
 // Helper function for validating request body
 function validateRequestBody<T extends z.ZodTypeAny>(
   schema: T,
@@ -142,20 +115,23 @@ function validateRequestBody<T extends z.ZodTypeAny>(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Seed default owner if no users exist
-  await seedDefaultOwner();
 
   // Session configuration with PostgreSQL store
   app.use(
     session({
+      name: env.COOKIE_NAME,
       secret: env.SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
       store: storage.sessionStore,
+      proxy: true,
       cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,
-        secure: env.NODE_ENV === "production",
+        // Set to false to allow session cookies over HTTP (standard for VPS/Docker without SSL)
+        secure: false,
+        sameSite: "lax",
+        path: "/",
       },
     }),
   );
@@ -317,18 +293,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
       });
 
-      // Auto-login the new owner
-      req.logIn(newUser, (err) => {
+      // Update the owner with the storeId
+      const updatedUser = await storage.updateUser(newUser.id, {
+        storeId: defaultStore.id,
+      });
+
+      // Auto-login the new owner with updated user data
+      req.logIn(updatedUser, (err) => {
         if (err) {
           return res.status(500).json({ error: "Authentication error" });
         }
         return res.status(201).json({
-          id: newUser.id,
-          username: newUser.username,
-          fullName: newUser.fullName,
-          role: newUser.role,
-          storeId: newUser.storeId,
-          permissions: newUser.permissions,
+          id: updatedUser.id,
+          username: updatedUser.username,
+          fullName: updatedUser.fullName,
+          role: updatedUser.role,
+          storeId: updatedUser.storeId,
+          permissions: updatedUser.permissions,
           defaultStoreId: defaultStore.id,
         });
       });
@@ -392,6 +373,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.logout(() => {
       res.json({ success: true });
     });
+  });
+
+  // User current store selection
+  app.post("/api/users/current-store", requireAuth, async (req, res) => {
+    try {
+      const { storeId } = req.body;
+      if (!storeId) {
+        return res.status(400).json({ error: "Store ID is required" });
+      }
+
+      const user = req.user as any;
+      const updatedUser = await storage.updateUser(user.id, {
+        storeId: parseInt(storeId),
+      });
+
+      req.logIn(updatedUser, (err) => {
+        if (err) {
+          return res.status(500).json({ error: "Failed to update session" });
+        }
+        res.json(updatedUser);
+      });
+    } catch (error) {
+      console.error("Error switching store:", error);
+      res.status(500).json({ error: "Server error" });
+    }
   });
 
   app.post("/api/auth/change-password", async (req, res) => {
@@ -684,26 +690,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/user/company", requireAuth, async (req, res) => {
+  app.put("/api/store/identity", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
+      if (!currentUser.storeId && currentUser.role !== "owner") {
+        return res.status(403).json({ error: "Store context required" });
+      }
+
+      // For owner, update the store they are currently managing (sent in query or body?)
+      // For now, let's assume the current storeId from the user session or a specific header
+      const storeId = currentUser.storeId; 
+
       const validatedData = validateRequestBody(
-        updateUserCompanySchema,
+        updateStoreIdentitySchema,
         req,
         res,
       );
       if (!validatedData) return;
 
-      const updatedUser = await storage.updateUser(
-        currentUser.id,
+      const updatedStore = await storage.updateStore(
+        storeId,
         validatedData,
       );
 
-      // Exclude password
-      const { password, ...userData } = updatedUser;
-      res.json(userData);
+      res.json(updatedStore);
     } catch (error) {
-      console.error("Error updating company details:", error);
+      console.error("Error updating store identity:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // Keep old endpoint for backwards compatibility during refactor
+  app.put("/api/user/company", requireAuth, async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      const storeId = currentUser.storeId;
+      if (!storeId) return res.status(400).json({ error: "No store associated" });
+
+      const validatedData = validateRequestBody(
+        updateStoreIdentitySchema,
+        req,
+        res,
+      );
+      if (!validatedData) return;
+
+      const updatedStore = await storage.updateStore(storeId, validatedData);
+      res.json(updatedStore);
+    } catch (error) {
       res.status(500).json({ error: "Server error" });
     }
   });
@@ -1073,7 +1106,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validatedData) return;
 
       const newStore = await storage.createStore(validatedData);
-      res.status(201).json(newStore);
+
+      // Associate the store with the user if they don't have one
+      const currentUser = req.user as any;
+      if (!currentUser.storeId) {
+        const updatedUser = await storage.updateUser(currentUser.id, {
+          storeId: newStore.id,
+        });
+        // Update session
+        req.logIn(updatedUser, (err) => {
+          if (err) console.error("Error updating session after store creation:", err);
+          res.status(201).json(newStore);
+        });
+      } else {
+        res.status(201).json(newStore);
+      }
     } catch (error) {
       console.error("Error creating store:", error);
       res.status(500).json({ error: "Server error" });
@@ -1594,7 +1641,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Category routes
   app.get("/api/categories", requireAuth, async (req, res) => {
     try {
-      const categories = await storage.getCategories();
+      const currentUser = req.user as any;
+      const storeId = req.query.storeId
+        ? parseInt(req.query.storeId as string)
+        : currentUser.storeId;
+
+      if (!storeId) {
+        return res.status(400).json({ error: "Store ID is required" });
+      }
+
+      const categories = await storage.getCategories(storeId);
       res.json(categories);
     } catch (error) {
       console.error("Error getting categories:", error);
@@ -1623,7 +1679,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = validateRequestBody(insertCategorySchema, req, res);
       if (!validatedData) return;
 
-      const newCategory = await storage.createCategory(validatedData);
+      // Inject storeId if not provided
+      if (!validatedData.storeId) {
+        const currentUser = req.user as any;
+        if (currentUser.storeId) {
+          validatedData.storeId = currentUser.storeId;
+        } else {
+          return res.status(400).json({ error: "Store ID is required" });
+        }
+      }
+
+      const newCategory = await storage.createCategory(validatedData as any);
       res.status(201).json(newCategory);
     } catch (error) {
       console.error("Error creating category:", error);
@@ -1666,9 +1732,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
+      const currentUser = req.user as any;
       const storeId = req.query.storeId
         ? parseInt(req.query.storeId as string)
-        : undefined;
+        : currentUser.storeId;
+        
+      if (!storeId) {
+        return res.status(400).json({ error: "Store ID is required" });
+      }
+
       const products = await storage.getProducts(storeId);
       res.json(products);
     } catch (error) {
@@ -1710,23 +1782,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", requireAuth, async (req, res) => {
     try {
+      // Inject storeId from session into body before validation
+      const currentUser = req.user as any;
+      if (currentUser.storeId && !req.body.storeId) {
+        req.body.storeId = currentUser.storeId;
+      }
+
       const validatedData = validateRequestBody(insertProductSchema, req, res);
       if (!validatedData) return;
 
-      // Check for duplicate SKU
+      // Duplicate check for SKU
+
+      // Check for duplicate SKU within the same store
       if (validatedData.sku) {
         const existingProduct = await storage.getProductBySku(
           validatedData.sku,
+          validatedData.storeId
         );
         if (existingProduct) {
           res
             .status(409)
-            .json({ error: "A product with this SKU/Code already exists" });
+            .json({ error: "A product with this SKU/Code already exists in this store" });
           return;
         }
       }
 
-      const newProduct = await storage.createProduct(validatedData);
+      const newProduct = await storage.createProduct(validatedData as any);
       res.status(201).json(newProduct);
     } catch (error) {
       console.error("Error creating product:", error);
@@ -1746,13 +1827,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check for duplicate SKU (excluding current product)
       if (validatedData.sku) {
+        const currentUser = req.user as any;
+        const currentProduct = await storage.getProduct(productId);
+        const storeId = validatedData.storeId || currentProduct?.storeId || currentUser.storeId;
+        
+        if (!storeId) {
+          return res.status(400).json({ error: "Store ID is required for validation" });
+        }
+
         const existingProduct = await storage.getProductBySku(
           validatedData.sku,
+          storeId
         );
         if (existingProduct && existingProduct.id !== productId) {
           res
             .status(409)
-            .json({ error: "A product with this SKU/Code already exists" });
+            .json({ error: "A product with this SKU/Code already exists in this store" });
           return;
         }
       }
@@ -1764,6 +1854,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedProduct);
     } catch (error) {
       console.error("Error updating product:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.delete("/api/products/bulk", requireAuth, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid product IDs" });
+      }
+      await storage.deleteProducts(ids);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error bulk deleting products:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
@@ -5716,8 +5820,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return invDate >= startDate && invDate <= endDate;
         });
 
-        // Get all products
-        const products = await storage.getProducts();
+        // Get all products for this store
+        const products = await storage.getProducts(storeId);
         const productMap = new Map(products.map((p) => [p.id, p]));
 
         // Aggregate sales by product
@@ -5932,8 +6036,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactions,
       ] = await Promise.all([
         storage.getClients(storeId),
-        storage.getProducts(),
-        storage.getCategories(),
+        storage.getProducts(storeId),
+        storage.getCategories(storeId),
         storage.getInvoices(storeId),
         storage.getQuotations(storeId),
         storage.getTransactions(storeId),
@@ -6031,7 +6135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user.role === "owner" ||
           user.permissions?.includes("products.view_lowest_price");
 
-        const products = await storage.getProducts();
+        const products = await storage.getProducts(storeId);
 
         // Get current, reserved, and available stock for each product
         const productDataWithStock = await Promise.all(
@@ -6484,7 +6588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const storeId = parseInt(req.params.storeId);
         // Get ALL products, not just those with batches in this store
-        const products = await storage.getProducts();
+        const products = await storage.getProducts(storeId);
 
         // Get pending PO quantities for all products
         const pendingPOQuantities =
@@ -6562,6 +6666,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { data } = req.body;
         const importUser = req.user as any;
+        const storeId = importUser.storeId;
+
+        if (!storeId) {
+          res.status(400).json({ error: "Store ID not found in user session" });
+          return;
+        }
+
         const importCanViewCost =
           importUser.role === "owner" ||
           importUser.permissions?.includes("products.view_cost");
@@ -6590,7 +6701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Check if product exists
-            const existingProduct = await storage.getProductBySku(sku);
+            const existingProduct = await storage.getProductBySku(sku, storeId);
 
             // Build update object only with fields that are present
             // Helper function to get value from row with multiple possible column names
@@ -6711,6 +6822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Create new product (requires minimum fields)
               const newProductData = {
                 sku,
+                storeId,
                 name: productData.name || sku,
                 description: productData.description || "",
                 currentSellingPrice: productData.currentSellingPrice || "0",
