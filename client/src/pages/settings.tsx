@@ -197,6 +197,21 @@ type PaymentTermFormData = z.infer<typeof paymentTermSchema>;
 type Store = {
   id: number;
   name: string;
+  tagline: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  taxNumber: string | null;
+  defaultTaxRate: string | null;
+  npwp: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  logoUrl: string | null;
+  quotationNotes: string | null;
+  invoiceNotes: string | null;
+  deliveryNoteNotes: string | null;
+  defaultNotes: string | null;
   invoicePaymentCategoryId: number | null;
   goodsReceiptPaymentCategoryId: number | null;
   defaultPaymentTypeId: number | null;
@@ -208,20 +223,7 @@ type UserData = {
   username: string;
   fullName: string;
   email: string;
-  companyName: string | null;
-  address: string | null;
-  phone: string | null;
-  companyTagline: string | null;
-  companyAddress: string | null;
-  companyPhone: string | null;
-  companyEmail: string | null;
-  taxNumber: string | null;
-  defaultTaxRate: string | null;
-  logoUrl: string | null;
-  quotationNotes: string | null;
-  invoiceNotes: string | null;
-  deliveryNoteNotes: string | null;
-  defaultNotes: string | null;
+  role: string;
 };
 
 type PaymentType = {
@@ -633,7 +635,7 @@ export default function SettingsPage() {
         description: "Your profile has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: `Failed to update profile: ${error.message}`,
@@ -642,22 +644,22 @@ export default function SettingsPage() {
     }
   });
 
-  // Update company details mutation
+  // Update company details mutation (now store identity)
   const companyMutation = useMutation({
     mutationFn: async (data: CompanyFormValues) => {
-      return apiRequest('PUT', '/api/user/company', data);
+      return apiRequest('PUT', `/api/stores/${currentStoreId}/identity`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}`] });
       toast({
-        title: "Company details updated",
-        description: "Your company details have been updated successfully.",
+        title: "Store identity updated",
+        description: "Branch details have been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: `Failed to update company details: ${error.message}`,
+        description: `Failed to update store details: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -675,7 +677,7 @@ export default function SettingsPage() {
         description: "Document notes updated for this branch.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: `Failed to save notes: ${error.message}`,
@@ -696,7 +698,7 @@ export default function SettingsPage() {
         description: "Your payment settings have been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: `Failed to update payment settings: ${error.message}`,
@@ -717,7 +719,7 @@ export default function SettingsPage() {
         description: "Your password has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: `Failed to update password: ${error.message}`,
@@ -1107,29 +1109,30 @@ export default function SettingsPage() {
         fullName: userData.fullName || "",
         email: userData.email || "",
         username: userData.username || "",
-        companyName: userData.companyName || "",
-        address: userData.address || "",
-        phone: userData.phone || "",
       });
-
-      companyForm.reset({
-        companyName: userData.companyName || "",
-        companyTagline: userData.companyTagline || "",
-        companyAddress: userData.companyAddress || "",
-        companyPhone: userData.companyPhone || "",
-        companyEmail: userData.companyEmail || "",
-        taxNumber: userData.taxNumber || "",
-        defaultTaxRate: userData.defaultTaxRate || "11",
-        logoUrl: userData.logoUrl || "",
-        quotationNotes: userData.quotationNotes || "",
-        invoiceNotes: userData.invoiceNotes || "",
-        deliveryNoteNotes: userData.deliveryNoteNotes || "",
-        defaultNotes: userData.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
-      });
-
       hasInitialized.current = true;
     }
-  }, [userData, profileForm, companyForm]);
+  }, [userData, profileForm]);
+
+  // Sync store data to company form
+  useEffect(() => {
+    if (storeData) {
+      companyForm.reset({
+        companyName: storeData.name || "",
+        companyTagline: storeData.tagline || "",
+        companyAddress: storeData.address || "",
+        companyPhone: storeData.phone || "",
+        companyEmail: storeData.email || "",
+        taxNumber: storeData.taxNumber || "",
+        defaultTaxRate: storeData.defaultTaxRate || "11",
+        logoUrl: storeData.logoUrl || "",
+        quotationNotes: storeData.quotationNotes || "",
+        invoiceNotes: storeData.invoiceNotes || "",
+        deliveryNoteNotes: storeData.deliveryNoteNotes || "",
+        defaultNotes: storeData.defaultNotes || "Items checked and verified upon delivery. Items cannot be returned.",
+      });
+    }
+  }, [storeData, companyForm, currentStoreId]);
 
   // Load global company settings
   useEffect(() => {
@@ -1550,18 +1553,6 @@ export default function SettingsPage() {
               <FolderOpen className="h-4 w-4" />
               <span>Categories</span>
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span>Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="stores" className="gap-2">
-              <Building className="h-4 w-4" />
-              <span>Cabang</span>
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span>Role</span>
-            </TabsTrigger>
             <TabsTrigger value="returns" className="gap-2">
               <RotateCcw className="h-4 w-4" />
               <span>Retur</span>
@@ -1605,64 +1596,65 @@ export default function SettingsPage() {
                       placeholder="Enter logo URL or upload using button"
                       className="flex-1"
                     />
-                    <ObjectUploader
-                      maxNumberOfFiles={1}
-                      maxFileSize={5242880}
-                      onGetUploadParameters={async (file) => {
-                        const responseObj = await apiRequest('POST', '/api/objects/upload', {});
-                        const response = await responseObj.json();
-                        if (!response.uploadURL) {
-                          throw new Error("No upload URL received from server");
-                        }
-                        return {
-                          method: 'PUT' as const,
-                          url: response.uploadURL,
-                        };
-                      }}
-                      onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-                        if (result.failed && result.failed.length > 0) {
-                          toast({
-                            title: "Upload failed",
-                            description: result.failed[0]?.error?.message || "Unknown error",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        if (result.successful && result.successful.length > 0) {
-                          const uploadedFile = result.successful[0];
-                          const uploadURL = (uploadedFile as any)?.uploadURL;
-                          
-                          if (uploadURL) {
-                            try {
-                              // Call /api/logo to set ACL and get public path
-                              const responseObj = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
-                              const responseData = await responseObj.json();
-                              
-                              const logoUrl = responseData.logoPath || responseData.logoURL || uploadURL;
-                              setGlobalLogoUrl(logoUrl);
-                              
-                              toast({
-                                title: "Logo uploaded",
-                                description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
-                              });
-                            } catch (error) {
-                              console.error("Error setting logo ACL:", error);
-                              // Fallback: use the upload URL without query params
-                              const urlParts = uploadURL.split('?');
-                              if (urlParts[0]) {
-                                setGlobalLogoUrl(urlParts[0]);
-                                toast({
-                                  title: "Logo uploaded",
-                                  description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
-                                });
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      <Upload className="h-4 w-4" />
-                    </ObjectUploader>
+                     <ObjectUploader
+                       maxNumberOfFiles={1}
+                       maxFileSize={5242880}
+                       onGetUploadParameters={async (file) => {
+                         const responseObj = await apiRequest('POST', '/api/objects/upload', {});
+                         const response = await responseObj.json();
+                         if (!response.uploadURL) {
+                           throw new Error("No upload URL received from server");
+                         }
+                         return {
+                           method: 'PUT' as const,
+                           url: response.uploadURL,
+                         };
+                       }}
+                       onComplete={async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                         if (result.failed && result.failed.length > 0) {
+                           toast({
+                             title: "Upload failed",
+                             description: result.failed[0]?.error?.message || "Unknown error",
+                             variant: "destructive",
+                           });
+                           return;
+                         }
+                         if (result.successful && result.successful.length > 0) {
+                           const uploadedFile = result.successful[0];
+                           const uploadURL = (uploadedFile as any)?.uploadURL;
+                           
+                           if (uploadURL) {
+                             try {
+                               // Call /api/logo to set ACL and get public path
+                               const responseObj = await apiRequest('PUT', '/api/logo', { logoURL: uploadURL });
+                               const responseData = await responseObj.json();
+                               
+                               const logoUrl = responseData.logoPath || responseData.logoURL || uploadURL;
+                               setGlobalLogoUrl(logoUrl);
+                               
+                               toast({
+                                 title: "Logo uploaded",
+                                 description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
+                               });
+                             } catch (error) {
+                               console.error("Error setting logo ACL:", error);
+                               // Fallback: use the upload URL without query params
+                               const urlParts = uploadURL.split('?');
+                               if (urlParts[0]) {
+                                 setGlobalLogoUrl(urlParts[0]);
+                                 toast({
+                                   title: "Logo uploaded",
+                                   description: "Logo berhasil diupload. Klik 'Save Branding Settings' untuk menyimpan.",
+                                 });
+                               }
+                             }
+                           }
+                         }
+                       }}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Logo
+                      </ObjectUploader>
                   </div>
                   {globalLogoUrl && (
                     <div className="flex items-center gap-4 p-4 border rounded-lg mt-2">
@@ -2673,17 +2665,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="space-y-6">
-          <UserManagement />
-        </TabsContent>
 
-        <TabsContent value="stores" className="space-y-6">
-          <StoreManagement />
-        </TabsContent>
-
-        <TabsContent value="roles" className="space-y-6">
-          <RoleManagement />
-        </TabsContent>
 
         <TabsContent value="returns" className="space-y-6">
           <Card>

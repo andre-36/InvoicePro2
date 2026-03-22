@@ -90,19 +90,20 @@ export interface IStorage {
 
   // Category methods
   getCategory(id: number): Promise<Category | undefined>;
-  getCategories(): Promise<Category[]>;
+  getCategories(storeId: number): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
 
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
-  getProductBySku(sku: string): Promise<Product | undefined>;
-  getProducts(storeId?: number): Promise<Product[]>;
+  getProductBySku(sku: string, storeId: number): Promise<Product | undefined>;
+  getProducts(storeId: number): Promise<Product[]>;
   getProductsWithLowStock(storeId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
+  deleteProducts(ids: number[]): Promise<void>;
 
   // Product dashboard methods
   getProductStats(productId: number): Promise<ProductStats>;
@@ -991,8 +992,8 @@ export class DatabaseStorage implements IStorage {
     return category;
   }
 
-  async getCategories(): Promise<Category[]> {
-    return db.select().from(categories).orderBy(categories.name);
+  async getCategories(storeId: number): Promise<Category[]> {
+    return db.select().from(categories).where(eq(categories.storeId, storeId)).orderBy(categories.name);
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
@@ -1019,41 +1020,34 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
-  async getProductBySku(sku: string): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.sku, sku));
+  async getProductBySku(sku: string, storeId: number): Promise<Product | undefined> {
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.sku, sku), eq(products.storeId, storeId)));
     return product;
   }
 
-  async getProducts(storeId?: number): Promise<Product[]> {
-    const query = db.select().from(products);
-
-    // If storeId is provided, we filter only products that have batches in the specified store
-    if (storeId) {
-      const productsInStore = await db.execute(sql`
-        SELECT DISTINCT p.*
-        FROM ${products} p
-        JOIN ${productBatches} pb ON p.id = pb.product_id
-        WHERE pb.store_id = ${storeId}
-        ORDER BY p.name
-      `);
-      return productsInStore;
-    }
-
-    return query.orderBy(products.name);
+  async getProducts(storeId: number): Promise<Product[]> {
+    return db
+      .select()
+      .from(products)
+      .where(eq(products.storeId, storeId))
+      .orderBy(products.name);
   }
 
   async getProductsWithLowStock(storeId: number): Promise<Product[]> {
     const lowStockProducts = await db.execute(sql`
       SELECT p.*, 
-             SUM(pb.remaining_quantity) as total_quantity
-      FROM ${products} p
-      JOIN ${productBatches} pb ON p.id = pb.product_id
-      WHERE pb.store_id = ${storeId} AND p.is_active = true
+             COALESCE(SUM(pb.remaining_quantity), 0) as total_quantity
+      FROM ${sql.identifier('products')} p
+      LEFT JOIN ${sql.identifier('product_batches')} pb ON p.id = pb.product_id AND pb.store_id = ${storeId}
+      WHERE p.store_id = ${storeId} AND p.is_active = true
       GROUP BY p.id
-      HAVING SUM(pb.remaining_quantity) <= p.min_stock
+      HAVING COALESCE(SUM(pb.remaining_quantity), 0) <= p.min_stock
       ORDER BY p.name
     `);
-    return lowStockProducts;
+    return lowStockProducts as any;
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
@@ -1072,6 +1066,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async deleteProducts(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.delete(products).where(inArray(products.id, ids));
   }
 
   // Product dashboard methods
@@ -5538,13 +5537,13 @@ export class DatabaseStorage implements IStorage {
     // Calculate total revenue and expenses
     const revenueResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as total
-      FROM ${transactions}
+      FROM ${sql.identifier('transactions')}
       WHERE store_id = ${storeId} AND type = 'income'
     `);
 
     const expensesResult = await db.execute(sql`
       SELECT COALESCE(SUM(amount::numeric), 0) as total
-      FROM ${transactions}
+      FROM ${sql.identifier('transactions')}
       WHERE store_id = ${storeId} AND type = 'expense'
     `);
 
@@ -5564,22 +5563,24 @@ export class DatabaseStorage implements IStorage {
       WHERE store_id = ${storeId}
     `);
 
-    // Count products
+    // Count products belonging to this store
     const productsResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT p.id) as count
-      FROM ${products} p
-      JOIN ${productBatches} pb ON p.id = pb.product_id
-      WHERE pb.store_id = ${storeId} AND p.is_active = true
+      SELECT COUNT(*) as count
+      FROM ${products}
+      WHERE store_id = ${storeId} AND is_active = true
     `);
 
-    // Count products with low stock
+    // Count products with low stock (summing batches per store)
     const lowStockResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT p.id) as count
-      FROM ${products} p
-      JOIN ${productBatches} pb ON p.id = pb.product_id
-      WHERE pb.store_id = ${storeId} AND p.is_active = true
-      GROUP BY p.id
-      HAVING SUM(pb.remaining_quantity::numeric) <= p.min_stock
+      SELECT COUNT(*) as count
+      FROM (
+        SELECT p.id
+        FROM ${products} p
+        LEFT JOIN ${productBatches} pb ON p.id = pb.product_id AND pb.store_id = ${storeId}
+        WHERE p.store_id = ${storeId} AND p.is_active = true
+        GROUP BY p.id
+        HAVING COALESCE(SUM(pb.remaining_quantity::numeric), 0) <= p.min_stock
+      ) as low_stock_products
     `);
 
     // Count sales by periods
@@ -5703,10 +5704,10 @@ export class DatabaseStorage implements IStorage {
         COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
         COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
         COUNT(DISTINCT p.id) as product_count
-      FROM ${categories} c
-      INNER JOIN ${products} p ON c.id = p.category_id
-      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
-      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      FROM ${sql.identifier('categories')} c
+      INNER JOIN ${sql.identifier('products')} p ON c.id = p.category_id
+      INNER JOIN ${sql.identifier('invoice_items')} ii ON p.id = ii.product_id
+      INNER JOIN ${sql.identifier('invoices')} i ON ii.invoice_id = i.id
       WHERE i.store_id = ${storeId} AND i.status = 'paid'
       GROUP BY c.id, c.name
       HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
@@ -5719,9 +5720,9 @@ export class DatabaseStorage implements IStorage {
         COALESCE(SUM(ii.total_amount::numeric), 0) as total_revenue,
         COALESCE(SUM(ii.quantity::numeric), 0) as total_quantity,
         COUNT(DISTINCT p.id) as product_count
-      FROM ${products} p
-      INNER JOIN ${invoiceItems} ii ON p.id = ii.product_id
-      INNER JOIN ${invoices} i ON ii.invoice_id = i.id
+      FROM ${sql.identifier('products')} p
+      INNER JOIN ${sql.identifier('invoice_items')} ii ON p.id = ii.product_id
+      INNER JOIN ${sql.identifier('invoices')} i ON ii.invoice_id = i.id
       WHERE p.category_id IS NULL AND i.store_id = ${storeId} AND i.status = 'paid'
       GROUP BY p.category_id
       HAVING COALESCE(SUM(ii.total_amount::numeric), 0) > 0
@@ -5813,9 +5814,9 @@ export class DatabaseStorage implements IStorage {
           SUM(ii.quantity::numeric) as total_sold,
           SUM(ii.total_amount::numeric) as total_revenue,
           SUM(ii.profit::numeric) as total_profit
-        FROM ${products} p
-        JOIN ${invoiceItems} ii ON p.id = ii.product_id
-        JOIN ${invoices} i ON ii.invoice_id = i.id
+        FROM ${sql.identifier('products')} p
+        JOIN ${sql.identifier('invoice_items')} ii ON p.id = ii.product_id
+        JOIN ${sql.identifier('invoices')} i ON ii.invoice_id = i.id
         WHERE i.store_id = ${storeId} AND i.status = 'paid'
         GROUP BY p.id, p.name, p.sku
       )
@@ -5858,8 +5859,8 @@ export class DatabaseStorage implements IStorage {
           THEN SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric) / SUM(pb.remaining_quantity::numeric)
           ELSE 0 
         END as average_cost
-      FROM ${productBatches} pb
-      JOIN ${products} p ON pb.product_id = p.id
+      FROM ${sql.identifier('product_batches')} pb
+      JOIN ${sql.identifier('products')} p ON pb.product_id = p.id
       WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
     `);
 
@@ -5868,9 +5869,9 @@ export class DatabaseStorage implements IStorage {
       SELECT 
         COALESCE(c.name, 'Uncategorized') as category,
         COALESCE(SUM(pb.remaining_quantity::numeric * pb.capital_cost::numeric), 0) as value
-      FROM ${productBatches} pb
-      JOIN ${products} p ON pb.product_id = p.id
-      LEFT JOIN ${categories} c ON p.category_id = c.id
+      FROM ${sql.identifier('product_batches')} pb
+      JOIN ${sql.identifier('products')} p ON pb.product_id = p.id
+      LEFT JOIN ${sql.identifier('categories')} c ON p.category_id = c.id
       WHERE pb.store_id = ${storeId} AND pb.remaining_quantity::numeric > 0
       GROUP BY c.name
       ORDER BY value DESC
@@ -6400,7 +6401,7 @@ export class DatabaseStorage implements IStorage {
         ), 0) as realized_revenue,
         COALESCE(SUM(total_cost::numeric), 0) as realized_cost,
         COALESCE(SUM(profit::numeric), 0) as realized_profit
-      FROM ${deliveryNotes} dn
+      FROM ${sql.identifier('delivery_notes')} dn
       WHERE dn.store_id = ${storeId}
         AND dn.status = 'delivered'
         AND dn.delivery_date >= ${start.toISOString().split('T')[0]}
