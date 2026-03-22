@@ -5306,9 +5306,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPaymentTerm(paymentTermData: InsertPaymentTerm): Promise<PaymentTerm> {
+    // Generate code from name if not provided
+    if (!paymentTermData.code && paymentTermData.name) {
+      paymentTermData.code = paymentTermData.name
+        .toLowerCase()
+        .replace(/[^a-z0-0]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+      
+      // If result is empty (e.g. only special characters), use a default
+      if (!paymentTermData.code) {
+        paymentTermData.code = `term_${Date.now()}`;
+      }
+    }
+
     const [newPaymentTerm] = await db
       .insert(paymentTermsConfig)
-      .values(paymentTermData)
+      .values(paymentTermData as any)
       .returning();
     return newPaymentTerm;
   }

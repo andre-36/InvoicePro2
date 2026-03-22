@@ -9,7 +9,7 @@ export const paymentStatusEnum = pgEnum('payment_status', ['unpaid', 'partial_pa
 // Invoice delivery status (calculated automatically based on delivery notes)
 export const invoiceDeliveryStatusEnum = pgEnum('invoice_delivery_status', ['undelivered', 'partial_delivered', 'delivered']);
 export const quotationStatusEnum = pgEnum('quotation_status', ['draft', 'sent', 'accepted', 'rejected', 'expired']);
-export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['pending', 'partial', 'received', 'cancelled']);
+export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', ['draft', 'pending', 'partial', 'received', 'cancelled']);
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense']);
 export const paperSizeEnum = pgEnum('paper_size', ['a4', 'prs', 'halfsize']);
 export const productTypeEnum = pgEnum('product_type', ['standard', 'bundle']);
@@ -282,8 +282,8 @@ export const productBatches = pgTable("product_batches", {
   };
 });
 
-// Payment terms enum
-export const paymentTermsEnum = pgEnum("payment_terms", ["cod", "net_7", "net_14", "net_30", "custom"]);
+// Payment terms enum (REMOVED: replaced by varchar for flexibility)
+// export const paymentTermsEnum = pgEnum("payment_terms", ["cod", "net_7", "net_14", "net_30", "custom"]);
 
 // Invoices table
 export const invoices = pgTable("invoices", {
@@ -291,7 +291,7 @@ export const invoices = pgTable("invoices", {
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
   clientId: integer("client_id").references(() => clients.id),
-  paymentTerms: paymentTermsEnum("payment_terms").default("net_30").notNull(),
+  paymentTerms: varchar("payment_terms", { length: 50 }).default("net_30").notNull(),
   issueDate: date("issue_date").notNull(),
   dueDate: date("due_date").notNull(),
   status: invoiceStatusEnum("status").default("draft").notNull(),
@@ -764,7 +764,7 @@ export const paymentTypes = pgTable("payment_types", {
 export const paymentTermsConfig = pgTable("payment_terms_config", {
   id: serial("id").primaryKey(),
   storeId: integer("store_id").references(() => stores.id, { onDelete: 'cascade' }).notNull(),
-  code: paymentTermsEnum("code").notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   days: integer("days").notNull(),
   description: text("description"),
@@ -1002,15 +1002,43 @@ export const updateUserPaymentSchema = z.object({
 });
 export const insertStoreSchema = createInsertSchema(stores).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertClientSchema = createInsertSchema(clients).omit({ id: true, clientNumber: true, createdAt: true, updatedAt: true });
-export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, supplierNumber: true, createdAt: true, updatedAt: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ 
+  id: true, 
+  clientNumber: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  storeId: z.number().optional()
+});
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ 
+  id: true, 
+  supplierNumber: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  storeId: z.number().optional()
+});
 export const insertCategorySchema = createInsertSchema(categories).omit({
   id: true,
   createdAt: true,
   updatedAt: true
+}).extend({
+  storeId: z.number().optional()
 });
-export const insertInflowCategorySchema = createInsertSchema(inflowCategories).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertOutflowCategorySchema = createInsertSchema(outflowCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInflowCategorySchema = createInsertSchema(inflowCategories).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  storeId: z.number().optional()
+});
+export const insertOutflowCategorySchema = createInsertSchema(outflowCategories).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  storeId: z.number().optional()
+});
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductBundleComponentSchema = createInsertSchema(productBundleComponents).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductUnitSchema = createInsertSchema(productUnits).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1032,7 +1060,13 @@ export const insertSettingSchema = createInsertSchema(settings).omit({ id: true,
 export const insertPrintSettingsSchema = createInsertSchema(printSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertImportExportLogSchema = createInsertSchema(importExportLogs).omit({ id: true, createdAt: true });
 export const insertPaymentTypeSchema = createInsertSchema(paymentTypes).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertPaymentTermSchema = createInsertSchema(paymentTermsConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPaymentTermSchema = createInsertSchema(paymentTermsConfig).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  code: z.string().optional()
+});
 export const insertDeliveryNoteSchema = createInsertSchema(deliveryNotes).omit({ id: true, deliveryNumber: true, createdAt: true, updatedAt: true });
 export const insertDeliveryNoteItemSchema = createInsertSchema(deliveryNoteItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReturnSchema = createInsertSchema(returns).omit({ id: true, returnNumber: true, createdAt: true, updatedAt: true });

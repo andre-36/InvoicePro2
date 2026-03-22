@@ -87,6 +87,12 @@ export default function PurchaseOrderDetailPage({
     queryKey: ['/api/user'],
   });
 
+  // Fetch store details (name, address, tagline, etc.)
+  const { data: currentStore } = useQuery<any>({
+    queryKey: [`/api/stores/${currentStoreId}`],
+    enabled: !!currentStoreId,
+  });
+
   // Print PO with A4 format using iframe
   const handlePrint = () => {
     if (!purchaseOrder) return;
@@ -270,16 +276,16 @@ export default function PurchaseOrderDetailPage({
       <body>
         <div class="header">
           <div class="logo">
-            ${currentUser?.logoUrl 
-              ? `<img src="${currentUser.logoUrl}" alt="Logo" />`
-              : `<div class="company-name">${currentUser?.companyName || 'Company Name'}</div>`
+            ${currentStore?.logoUrl 
+              ? `<img src="${currentStore.logoUrl}" alt="Logo" />`
+              : `<div class="company-name">${currentStore?.name || 'Company Name'}</div>`
             }
           </div>
           <div class="company-info">
-            <div class="company-name">${currentUser?.companyName || 'Company Name'}</div>
-            ${currentUser?.companyAddress ? `<div>${currentUser.companyAddress}</div>` : ''}
-            ${currentUser?.companyPhone ? `<div>Tel: ${currentUser.companyPhone}</div>` : ''}
-            ${currentUser?.companyEmail ? `<div>Email: ${currentUser.companyEmail}</div>` : ''}
+            <div class="company-name">${currentStore?.name || 'Company Name'}</div>
+            ${currentStore?.address ? `<div>${currentStore.address}</div>` : ''}
+            ${currentStore?.phone ? `<div>Tel: ${currentStore.phone}</div>` : ''}
+            ${currentStore?.email ? `<div>Email: ${currentStore.email}</div>` : ''}
           </div>
         </div>
 
