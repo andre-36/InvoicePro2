@@ -5481,9 +5481,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const storeId = parseInt(req.params.storeId);
         const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
         const clients = await storage.getTopClients(storeId, limit);
-        res.json(clients);
+        
+        // Transform to match frontend interface
+        const transformedClients = clients.map((client) => {
+          const names = client.name.split(" ");
+          const initials =
+            names.length > 1
+              ? `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
+              : names[0].slice(0, 2).toUpperCase();
+
+          return {
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            totalValue: client.totalSpent,
+            invoiceCount: client.invoiceCount,
+            initials,
+          };
+        });
+        
+        res.json(transformedClients);
       } catch (error) {
         console.error("Error getting top clients:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/stores/:storeId/dashboard/recent-invoices",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+        const invoices = await storage.getRecentInvoices(storeId, limit);
+
+        const transformedInvoices = await Promise.all(
+          invoices.map(async (invoice) => {
+            const client = invoice.clientId
+              ? await storage.getClient(invoice.clientId)
+              : null;
+            return {
+              id: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              clientName: client?.name || "Unknown",
+              issueDate: invoice.issueDate,
+              total: invoice.totalAmount,
+              status: invoice.status,
+            };
+          }),
+        );
+
+        res.json(transformedInvoices);
+      } catch (error) {
+        console.error("Error getting recent invoices:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/stores/:storeId/dashboard/invoice-status",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const summary = await storage.getInvoiceStatusSummary(storeId);
+        res.json(summary);
+      } catch (error) {
+        console.error("Error getting invoice status:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/stores/:storeId/dashboard/category-sales",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const data = await storage.getProductSalesByCategory(storeId);
+        res.json(data);
+      } catch (error) {
+        console.error("Error getting category sales:", error);
         res.status(500).json({ error: "Server error" });
       }
     },

@@ -271,8 +271,11 @@ function AutoTransactionSettings() {
     if (store) {
       setInvoicePaymentCategoryId(store.invoicePaymentCategoryId);
       setGoodsReceiptPaymentCategoryId(store.goodsReceiptPaymentCategoryId);
+    } else {
+      setInvoicePaymentCategoryId(null);
+      setGoodsReceiptPaymentCategoryId(null);
     }
-  }, [store]);
+  }, [store, currentStoreId]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -1094,6 +1097,34 @@ export default function SettingsPage() {
       });
     },
   });
+
+  // Reset forms and selection states on store change to avoid showing stale data from previous store while loading
+  useEffect(() => {
+    // Clear selections
+    setSelectedTypeId(null);
+    setSelectedTermId(null);
+    setEditingTypeId(null);
+    setEditingTermId(null);
+    setEditingCategory(null);
+    setDeletingCategory(null);
+    setEditingInflowCategory(null);
+    setDeletingInflowCategory(null);
+    setEditingOutflowCategory(null);
+    setDeletingOutflowCategory(null);
+    setEditingCashAccount(null);
+    setDeletingCashAccount(null);
+    setDeletingTransfer(null);
+    
+    // Reset forms to their initial default empty states
+    companyForm.reset();
+    notesForm.reset();
+    inflowCategoryForm.reset();
+    outflowCategoryForm.reset();
+    cashAccountForm.reset();
+    transferForm.reset();
+    typeForm.reset();
+    termForm.reset();
+  }, [currentStoreId, companyForm, notesForm, inflowCategoryForm, outflowCategoryForm, cashAccountForm, transferForm, typeForm, termForm]);
 
   // Reset hasInitialized when component unmounts (so it reinitializes when user navigates back)
   useEffect(() => {
