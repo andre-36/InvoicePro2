@@ -435,12 +435,14 @@ export default function SettingsPage() {
 
   // Fetch cash accounts
   const { data: cashAccounts, isLoading: cashAccountsLoading } = useQuery<CashAccountWithBalance[]>({
-    queryKey: ['/api/cash-accounts'],
+    queryKey: [`/api/stores/${currentStoreId}/cash-accounts`],
+    enabled: !!currentStoreId,
   });
 
   // Fetch account transfers
   const { data: accountTransfers, isLoading: transfersLoading } = useQuery<AccountTransfer[]>({
-    queryKey: ['/api/account-transfers'],
+    queryKey: [`/api/stores/${currentStoreId}/account-transfers`],
+    enabled: !!currentStoreId,
   });
 
   // Fetch store settings (key-value)
@@ -1010,10 +1012,10 @@ export default function SettingsPage() {
       if (id) {
         return apiRequest('PUT', `/api/cash-accounts/${id}`, payload);
       }
-      return apiRequest('POST', '/api/cash-accounts', payload);
+      return apiRequest('POST', `/api/stores/${currentStoreId}/cash-accounts`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/cash-accounts`] });
       setEditingCashAccount(null);
       setCashAccountDialogOpen(false);
       cashAccountForm.reset();
@@ -1036,7 +1038,7 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/cash-accounts/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/cash-accounts`] });
       setDeletingCashAccount(null);
       toast({
         title: "Cash account deleted",
@@ -1055,11 +1057,11 @@ export default function SettingsPage() {
   // Account transfer mutation
   const transferMutation = useMutation({
     mutationFn: async (data: AccountTransferFormData) => {
-      return apiRequest('POST', '/api/account-transfers', data);
+      return apiRequest('POST', `/api/stores/${currentStoreId}/account-transfers`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/account-transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/account-transfers`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/cash-accounts`] });
       setTransferDialogOpen(false);
       transferForm.reset();
       toast({
@@ -1081,8 +1083,8 @@ export default function SettingsPage() {
       return apiRequest('DELETE', `/api/account-transfers/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/account-transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/cash-accounts'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/account-transfers`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${currentStoreId}/cash-accounts`] });
       setDeletingTransfer(null);
       toast({
         title: "Transfer deleted",
