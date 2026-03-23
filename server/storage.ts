@@ -253,7 +253,7 @@ export interface IStorage {
   // Preview number generation methods
   getNextInvoiceNumber(issueDate?: Date): Promise<string>;
   getNextQuotationNumber(): Promise<string>;
-  getNextPurchaseOrderNumber(orderDate?: Date): Promise<string>;
+  getNextPurchaseOrderNumber(storeId: number, orderDate?: Date): Promise<string>;
   getNextClientNumber(): Promise<string>;
   getNextSupplierNumber(): Promise<string>;
 
@@ -3679,7 +3679,10 @@ export class DatabaseStorage implements IStorage {
 
   async createGoodsReceipt(goodsReceiptData: InsertGoodsReceipt, items: Array<InsertGoodsReceiptItem & { productId: number }>): Promise<GoodsReceipt> {
     return withTransaction(async (tx) => {
-      const receiptNumber = await this.getNextGoodsReceiptNumber(goodsReceiptData.receiptDate ? new Date(goodsReceiptData.receiptDate) : undefined);
+      const receiptNumber = await this.getNextGoodsReceiptNumber(
+        goodsReceiptData.storeId, 
+        goodsReceiptData.receiptDate ? new Date(goodsReceiptData.receiptDate) : undefined
+      );
 
       const receiptValues: any = {
         ...goodsReceiptData,
@@ -3850,7 +3853,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const updateData: any = { status: newStatus as any, updatedAt: new Date() };
-      if (newStatus === 'received') updateData.deliveredDate = new Date();
+      if (newStatus === 'received') updateData.deliveredDate = new Date().toISOString().split('T')[0];
 
       await tx.update(purchaseOrders)
         .set(updateData)
@@ -4591,7 +4594,7 @@ export class DatabaseStorage implements IStorage {
       const month = (orderDate.getMonth() + 1).toString().padStart(2, '0');
       const yearMonth = year + month;
 
-      const purchaseOrderNumber = await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
+      const purchaseOrderNumber = await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx, purchaseOrderData.storeId);
 
       // Create purchase order
       const [newPurchaseOrder] = await tx
@@ -4671,7 +4674,9 @@ export class DatabaseStorage implements IStorage {
     };
 
     if (deliveredDate) {
-      updateData.deliveredDate = deliveredDate;
+      updateData.deliveredDate = deliveredDate instanceof Date 
+        ? deliveredDate.toISOString().split('T')[0] 
+        : deliveredDate;
     }
 
     const [updatedPurchaseOrder] = await db
@@ -4801,7 +4806,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       if (newStatus === 'received') {
-        updateData.deliveredDate = new Date();
+        updateData.deliveredDate = new Date().toISOString().split('T')[0];
       }
 
       const [updatedPurchaseOrder] = await tx
@@ -4874,7 +4879,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       if (newStatus === 'received') {
-        updateData.deliveredDate = new Date();
+        updateData.deliveredDate = new Date().toISOString().split('T')[0];
       }
 
       await tx
@@ -6641,7 +6646,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getNextPurchaseOrderNumber(orderDate?: Date): Promise<string> {
+  async getNextPurchaseOrderNumber(storeId: number, orderDate?: Date): Promise<string> {
     try {
       const currentDate = orderDate || new Date();
       const year = currentDate.getFullYear().toString().slice(-2);
@@ -6651,7 +6656,7 @@ export class DatabaseStorage implements IStorage {
       console.log('Generating purchase order number for yearMonth:', yearMonth);
 
       return withTransaction(async (tx) => {
-        return await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx);
+        return await generateNextNumber("PO", yearMonth, purchaseOrders, purchaseOrders.purchaseOrderNumber, tx, storeId);
       });
     } catch (error) {
       console.error('Error in getNextPurchaseOrderNumber:', error);
