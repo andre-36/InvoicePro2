@@ -933,8 +933,6 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                           <TableHead className="w-[150px]">Linked PO</TableHead>
                           <TableHead className="w-[80px] text-right">Qty</TableHead>
                           <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
-                          <TableHead className="w-[70px] text-right">Tax %</TableHead>
-                          <TableHead className="w-[80px] text-right">Discount</TableHead>
                           <TableHead className="w-[100px] text-right">Subtotal</TableHead>
                           <TableHead className="w-[40px]"></TableHead>
                         </TableRow>
@@ -1061,25 +1059,7 @@ export default function GoodsReceiptForm({ goodsReceiptId, onSuccess, mode = goo
                                 />
                               )}
                             </TableCell>
-                            <TableCell className="p-1">
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                value={item.taxRate} 
-                                onChange={(e) => updateItem(index, 'taxRate', e.target.value)} 
-                                className="h-8 text-right" 
-                                readOnly={!!item.purchaseOrderId}
-                              />
-                            </TableCell>
-                            <TableCell className="p-1">
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                value={item.discount} 
-                                onChange={(e) => updateItem(index, 'discount', e.target.value)} 
-                                className="h-8 text-right" 
-                              />
-                            </TableCell>
+
                             <TableCell className="p-1 text-right font-medium">
                               {formatCurrency(item.subtotal || "0")}
                             </TableCell>

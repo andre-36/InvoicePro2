@@ -2093,11 +2093,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // All pending PO items list (for PO list "By Item" view)
   app.get(
-    "/api/purchase-orders/pending-items",
+    "/api/stores/:storeId/purchase-orders/pending-items",
     requireAuth,
     async (req, res) => {
       try {
-        const storeId = parseInt(req.query.storeId as string) || 1;
+        const storeId = parseInt(req.params.storeId);
+        if (isNaN(storeId)) {
+          return res.status(400).json({ error: "Invalid store ID" });
+        }
         const pendingItems = await storage.getPendingPOItemsList(storeId);
         res.json(pendingItems);
       } catch (error) {
@@ -4189,7 +4192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const storeId = parseInt(req.params.storeId);
-        const purchaseOrders = await storage.getPurchaseOrders(storeId);
+        const purchaseOrders = await storage.getPurchaseOrdersWithItems(storeId);
         res.json(purchaseOrders);
       } catch (error) {
         console.error("Error getting purchase orders:", error);
@@ -4198,178 +4201,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Fallback route without storeId - uses user's store
-  app.get("/api/purchase-orders", requireAuth, async (req, res) => {
-    try {
-      const storeId = req.user?.storeId || 1;
-      const purchaseOrders = await storage.getPurchaseOrdersWithItems(storeId);
-      res.json(purchaseOrders);
-    } catch (error) {
-      console.error("Error getting purchase orders:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
   // Get next purchase order number preview - MUST be before /:id route
-  app.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
-    try {
-      const orderDate = req.query.orderDate
-        ? new Date(req.query.orderDate as string)
-        : new Date();
-      const nextNumber = await storage.getNextPurchaseOrderNumber(orderDate);
-      res.json({ purchaseOrderNumber: nextNumber });
-    } catch (error) {
-      console.error("Error getting next purchase order number:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
-  app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
-    try {
-      const purchaseOrderId = parseInt(req.params.id);
-      const result = await storage.getPurchaseOrderWithItems(purchaseOrderId);
-
-      if (!result) {
-        return res.status(404).json({ error: "Purchase order not found" });
+  app.get(
+    "/api/stores/:storeId/purchase-orders/next-number",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const orderDate = req.query.orderDate
+          ? new Date(req.query.orderDate as string)
+          : new Date();
+        const nextNumber = await storage.getNextPurchaseOrderNumber(
+          storeId,
+          orderDate,
+        );
+        res.json({ purchaseOrderNumber: nextNumber });
+      } catch (error) {
+        console.error("Error getting next purchase order number:", error);
+        res.status(500).json({ error: "Server error" });
       }
+    },
+  );
 
-      // Calculate received quantities from Goods Receipts for each PO item
-      const receivedQuantitiesMap =
-        await storage.getReceivedQuantitiesForPO(purchaseOrderId);
+  app.get(
+    "/api/stores/:storeId/purchase-orders/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const result = await storage.getPurchaseOrderWithItems(purchaseOrderId);
 
-      // Update items with calculated received quantities
-      const itemsWithReceivedQty = result.items.map((item) => ({
-        ...item,
-        receivedQuantity: receivedQuantitiesMap.get(item.productId) || "0",
-      }));
+        if (!result) {
+          return res.status(404).json({ error: "Purchase order not found" });
+        }
 
-      // Return a flattened object with purchaseOrder fields and items array
-      res.json({
-        ...result.purchaseOrder,
-        items: itemsWithReceivedQty,
-      });
-    } catch (error) {
-      console.error("Error getting purchase order:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+        // Calculate received quantities from Goods Receipts for each PO item
+        const receivedQuantitiesMap =
+          await storage.getReceivedQuantitiesForPO(purchaseOrderId);
 
-  app.post("/api/purchase-orders", requireAuth, async (req, res) => {
-    try {
-      const schema = z.object({
-        purchaseOrder: insertPurchaseOrderSchema,
-        items: z.array(
-          z.object({
-            description: z.string(),
-            productId: z.number(),
-            productUnitId: z.number().nullable().optional(),
-            quantity: z.union([z.string(), z.number()]),
-            baseQuantity: z
-              .union([z.string(), z.number()])
-              .nullable()
-              .optional(),
-            unitCost: z.union([z.string(), z.number()]),
-            baseCost: z.union([z.string(), z.number()]).nullable().optional(),
-            taxRate: z.union([z.string(), z.number()]).optional(),
-            taxAmount: z.union([z.string(), z.number()]).optional(),
-            discount: z.union([z.string(), z.number()]).optional(),
-            subtotal: z.union([z.string(), z.number()]),
-            totalAmount: z.union([z.string(), z.number()]),
-          }),
-        ),
-      });
+        // Update items with calculated received quantities
+        const itemsWithReceivedQty = result.items.map((item) => ({
+          ...item,
+          receivedQuantity: receivedQuantitiesMap.get(item.productId) || "0",
+        }));
 
-      const validatedData = validateRequestBody(schema, req, res);
-      if (!validatedData) return;
+        // Return a flattened object with purchaseOrder fields and items array
+        res.json({
+          ...result.purchaseOrder,
+          items: itemsWithReceivedQty,
+        });
+      } catch (error) {
+        console.error("Error getting purchase order:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
-      const poWithCreator = {
-        ...validatedData.purchaseOrder,
-        createdByName: req.user?.fullName || req.user?.username || null,
-      };
+  app.post(
+    "/api/stores/:storeId/purchase-orders",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const schema = z.object({
+          purchaseOrder: insertPurchaseOrderSchema,
+          items: z.array(
+            z.object({
+              description: z.string(),
+              productId: z.number(),
+              productUnitId: z.number().nullable().optional(),
+              quantity: z.union([z.string(), z.number()]),
+              baseQuantity: z
+                .union([z.string(), z.number()])
+                .nullable()
+                .optional(),
+              unitCost: z.union([z.string(), z.number()]),
+              baseCost: z.union([z.string(), z.number()]).nullable().optional(),
+              taxRate: z.union([z.string(), z.number()]).optional(),
+              taxAmount: z.union([z.string(), z.number()]).optional(),
+              discount: z.union([z.string(), z.number()]).optional(),
+              subtotal: z.union([z.string(), z.number()]),
+              totalAmount: z.union([z.string(), z.number()]),
+            }),
+          ),
+        });
 
-      const newPurchaseOrder = await storage.createPurchaseOrder(
-        poWithCreator,
-        validatedData.items,
-      );
-      logActivity(req, {
-        action: "create",
-        entity: "purchase_order",
-        entityId: newPurchaseOrder.id,
-        entityLabel: newPurchaseOrder.purchaseOrderNumber,
-        description: `Membuat Purchase Order ${newPurchaseOrder.purchaseOrderNumber}${newPurchaseOrder.supplierName ? ` ke ${newPurchaseOrder.supplierName}` : ""}`,
-      });
+        const validatedData = validateRequestBody(schema, req, res);
+        if (!validatedData) return;
 
-      res.status(201).json(newPurchaseOrder);
-    } catch (error) {
-      console.error("Error creating purchase order:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+        const poWithCreator = {
+          ...validatedData.purchaseOrder,
+          storeId,
+          createdByName: req.user?.fullName || req.user?.username || null,
+        };
 
-  app.put("/api/purchase-orders/:id", requireAuth, async (req, res) => {
-    try {
-      const purchaseOrderId = parseInt(req.params.id);
-      const schema = z.object({
-        purchaseOrder: insertPurchaseOrderSchema.partial(),
-        items: z.array(
-          z.object({
-            id: z.number().optional(),
-            description: z.string(),
-            productId: z.number().nullable(),
-            productUnitId: z.number().nullable().optional(),
-            quantity: z.union([z.string(), z.number()]),
-            baseQuantity: z
-              .union([z.string(), z.number()])
-              .nullable()
-              .optional(),
-            unitCost: z.union([z.string(), z.number()]),
-            baseCost: z.union([z.string(), z.number()]).nullable().optional(),
-            taxRate: z.union([z.string(), z.number()]).optional(),
-            taxAmount: z.union([z.string(), z.number()]).optional(),
-            discount: z.union([z.string(), z.number()]).optional(),
-            subtotal: z.union([z.string(), z.number()]),
-            totalAmount: z.union([z.string(), z.number()]),
-          }),
-        ),
-      });
+        const newPurchaseOrder = await storage.createPurchaseOrder(
+          poWithCreator,
+          validatedData.items,
+        );
+        logActivity(req, {
+          action: "create",
+          storeId,
+          entity: "purchase_order",
+          entityId: newPurchaseOrder.id,
+          entityLabel: newPurchaseOrder.purchaseOrderNumber,
+          description: `Membuat Purchase Order ${newPurchaseOrder.purchaseOrderNumber}${newPurchaseOrder.supplierName ? ` ke ${newPurchaseOrder.supplierName}` : ""}`,
+        });
 
-      const validatedData = validateRequestBody(schema, req, res);
-      if (!validatedData) return;
+        res.status(201).json(newPurchaseOrder);
+      } catch (error) {
+        console.error("Error creating purchase order:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
-      const updatedPurchaseOrder = await storage.updatePurchaseOrder(
-        purchaseOrderId,
-        validatedData.purchaseOrder,
-        validatedData.items,
-      );
+  app.put(
+    "/api/stores/:storeId/purchase-orders/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const schema = z.object({
+          purchaseOrder: insertPurchaseOrderSchema.partial(),
+          items: z.array(
+            z.object({
+              id: z.number().optional(),
+              description: z.string(),
+              productId: z.number().nullable(),
+              productUnitId: z.number().nullable().optional(),
+              quantity: z.union([z.string(), z.number()]),
+              baseQuantity: z
+                .union([z.string(), z.number()])
+                .nullable()
+                .optional(),
+              unitCost: z.union([z.string(), z.number()]),
+              baseCost: z.union([z.string(), z.number()]).nullable().optional(),
+              taxRate: z.union([z.string(), z.number()]).optional(),
+              taxAmount: z.union([z.string(), z.number()]).optional(),
+              discount: z.union([z.string(), z.number()]).optional(),
+              subtotal: z.union([z.string(), z.number()]),
+              totalAmount: z.union([z.string(), z.number()]),
+            }),
+          ),
+        });
 
-      res.json(updatedPurchaseOrder);
-    } catch (error) {
-      console.error("Error updating purchase order:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+        const validatedData = validateRequestBody(schema, req, res);
+        if (!validatedData) return;
 
-  app.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
-    try {
-      const purchaseOrderId = parseInt(req.params.id);
-      const poForDel = await storage.getPurchaseOrder(purchaseOrderId);
-      await storage.deletePurchaseOrder(purchaseOrderId);
-      logActivity(req, {
-        action: "delete",
-        entity: "purchase_order",
-        entityId: purchaseOrderId,
-        entityLabel: poForDel?.purchaseOrderNumber,
-        description: `Menghapus Purchase Order ${poForDel?.purchaseOrderNumber || purchaseOrderId}`,
-      });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting purchase order:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+        const updatedPurchaseOrder = await storage.updatePurchaseOrder(
+          purchaseOrderId,
+          validatedData.purchaseOrder,
+          validatedData.items,
+        );
+
+        res.json(updatedPurchaseOrder);
+      } catch (error) {
+        console.error("Error updating purchase order:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/stores/:storeId/purchase-orders/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const purchaseOrderId = parseInt(req.params.id);
+        const poForDel = await storage.getPurchaseOrder(purchaseOrderId);
+        await storage.deletePurchaseOrder(purchaseOrderId);
+        logActivity(req, {
+          action: "delete",
+          storeId,
+          entity: "purchase_order",
+          entityId: purchaseOrderId,
+          entityLabel: poForDel?.purchaseOrderNumber,
+          description: `Menghapus Purchase Order ${poForDel?.purchaseOrderNumber || purchaseOrderId}`,
+        });
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error deleting purchase order:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
   app.patch(
-    "/api/purchase-orders/:id/status",
+    "/api/stores/:storeId/purchase-orders/:id/status",
     requireAuth,
     async (req, res) => {
       try {
@@ -4400,7 +4420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Receive purchase order items route
   app.post(
-    "/api/purchase-orders/:id/receive",
+    "/api/stores/:storeId/purchase-orders/:id/receive",
     requireAuth,
     async (req, res) => {
       try {
@@ -4652,53 +4672,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/goods-receipts/:id", requireAuth, async (req, res) => {
-    try {
-      const receiptId = parseInt(req.params.id);
-      const goodsReceipt = await storage.getGoodsReceiptWithItems(receiptId);
+  app.get(
+    "/api/stores/:storeId/goods-receipts/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const receiptId = parseInt(req.params.id);
+        const goodsReceipt = await storage.getGoodsReceiptWithItems(receiptId);
 
-      if (!goodsReceipt) {
-        return res.status(404).json({ error: "Goods receipt not found" });
+        if (!goodsReceipt) {
+          return res.status(404).json({ error: "Goods receipt not found" });
+        }
+
+        res.json(goodsReceipt);
+      } catch (error) {
+        console.error("Error getting goods receipt:", error);
+        res.status(500).json({ error: "Server error" });
       }
+    },
+  );
 
-      res.json(goodsReceipt);
-    } catch (error) {
-      console.error("Error getting goods receipt:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+  app.post(
+    "/api/stores/:storeId/goods-receipts",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const schema = z.object({
+          goodsReceipt: insertGoodsReceiptSchema,
+          items: z.array(
+            z.object({
+              productId: z.number(),
+              purchaseOrderId: z.number().nullable().optional(),
+              purchaseOrderItemId: z.number().nullable().optional(),
+              description: z.string(),
+              quantity: z.union([z.string(), z.number()]),
+              unitCost: z.union([z.string(), z.number()]),
+              baseCost: z.union([z.string(), z.number()]).nullable().optional(),
+              baseQuantity: z
+                .union([z.string(), z.number()])
+                .nullable()
+                .optional(),
+              taxRate: z.union([z.string(), z.number()]).optional(),
+              taxAmount: z.union([z.string(), z.number()]).optional(),
+              discount: z.union([z.string(), z.number()]).optional(),
+              subtotal: z.union([z.string(), z.number()]),
+              totalAmount: z.union([z.string(), z.number()]),
+              returnQuantity: z.union([z.string(), z.number()]).optional(),
+              returnReason: z.string().optional(),
+              returnStatus: z.enum(["none", "pending", "returned"]).optional(),
+            }),
+          ),
+        });
 
-  app.post("/api/goods-receipts", requireAuth, async (req, res) => {
-    try {
-      const schema = z.object({
-        goodsReceipt: insertGoodsReceiptSchema,
-        items: z.array(
-          z.object({
-            productId: z.number(),
-            purchaseOrderId: z.number().nullable().optional(),
-            purchaseOrderItemId: z.number().nullable().optional(),
-            description: z.string(),
-            quantity: z.union([z.string(), z.number()]),
-            unitCost: z.union([z.string(), z.number()]),
-            baseCost: z.union([z.string(), z.number()]).nullable().optional(),
-            baseQuantity: z
-              .union([z.string(), z.number()])
-              .nullable()
-              .optional(),
-            taxRate: z.union([z.string(), z.number()]).optional(),
-            taxAmount: z.union([z.string(), z.number()]).optional(),
-            discount: z.union([z.string(), z.number()]).optional(),
-            subtotal: z.union([z.string(), z.number()]),
-            totalAmount: z.union([z.string(), z.number()]),
-            returnQuantity: z.union([z.string(), z.number()]).optional(),
-            returnReason: z.string().optional(),
-            returnStatus: z.enum(["none", "pending", "returned"]).optional(),
-          }),
-        ),
-      });
-
-      const validatedData = validateRequestBody(schema, req, res);
-      if (!validatedData) return;
+        const validatedData = validateRequestBody(schema, req, res);
+        if (!validatedData) return;
 
       // Validate over-receipt: aggregate qty per PO item, must not exceed remaining
       const poItemAggregated = new Map<string, { totalQty: number, purchaseOrderId: number, purchaseOrderItemId: number, description: string }>();
@@ -4737,7 +4765,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Convert all Date objects to strings (drizzle-zod coerces date columns to Date objects)
-      const grData = { ...validatedData.goodsReceipt } as any;
+      const grData = { 
+        ...validatedData.goodsReceipt,
+        storeId 
+      } as any;
       for (const key of Object.keys(grData)) {
         if (grData[key] instanceof Date) {
           grData[key] = grData[key].toISOString().split("T")[0];
@@ -4829,41 +4860,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/goods-receipts/:id", requireAuth, async (req, res) => {
-    try {
-      const receiptId = parseInt(req.params.id);
-      const schema = z.object({
-        goodsReceipt: insertGoodsReceiptSchema.partial(),
-        items: z
-          .array(
-            z.object({
-              id: z.number().optional(),
-              productId: z.number(),
-              purchaseOrderId: z.number().nullable().optional(),
-              purchaseOrderItemId: z.number().nullable().optional(),
-              description: z.string(),
-              quantity: z.union([z.string(), z.number()]),
-              unitCost: z.union([z.string(), z.number()]),
-              baseCost: z.union([z.string(), z.number()]).nullable().optional(),
-              baseQuantity: z
-                .union([z.string(), z.number()])
-                .nullable()
-                .optional(),
-              taxRate: z.union([z.string(), z.number()]).optional(),
-              taxAmount: z.union([z.string(), z.number()]).optional(),
-              discount: z.union([z.string(), z.number()]).optional(),
-              subtotal: z.union([z.string(), z.number()]),
-              totalAmount: z.union([z.string(), z.number()]),
-              returnQuantity: z.union([z.string(), z.number()]).optional(),
-              returnReason: z.string().optional(),
-              returnStatus: z.enum(["none", "pending", "returned"]).optional(),
-            }),
-          )
-          .optional(),
-      });
+  app.put(
+    "/api/stores/:storeId/goods-receipts/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const receiptId = parseInt(req.params.id);
+        const schema = z.object({
+          goodsReceipt: insertGoodsReceiptSchema.partial(),
+          items: z
+            .array(
+              z.object({
+                id: z.number().optional(),
+                productId: z.number(),
+                purchaseOrderId: z.number().nullable().optional(),
+                purchaseOrderItemId: z.number().nullable().optional(),
+                description: z.string(),
+                quantity: z.union([z.string(), z.number()]),
+                unitCost: z.union([z.string(), z.number()]),
+                baseCost: z.union([z.string(), z.number()]).nullable().optional(),
+                baseQuantity: z
+                  .union([z.string(), z.number()])
+                  .nullable()
+                  .optional(),
+                taxRate: z.union([z.string(), z.number()]).optional(),
+                taxAmount: z.union([z.string(), z.number()]).optional(),
+                discount: z.union([z.string(), z.number()]).optional(),
+                subtotal: z.union([z.string(), z.number()]),
+                totalAmount: z.union([z.string(), z.number()]),
+                returnQuantity: z.union([z.string(), z.number()]).optional(),
+                returnReason: z.string().optional(),
+                returnStatus: z.enum(["none", "pending", "returned"]).optional(),
+              }),
+            )
+            .optional(),
+        });
 
-      const validatedData = validateRequestBody(schema, req, res);
-      if (!validatedData) return;
+        const validatedData = validateRequestBody(schema, req, res);
+        if (!validatedData) return;
 
       if (validatedData.items) {
         const existingGR = await storage.getGoodsReceiptWithItems(receiptId);
@@ -4910,9 +4945,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const grUpdateData = { ...validatedData.goodsReceipt };
+      for (const key of Object.keys(grUpdateData)) {
+        if ((grUpdateData as any)[key] instanceof Date) {
+          (grUpdateData as any)[key] = (grUpdateData as any)[key]
+            .toISOString()
+            .split("T")[0];
+        }
+      }
+
       const updatedGoodsReceipt = await storage.updateGoodsReceipt(
         receiptId,
-        validatedData.goodsReceipt,
+        grUpdateData,
         validatedData.items,
       );
 
@@ -4923,52 +4967,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/goods-receipts/:id", requireAuth, async (req, res) => {
-    try {
-      const receiptId = parseInt(req.params.id);
-      const grForDel = await storage.getGoodsReceipt(receiptId);
-      await storage.deleteGoodsReceipt(receiptId);
-      logActivity(req, {
-        action: "delete",
-        entity: "goods_receipt",
-        entityId: receiptId,
-        entityLabel: grForDel?.receiptNumber,
-        description: `Menghapus Penerimaan Barang ${grForDel?.receiptNumber || receiptId}`,
-      });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting goods receipt:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+  app.delete(
+    "/api/stores/:storeId/goods-receipts/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const receiptId = parseInt(req.params.id);
+        const grForDel = await storage.getGoodsReceipt(receiptId);
+        await storage.deleteGoodsReceipt(receiptId);
+        logActivity(req, {
+          action: "delete",
+          storeId,
+          entity: "goods_receipt",
+          entityId: receiptId,
+          entityLabel: grForDel?.receiptNumber,
+          description: `Menghapus Penerimaan Barang ${grForDel?.receiptNumber || receiptId}`,
+        });
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error deleting goods receipt:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
-  app.patch("/api/goods-receipts/:id/status", requireAuth, async (req, res) => {
-    try {
-      const receiptId = parseInt(req.params.id);
-      const schema = z.object({
-        status: z.enum([
-          "draft",
-          "confirmed",
-          "partial_paid",
-          "paid",
-          "cancelled",
-        ]),
-      });
+  app.patch(
+    "/api/stores/:storeId/goods-receipts/:id/status",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const storeId = parseInt(req.params.storeId);
+        const receiptId = parseInt(req.params.id);
+        const schema = z.object({
+          status: z.enum([
+            "draft",
+            "confirmed",
+            "partial_paid",
+            "paid",
+            "cancelled",
+          ]),
+        });
 
-      const validatedData = validateRequestBody(schema, req, res);
-      if (!validatedData) return;
+        const validatedData = validateRequestBody(schema, req, res);
+        if (!validatedData) return;
 
-      const updatedGoodsReceipt = await storage.updateGoodsReceiptStatus(
-        receiptId,
-        validatedData.status,
-      );
+        const updatedGoodsReceipt = await storage.updateGoodsReceiptStatus(
+          receiptId,
+          validatedData.status,
+        );
 
-      res.json(updatedGoodsReceipt);
-    } catch (error) {
-      console.error("Error updating goods receipt status:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+        res.json(updatedGoodsReceipt);
+      } catch (error) {
+        console.error("Error updating goods receipt status:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
 
   // Goods Receipt Item update (for return tracking)
   app.patch("/api/goods-receipt-items/:id", requireAuth, async (req, res) => {
