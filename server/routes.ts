@@ -6202,22 +6202,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
 
-          // Only count invoices in range for stats
-          const invDate = new Date(inv.issueDate);
-          if (invDate >= startDate && invDate <= endDate) {
-            clientStats[inv.clientId].invoiceCount++;
-            clientStats[inv.clientId].totalPurchase += parseFloat(
-              inv.totalAmount || "0",
-            );
-
-            if (
-              !clientStats[inv.clientId].lastPurchaseDate ||
-              inv.issueDate > clientStats[inv.clientId].lastPurchaseDate!
-            ) {
-              clientStats[inv.clientId].lastPurchaseDate = inv.issueDate;
-            }
-          }
-
           // Calculate outstanding for all time
           const payments = await storage.getInvoicePayments(inv.id);
           const paymentTotal = payments.reduce(
@@ -6229,6 +6213,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const outstanding = parseFloat(inv.totalAmount || "0") - paymentTotal;
           if (outstanding > 0) {
             clientStats[inv.clientId].outstanding += outstanding;
+          }
+
+          // Only count fully paid invoices in range for stats
+          const invDate = new Date(inv.issueDate);
+          if (invDate >= startDate && invDate <= endDate && outstanding <= 0) {
+            clientStats[inv.clientId].invoiceCount++;
+            clientStats[inv.clientId].totalPurchase += parseFloat(
+              inv.totalAmount || "0",
+            );
+
+            if (
+              !clientStats[inv.clientId].lastPurchaseDate ||
+              inv.issueDate > clientStats[inv.clientId].lastPurchaseDate!
+            ) {
+              clientStats[inv.clientId].lastPurchaseDate = inv.issueDate;
+            }
           }
         }
 
