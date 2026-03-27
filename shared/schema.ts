@@ -946,6 +946,7 @@ export const AVAILABLE_PERMISSIONS = [
   'returns.create',
   'returns.edit',
   'returns.delete',
+  'returns.print',
   'transactions.view',
   'transactions.create',
   'transactions.edit',
