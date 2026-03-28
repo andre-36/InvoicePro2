@@ -2522,6 +2522,15 @@ export class DatabaseStorage implements IStorage {
             const deductFromBatch = Math.min(remainingToDeduct, remaining);
             itemCost += deductFromBatch * capitalCost;
 
+            // Track which batch was used and its cost
+            await tx.insert(invoiceItemBatches).values({
+              invoiceItemId: item.id,
+              batchId: batch.id,
+              quantity: deductFromBatch.toString(),
+              capitalCost: capitalCost.toString(),
+              createdAt: new Date()
+            });
+
             const newReserved = Math.max(0, reserved - deductFromBatch);
             const newRemaining = remaining - deductFromBatch;
 
@@ -2529,7 +2538,7 @@ export class DatabaseStorage implements IStorage {
               .update(productBatches)
               .set({
                 remainingQuantity: newRemaining.toString(),
-                reservedQuantity: newReserved.toString(),
+                reservedQuantity: newRemaining < newReserved ? newRemaining.toString() : newReserved.toString(), // Hardening reserve sync
                 updatedAt: new Date()
               })
               .where(eq(productBatches.id, batch.id));
@@ -3126,6 +3135,15 @@ export class DatabaseStorage implements IStorage {
 
             const quantityFromBatch = Math.min(remainingToAllocate, remaining);
             totalCost += quantityFromBatch * capitalCost;
+
+            // Track which batch was used and its cost for this delivery
+            await tx.insert(invoiceItemBatches).values({
+              invoiceItemId: invItem.id,
+              batchId: batch.id,
+              quantity: quantityFromBatch.toString(),
+              capitalCost: capitalCost.toString(),
+              createdAt: new Date()
+            });
 
             const newRemaining = remaining - quantityFromBatch;
             const reservedReduction = Math.min(reserved, quantityFromBatch);
@@ -6058,8 +6076,8 @@ export class DatabaseStorage implements IStorage {
       FROM ${productBatches} pb
       WHERE pb.store_id = ${storeId}
         AND pb.batch_number LIKE 'RTN-%'
-        AND pb.purchase_date >= ${startStr}
-        AND pb.purchase_date <= ${endStr}
+        AND pb.created_at >= ${startStr}
+        AND pb.created_at <= ${endStr}
     `);
 
     // Get inventory values
@@ -6888,40 +6906,79 @@ export class DatabaseStorage implements IStorage {
         baseQtyToStock = qtyToStock * ratio;
       }
 
-      // Get the unit cost from the most recent batch for this product (capitalCost field)
-      let returnCost = 0;
-      
-      const existingBatches = await tx
+      // 1. Get which batches were sold for this invoice item (FIFO)
+      const soldBatches = await tx
         .select()
-        .from(productBatches)
-        .where(
-          and(
-            eq(productBatches.productId, invoiceItem.productId),
-            eq(productBatches.storeId, invoice.storeId)
-          )
-        )
-        .orderBy(desc(productBatches.purchaseDate))
-        .limit(1);
-      
-      if (existingBatches.length > 0) {
-        returnCost = parseFloat(existingBatches[0].capitalCost?.toString() || '0');
-      }
+        .from(invoiceItemBatches)
+        .where(eq(invoiceItemBatches.invoiceItemId, item.invoiceItemId))
+        .orderBy(desc(invoiceItemBatches.createdAt)); // Most recent sales first for return
 
-      // Create a new batch only for the delivered portion being returned
-      const batchNumber = returnRecord.returnNumber;
-      await tx.insert(productBatches).values({
-        productId: invoiceItem.productId,
-        storeId: invoice.storeId,
-        batchNumber,
-        capitalCost: returnCost.toString(),
-        initialQuantity: baseQtyToStock.toString(),
-        remainingQuantity: baseQtyToStock.toString(),
-        reservedQuantity: '0',
-        purchaseDate: returnRecord.returnDate,
-        notes: `Return dari ${returnRecord.returnNumber}`,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      let remainingToRestock = baseQtyToStock;
+
+      for (const soldBatch of soldBatches) {
+        if (remainingToRestock <= 0) break;
+
+        const soldQty = parseFloat(soldBatch.quantity);
+        const qtyFromThisBatch = Math.min(remainingToRestock, soldQty);
+        
+        // Find the original batch to get its purchase date
+        const [originalBatch] = await tx
+          .select()
+          .from(productBatches)
+          .where(eq(productBatches.id, soldBatch.batchId));
+        
+        const returnCost = parseFloat(soldBatch.capitalCost);
+        const originalPurchaseDate = originalBatch?.purchaseDate || returnRecord.returnDate;
+
+        // Create a new return batch inheriting original properties to maintain FIFO order
+        await tx.insert(productBatches).values({
+          productId: invoiceItem.productId,
+          storeId: invoice.storeId,
+          batchNumber: `${returnRecord.returnNumber}-${soldBatch.batchId}`,
+          capitalCost: returnCost.toString(),
+          initialQuantity: qtyFromThisBatch.toString(),
+          remainingQuantity: qtyFromThisBatch.toString(),
+          reservedQuantity: '0',
+          purchaseDate: originalPurchaseDate, // Use original purchase date to restore FIFO position
+          notes: `Return dari ${returnRecord.returnNumber} (Original Batch: ${originalBatch?.batchNumber || 'N/A'})`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+
+        remainingToRestock -= qtyFromThisBatch;
+      }
+      
+      // If there's still quantity to restock but no matching sold batches (should be rare)
+      if (remainingToRestock > 0) {
+        // Fallback to most recent batch cost and current date
+        const existingBatches = await tx
+          .select()
+          .from(productBatches)
+          .where(
+            and(
+              eq(productBatches.productId, invoiceItem.productId),
+              eq(productBatches.storeId, invoice.storeId)
+            )
+          )
+          .orderBy(desc(productBatches.purchaseDate))
+          .limit(1);
+        
+        const fallbackCost = existingBatches.length > 0 ? existingBatches[0].capitalCost : '0';
+
+        await tx.insert(productBatches).values({
+          productId: invoiceItem.productId,
+          storeId: invoice.storeId,
+          batchNumber: returnRecord.returnNumber,
+          capitalCost: fallbackCost.toString(),
+          initialQuantity: remainingToRestock.toString(),
+          remainingQuantity: remainingToRestock.toString(),
+          reservedQuantity: '0',
+          purchaseDate: returnRecord.returnDate,
+          notes: `Return dari ${returnRecord.returnNumber} (Fallback Cost)`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
     }
   }
 
