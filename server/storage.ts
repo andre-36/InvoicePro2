@@ -804,6 +804,51 @@ export class DatabaseStorage implements IStorage {
       .set({ ...storeData, updatedAt: new Date() })
       .where(eq(stores.id, id))
       .returning();
+
+    // If auto-transaction categories changed, sync existing automatic transactions
+    if (storeData.invoicePaymentCategoryId !== undefined || storeData.goodsReceiptPaymentCategoryId !== undefined) {
+      try {
+        if (storeData.invoicePaymentCategoryId !== undefined) {
+          let categoryName = "invoice_payment";
+          if (storeData.invoicePaymentCategoryId) {
+            const cat = await this.getInflowCategory(storeData.invoicePaymentCategoryId);
+            if (cat) categoryName = cat.name;
+          }
+          
+          // Bulk update all income transactions linked to invoice payments for this store
+          await db.update(transactions)
+            .set({ category: categoryName })
+            .where(and(
+              eq(transactions.storeId, id),
+              sql`${transactions.invoicePaymentId} IS NOT NULL`
+            ));
+          
+          console.log(`Bulk synced invoice payment transactions for store ${id} to category: ${categoryName}`);
+        }
+
+        if (storeData.goodsReceiptPaymentCategoryId !== undefined) {
+          let categoryName = "goods_receipt_payment";
+          if (storeData.goodsReceiptPaymentCategoryId) {
+            const cat = await this.getOutflowCategory(storeData.goodsReceiptPaymentCategoryId);
+            if (cat) categoryName = cat.name;
+          }
+
+          // Bulk update all expense transactions linked to goods receipt payments for this store
+          await db.update(transactions)
+            .set({ category: categoryName })
+            .where(and(
+              eq(transactions.storeId, id),
+              sql`${transactions.goodsReceiptPaymentId} IS NOT NULL`
+            ));
+
+          console.log(`Bulk synced goods receipt payment transactions for store ${id} to category: ${categoryName}`);
+        }
+      } catch (syncError) {
+        console.error("Error during bulk transaction category sync:", syncError);
+        // We don't throw here to avoid failing the whole store update
+      }
+    }
+
     return updatedStore;
   }
 

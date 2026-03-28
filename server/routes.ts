@@ -2926,7 +2926,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               throw depositError;
             }
           } else {
-            // Only create transaction for non-credit-note payments (actual cash receipts)
             // Lookup payment type to get cash account and deduction percentage
             const paymentType = await storage.getPaymentTypeByName(
               invoice.storeId,
@@ -2947,47 +2946,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Check if store has auto transaction setting for invoice payments
             const store = await storage.getStore(invoice.storeId);
             const inflowCategoryId = store?.invoicePaymentCategoryId;
-
-            // Only create transaction if category is configured
+            
+            // Get category name
+            let categoryName = "invoice_payment"; // Fallback name
             if (inflowCategoryId) {
-              // Get category name
-              const inflowCategory =
-                await storage.getInflowCategory(inflowCategoryId);
-              const categoryName = inflowCategory?.name || "invoice_payment";
-
-              // Get client name for description
-              let clientName = "";
-              if (invoice.clientId) {
-                const client = await storage.getClient(invoice.clientId);
-                clientName = client?.name || "";
+              const inflowCategory = await storage.getInflowCategory(inflowCategoryId);
+              if (inflowCategory) {
+                categoryName = inflowCategory.name;
               }
-
-              // Create a transaction entry for this payment as income
-              const transactionData: any = {
-                storeId: invoice.storeId,
-                type: "income" as const,
-                category: categoryName,
-                amount: netAmount.toFixed(2),
-                date: validatedData.paymentDate,
-                description:
-                  deductionAmount > 0
-                    ? `Payment for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
-                    : `Payment received for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""}`,
-                referenceNumber: `Invoice #${invoice.invoiceNumber}`,
-                invoicePaymentId: newPayment.id,
-              };
-
-              // Link to cash account if payment type has one
-              if (paymentType?.cashAccountId) {
-                transactionData.accountId = paymentType.cashAccountId;
-              }
-
-              console.log(
-                "Creating invoice payment transaction:",
-                transactionData,
-              );
-              await storage.createTransaction(transactionData);
             }
+
+            // Get client name for description
+            let clientName = "";
+            if (invoice.clientId) {
+              const client = await storage.getClient(invoice.clientId);
+              clientName = client?.name || "";
+            }
+
+            // Create a transaction entry for this payment as income
+            const transactionData: any = {
+              storeId: invoice.storeId,
+              type: "income" as const,
+              category: categoryName,
+              amount: netAmount.toFixed(2),
+              date: validatedData.paymentDate,
+              description:
+                deductionAmount > 0
+                  ? `Payment for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""} (${validatedData.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
+                  : `Payment received for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""}`,
+              referenceNumber: `Invoice #${invoice.invoiceNumber}`,
+              invoicePaymentId: newPayment.id,
+            };
+
+            // Link to cash account if payment type has one
+            if (paymentType?.cashAccountId) {
+              transactionData.accountId = paymentType.cashAccountId;
+            }
+
+            console.log(
+              "Creating invoice payment transaction:",
+              transactionData,
+            );
+            await storage.createTransaction(transactionData);
           }
         }
 
@@ -3030,6 +3030,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentId,
           validatedData,
         );
+
+        // Synchronize changes to the linked transaction if amount, date, or payment type changed
+        if (validatedData.amount || validatedData.paymentDate || validatedData.paymentType) {
+          try {
+            const invoiceId = parseInt(req.params.invoiceId);
+            const invoice = await storage.getInvoice(invoiceId);
+            
+            if (invoice) {
+              // Recalculate net amount based on payment type rules
+              const paymentType = await storage.getPaymentTypeByName(
+                invoice.storeId,
+                updatedPayment.paymentType,
+              );
+
+              const paymentAmount = parseFloat(updatedPayment.amount);
+              let netAmount = paymentAmount;
+              if (paymentType?.deductionPercentage) {
+                const deductionPct = parseFloat(paymentType.deductionPercentage);
+                netAmount = paymentAmount - (paymentAmount * (deductionPct / 100));
+              }
+
+              // Get store inflow category for the name
+              const store = await storage.getStore(invoice.storeId);
+              let categoryName = "invoice_payment";
+              if (store?.invoicePaymentCategoryId) {
+                const inflowCategory = await storage.getInflowCategory(store.invoicePaymentCategoryId);
+                if (inflowCategory) categoryName = inflowCategory.name;
+              }
+
+              const client = invoice.clientId ? await storage.getClient(invoice.clientId) : null;
+              const clientName = client?.name || "";
+
+              // Update the linked transaction
+              const transactions = await storage.getTransactions(invoice.storeId);
+              const linkedTx = transactions.find(t => t.invoicePaymentId === paymentId);
+              
+              if (linkedTx) {
+                await storage.updateTransaction(linkedTx.id, {
+                  amount: netAmount.toFixed(2),
+                  date: updatedPayment.paymentDate,
+                  category: categoryName, // Ensure category is also synced in case it was changed in settings
+                  accountId: paymentType?.cashAccountId || linkedTx.accountId,
+                  description: netAmount < paymentAmount
+                    ? `Payment for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""} (${updatedPayment.paymentType}, net after ${paymentType?.deductionPercentage}% fee)`
+                    : `Payment received for invoice ${invoice.invoiceNumber}${clientName ? ` - ${clientName}` : ""}`,
+                });
+              }
+            }
+          } catch (syncError) {
+            console.error("Error syncing transaction on payment update:", syncError);
+            // Non-blocking for the payment update itself
+          }
+        }
+
         res.json(updatedPayment);
       } catch (error) {
         console.error("Error updating invoice payment:", error);
@@ -5101,10 +5155,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             supplierName = supplier?.name || "";
           }
 
+          // Check if store has auto transaction setting for GR payments
+          const store = await storage.getStore(goodsReceipt.storeId);
+          const outflowCategoryId = store?.goodsReceiptPaymentCategoryId;
+
+          // Get category name
+          let categoryName = "goods_receipt_payment"; // Fallback name
+          if (outflowCategoryId) {
+            const outflowCategory = await storage.getOutflowCategory(outflowCategoryId);
+            if (outflowCategory) {
+              categoryName = outflowCategory.name;
+            }
+          }
+
           // Create an expense transaction for this payment
           const transactionData: any = {
             storeId: goodsReceipt.storeId,
             type: "expense" as const,
+            category: categoryName,
             amount: String(validatedData.amount),
             date: validatedData.paymentDate,
             description: `Pembayaran GR: ${goodsReceipt.receiptNumber}${supplierName ? ` - ${supplierName}` : ""}`,
@@ -5164,6 +5232,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentId,
           validatedData,
         );
+
+        // Synchronize changes to the linked transaction if amount, date or account changed
+        if (validatedData.amount || validatedData.paymentDate || validatedData.cashAccountId) {
+          try {
+            const goodsReceipt = await storage.getGoodsReceipt(goodsReceiptId);
+            if (goodsReceipt) {
+              const transactions = await storage.getTransactions(goodsReceipt.storeId);
+              const linkedTx = transactions.find(t => t.goodsReceiptPaymentId === paymentId);
+              
+              if (linkedTx) {
+                // Get store outflow category for the name
+                const store = await storage.getStore(goodsReceipt.storeId);
+                let categoryName = "goods_receipt_payment";
+                if (store?.goodsReceiptPaymentCategoryId) {
+                  const outflowCategory = await storage.getOutflowCategory(store.goodsReceiptPaymentCategoryId);
+                  if (outflowCategory) categoryName = outflowCategory.name;
+                }
+
+                await storage.updateTransaction(linkedTx.id, {
+                  amount: String(updatedPayment.amount),
+                  date: updatedPayment.paymentDate,
+                  category: categoryName, // Sync category name in case it changed in settings
+                  accountId: updatedPayment.cashAccountId || linkedTx.accountId,
+                });
+              }
+            }
+          } catch (syncError) {
+            console.error("Error syncing GR transaction on payment update:", syncError);
+          }
+        }
         res.json(updatedPayment);
       } catch (error) {
         console.error("Error updating goods receipt payment:", error);
